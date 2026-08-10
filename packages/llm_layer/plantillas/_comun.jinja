@@ -1,0 +1,88 @@
+{# ===========================================================================
+   Macros compartidas por todas las plantillas de causa.
+   Regla de oro: aquí NO se calcula nada. Cada cifra que se imprime es un campo
+   de DatosPlantilla, es decir, un valor del FactSet ya formateado.
+   Castellano de Lima, trato de usted, tono de persona y no de manual. Tres reglas:
+     · Se dice "recibo". Nunca "factura": en atención a personas, la factura es el
+       documento de una empresa y aleja al cliente del texto.
+     · Se dice "monto", no "importe"; "costo", no "coste"; "le llegó más caro", no
+       "presentó un incremento".
+     · **"Cancelar" no se usa jamás.** En Perú cancelar significa PAGAR ("ya cancelé
+       mi recibo"), así que escribirlo con el sentido de anular se entiende al revés.
+       Para lo otro se dice "dar de baja"; para el pago, "pagar" o "ponerse al día".
+   =========================================================================== #}
+
+{% macro apertura(d) -%}
+{% if d.subio %}
+Su recibo de {{ d.mes_actual }} le llegó {{ d.delta_abs }} más caro que el de {{ d.mes_previo }}
+{% elif d.bajo %}
+Su recibo de {{ d.mes_actual }} le llegó {{ d.delta_abs }} más barato que el de {{ d.mes_previo }}
+{% else %}
+Su recibo de {{ d.mes_actual }} se mantiene igual que el de {{ d.mes_previo }}
+{% endif %}
+{%- endmacro %}
+
+{% macro totales(d) -%}
+Pasó de {{ d.total_previo }} a {{ d.total_actual }}.
+{%- endmacro %}
+
+{% macro deuda_frase(d) -%}
+{% if d.tiene_deuda %}
+Además, usted arrastra un saldo pendiente de {{ d.deuda_anterior }} de recibos anteriores, así que el total a pagar le queda en {{ d.total_a_pagar }}.
+{% endif %}
+{%- endmacro %}
+
+{% macro efervescente(d) -%}
+{% if d.beneficios %}
+Recuerde que su plan ya incluye {{ d.beneficios|join(" y ") }}, sin costo adicional.
+{% endif %}
+{%- endmacro %}
+
+{# Cuando en el mismo recibo conviven una causa que sube y otra que baja, el neto por sí
+   solo engaña: "subió S/ 20.82 por el cambio de plan" es falso si el cambio de plan
+   ahorró S/ 32.26 y lo que subió fue el fin de un descuento. Estas dos macros separan
+   los signos y cierran con el neto, en ese orden. #}
+{% macro contraste(d) -%}
+{% if d.signos_mixtos and d.causa_que_ahorra %}
+A la vez, {{ d.causa_que_ahorra.etiqueta }} jugó a su favor y le ahorró {{ d.causa_que_ahorra.monto }} en este mismo recibo.
+{% endif %}
+{%- endmacro %}
+
+{% macro neto(d) -%}
+{% if d.signos_mixtos %}
+{% if d.subio %}Sumando y restando, su recibo quedó {{ d.delta_abs }} más caro que el de {{ d.mes_previo }}.{% elif d.bajo %}Sumando y restando, su recibo quedó {{ d.delta_abs }} más barato que el de {{ d.mes_previo }}.{% else %}Sumando y restando, su recibo quedó igual que el de {{ d.mes_previo }}.{% endif %}
+{% endif %}
+{%- endmacro %}
+
+{% macro cierre_estandar(d) -%}
+{{ neto(d) }} {{ deuda_frase(d) }} {{ efervescente(d) }} Si gusta, le muestro el detalle línea por línea o lo paso con un asesor.
+{%- endmacro %}
+
+{% macro frase_generica(d, c) -%}
+{{ c.etiqueta|capitalize }}: {% if c.sube %}le suma {{ c.monto }} en este recibo{% else %}le descuenta {{ c.monto }} en este recibo, a su favor{% endif %}.
+{%- endmacro %}
+
+{% macro frase_residual_std(d) -%}
+El resto de la diferencia son conceptos menores del recibo, sin cambios que valga la pena detallar.
+{%- endmacro %}
+
+{% macro tabla_tramos(d) -%}
+{% if d.tramos %}
+El mes se le cobró por tramos: {% for t in d.tramos %}{{ t.etiqueta }}, {{ t.dias }} días con tarifa de {{ t.tarifa }}{% if t.suspendido %} (servicio cortado, no se le cobró){% else %}, equivalente a {{ t.prorrateado }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}. El ciclo completo tiene {{ d.dias_ciclo }} días.
+{% endif %}
+{%- endmacro %}
+
+{#
+   El signo manda, no solo la clase. Una línea NUEVA puede ser un cargo (el paquete que
+   contrató) o un abono (el ajuste retroactivo a su favor cuando se pasa a un plan más
+   barato), y una línea que DESAPARECE puede ser un cargo que se fue —el recibo baja— o
+   un descuento que se venció —el recibo sube—. Decir "aparece por S/ 12.26" de un abono
+   de S/ 12.26, o "ya no se le cobra" de un descuento, es contar la verdad al revés
+   aunque la cifra esté anclada. `l.sube` es delta > 0, así que separa los cuatro casos
+   sin necesidad de mirar la familia del concepto.
+#}
+{% macro lista_lineas(d) -%}
+{% if d.lineas %}
+Lo que se movió en su recibo: {% for l in d.lineas %}{{ l.nombre }} {% if l.es_nuevo and l.sube %}aparece por {{ l.delta }}{% elif l.es_nuevo %}aparece a su favor por {{ l.delta }}{% elif l.desaparecio and l.sube %}ya no se le aplica, eran {{ l.delta }}{% elif l.desaparecio %}ya no se le cobra, eran {{ l.delta }}{% elif l.sube %}le sube {{ l.delta }}{% else %}le baja {{ l.delta }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.
+{% endif %}
+{%- endmacro %}

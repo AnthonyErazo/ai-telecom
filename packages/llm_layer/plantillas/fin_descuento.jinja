@@ -1,0 +1,40 @@
+{# Promoción vencida: el cliente no compró nada, simplemente se acabó el descuento.
+   Es la causa que más sensación de "cobro indebido" genera, así que se explica sin
+   rodeos y se ofrece revisar alternativas.
+
+   Esta plantilla cubre también el caso compuesto que motivó la corrección de la
+   atribución causal: un cambio de plan que MATA la promoción atada al plan anterior.
+   Ahí conviven dos causas de signo contrario y el orden importa: primero se nombra la
+   que SUBIÓ el recibo (el fin del descuento), después se reconoce explícitamente el
+   ahorro del cambio de plan, y solo al final se da el neto. Decirlo al revés —"su
+   recibo subió porque cambió de plan"— es aritméticamente compatible y narrativamente
+   falso. #}
+{% from "_comun.jinja" import apertura, totales, contraste, cierre_estandar, frase_generica, frase_residual_std, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }} porque se le venció el descuento que tenía y volvió al precio de lista.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{% if c.causa == "FIN_DESCUENTO" %}
+Se le terminó un descuento de {{ c.monto }}: la promoción llegó a su última mensualidad y ya no figura en este recibo.
+{% elif c.causa == "CAMBIO_PLAN" and not c.sube %}
+A la vez, cambió a un plan más barato, lo que le ahorró {{ c.monto }} entre la renta del mes que viene y el ajuste de los días ya cobrados.
+{% elif c.causa == "CAMBIO_PLAN" %}
+El cambio de plan explica {{ c.monto }} más: se juntan el ajuste de los días del mes en curso y la renta del mes que viene.
+{% else %}
+{{ frase_generica(d, c) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Las promociones se contratan por un tiempo pactado. Cuando ese tiempo se acaba, el descuento deja de aplicarse y el plan vuelve a cobrarse a su precio de lista. Usted no contrató nada nuevo ni le cobraron nada de más: lo que pasó es que se le venció el beneficio. {{ contraste(d) }} {{ lista_lineas(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

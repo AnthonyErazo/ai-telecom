@@ -1,0 +1,67 @@
+# recibo-claro — dependencias de ejecución
+#
+# La fuente de verdad es `pyproject.toml`. Este fichero existe para quien clone el
+# repositorio y prefiera `pip install -r requirements.txt` sin instalar el paquete.
+# Si edita uno, edite el otro: no hay generación automática.
+#
+#   Instalación mínima:   pip install -r requirements.txt
+#   Con todo:             pip install -r requirements-dev.txt
+#
+# Solo licencias permisivas (MIT / Apache-2.0 / BSD / PSF). Prohibido GPL/AGPL:
+# BASES §9 cede la propiedad intelectual a Integratel, y una dependencia con licencia
+# restringida le impediría desplegar la solución sin negociar con un tercero.
+
+# --- API y modelo de datos ---------------------------------------------------
+fastapi>=0.115,<1.0             # MIT
+uvicorn[standard]>=0.30,<1.0    # BSD-3
+pydantic>=2.9,<3.0              # MIT
+pydantic-settings>=2.4,<3.0     # MIT
+
+# --- Persistencia ------------------------------------------------------------
+# Solo se persiste el índice vectorial del RAG. Sin base de datos la API responde
+# exactamente lo mismo: únicamente pierde el índice entre reinicios.
+sqlalchemy>=2.0,<3.0            # MIT
+psycopg[binary]>=3.2,<4.0       # LGPL-3.0: uso como biblioteca sin modificar ni enlazar
+                                # estáticamente, que es el supuesto que la LGPL permite
+                                # sin propagar la licencia al código propio
+
+# --- Recuperación y plantillas ----------------------------------------------
+jinja2>=3.1,<4.0                # BSD-3
+rank-bm25>=0.2.2,<0.3           # Apache-2.0
+
+# --- Capa generativa (LLM_MODE=gemini) --------------------------------------
+# Con LLM_MODE=mock no se usa, pero se declara aquí porque es la ruta en marcha.
+google-genai>=1.0,<2.0          # Apache-2.0
+
+# --- Seguridad y utilidades --------------------------------------------------
+pyjwt>=2.9,<3.0                 # MIT
+pyyaml>=6.0,<7.0                # MIT
+httpx>=0.27,<1.0                # BSD-3
+
+# --- Orquestación del turno (ORQUESTADOR=grafo, valor por defecto) -----------
+# Técnicamente opcional —con ORQUESTADOR=directo el endpoint responde igual—, pero
+# el valor por defecto es `grafo`, así que una instalación sin esto se comporta
+# distinto de la documentada. Por eso va en el fichero base y no en el opcional.
+# Prohibidos langgraph-api y langgraph-cli: Elastic License 2.0.
+langgraph>=1.2,<2.0                     # MIT
+langchain-core>=1.5,<2.0                # MIT
+langgraph-checkpoint>=4.1,<5.0          # MIT
+langgraph-checkpoint-sqlite>=3.1,<4.0   # MIT
+
+# --- NO se instalan por defecto ----------------------------------------------
+# Integraciones de LangChain para LLM_MODE=langchain. Cada fabricante es un paquete
+# aparte y solo hace falta el del que se vaya a usar:
+#
+#   pip install langchain-google-genai     # google_genai:gemini-2.5-flash
+#   pip install langchain-anthropic        # anthropic:claude-sonnet-5
+#   pip install langchain-openai           # openai:gpt-5.4
+#   pip install langchain-ollama           # ollama:qwen3:14b   (local, sin clave)
+#
+# Sin el paquete correspondiente, LLM_MODE=langchain construye pero falla en la
+# primera llamada con un ErrorConfiguracionProveedor que nombra el pip exacto. El
+# sistema no se cae: degrada a plantilla determinística, y dentro de una cascada
+# (LLM_MODE=gemini,langchain) se salta sin consumir intento.
+#
+# Medición propia (agosto 2026, gemini-2.5-flash, 3 rondas): la ruta LangChain da
+# las mismas cifras que el SDK directo pero tarda ~4x más en la explicación de
+# recibo (5,9 s frente a 1,5 s). Ver docs/ELECCION_DEL_MODELO.md §11.

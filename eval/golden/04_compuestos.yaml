@@ -1,0 +1,186 @@
+# Casos COMPUESTOS: dos escenarios simultáneos en el mismo ciclo.
+# Son el 30 % del dataset y el sitio donde se rompe la atribución ingenua: hay más de
+# un movimiento en la ventana y el motor tiene que repartir el delta entre causas sin
+# inventarse ninguna. Aquí es donde s2 (unicidad de causa) deja de valer 1.
+
+- caso_id: G18_cambio_plan_mas_deuda_adelantada
+  descripcion: Cambio de plan con deuda arrastrada e interés moratorio (ADELANTADA).
+  seed: 20260804
+  cuenta_id: C-00081
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "cambié de plan y además debo el mes pasado, ¿cómo queda todo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, DEUDA_ANTERIOR]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados:
+    - RENTA_PLAN_MOVIL
+    - AJUSTE_RETROACTIVO_RENTA
+    - INTERES_MORATORIO
+    - IGV
+  delta_esperado_cent: 3168
+  total_esperado_cent: 12596
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G19_equipo_mas_cambio_plan_adelantada
+  descripcion: >-
+    Equipo financiado nuevo y cambio de plan en el mismo ciclo (ADELANTADA). Dos causas
+    con signos que no se cancelan: el reparto tiene que cerrar exacto.
+  seed: 20260804
+  cuenta_id: C-00072
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "compré un equipo y cambié de plan, ¿por qué subió tanto?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, CAMBIO_PLAN]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO, CAMBIO_DE_PLAN]
+  conceptos_esperados:
+    - CUOTA_EQUIPO_FINANCIADO
+    - RENTA_PLAN_MOVIL
+    - AJUSTE_RETROACTIVO_RENTA
+    - IGV
+  delta_esperado_cent: 12926
+  total_esperado_cent: 19404
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G20_reconexion_mas_nota_credito_adelantada
+  descripcion: >-
+    Reconexión y nota de crédito a la vez (ADELANTADA). Tres causas y delta negativo:
+    la explicación debe decir que BAJÓ pese al cargo de reconexión.
+  seed: 20260804
+  cuenta_id: C-00051
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "reclamé y me reconectaron, ¿en qué quedó mi recibo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION, NOTA_CREDITO]
+  causas_esperadas: [RECONEXION, SUSPENSION, NOTA_CREDITO]
+  causas_oficiales_esperadas:
+    - RECONEXIONES
+    - AJUSTES_POR_DIAS_DE_SUSPENSION
+    - NOTAS_CREDITO_DEBITO
+  conceptos_esperados:
+    - CARGO_RECONEXION
+    - AJUSTE_DIAS_SUSPENSION
+    - NOTA_CREDITO
+    - IGV
+  delta_esperado_cent: -7084
+  total_esperado_cent: 11964
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G21_reconexion_mas_paquete_vencida
+  descripcion: Reconexión y compra de paquete de roaming en el mismo ciclo (VENCIDA).
+  seed: 20260804
+  cuenta_id: C-00043
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "me reconectaron y compré un paquete, ¿por qué subió tanto?"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION, ALTA_PAQUETE]
+  causas_esperadas: [RECONEXION, SUSPENSION, ALTA_PAQUETE]
+  causas_oficiales_esperadas:
+    - RECONEXIONES
+    - AJUSTES_POR_DIAS_DE_SUSPENSION
+    - COMPRA_DE_PAQUETES
+  conceptos_esperados:
+    - CARGO_RECONEXION
+    - RENTA_HOGAR_INTERNET
+    - PAQUETE_ROAMING
+    - IGV
+  delta_esperado_cent: 5452
+  total_esperado_cent: 16874
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G22_fin_descuento_mas_deuda_vencida
+  descripcion: Promoción vencida sobre una cuenta que ya arrastraba deuda (VENCIDA).
+  seed: 20260804
+  cuenta_id: C-00172
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "se me acabó el descuento y encima debo, explíqueme por favor"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO, DEUDA_ANTERIOR]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, INTERES_MORATORIO, IGV]
+  delta_esperado_cent: 1387
+  total_esperado_cent: 13225
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G23_paquete_mas_cambio_plan_vencida
+  descripcion: >-
+    Compra de un paquete de datos y cambio de plan (VENCIDA). Dos movimientos en la
+    misma ventana sobre conceptos distintos.
+  seed: 20260804
+  cuenta_id: C-00093
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "contraté algo más y cambié de plan, ¿qué me cobraron?"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [ALTA_PAQUETE, CAMBIO_PLAN]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, CAMBIO_DE_PLAN]
+  conceptos_esperados: [PAQUETE_DATOS_ADICIONAL, RENTA_PLAN_MOVIL, IGV]
+  delta_esperado_cent: 12062
+  total_esperado_cent: 14698
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G24_paquete_mas_equipo_adelantada
+  descripcion: Paquete de roaming y cuota de equipo financiado (ADELANTADA).
+  seed: 20260804
+  cuenta_id: C-00162
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_PAQUETE, ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, EQUIPO_FINANCIADO]
+  conceptos_esperados: [PAQUETE_ROAMING, CUOTA_EQUIPO_FINANCIADO, IGV]
+  delta_esperado_cent: 6856
+  total_esperado_cent: 26140
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G25_cambio_plan_mas_equipo_vencida
+  descripcion: >-
+    Cambio de plan y equipo financiado en VENCIDA. La cuota no se prorratea aunque el
+    plan sí: es el error típico que la explicación debe evitar.
+  seed: 20260804
+  cuenta_id: C-00032
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "cambié de plan y compré un equipo, ¿me prorratearon la cuota?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [CAMBIO_PLAN, ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, EQUIPO_FINANCIADO]
+  conceptos_esperados: [RENTA_PLAN_MOVIL, CUOTA_EQUIPO_FINANCIADO, IGV]
+  delta_esperado_cent: 11308
+  total_esperado_cent: 12476
+  debe_derivar: false
+  no_debe_contener: []

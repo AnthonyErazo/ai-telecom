@@ -1,0 +1,45 @@
+# Contexto de build mínimo: menos capas, menos superficie y ningún secreto.
+
+# Secretos y configuración local (la imagen se configura por variables de entorno)
+.env
+.env.local
+*.pem
+*.key
+
+# Datos: nunca entran en la imagen. Se montan como volumen en tiempo de ejecución.
+# (BASES: la información de Movistar es confidencial durante 10 años; una imagen
+#  con datos dentro es una imagen que no se puede publicar.)
+data/
+
+# Historial y herramientas de desarrollo
+.git/
+.github/
+.gitignore
+.dockerignore
+.vscode/
+.idea/
+
+# Artefactos de Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Cachés de test y lint
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# No se ejecutan dentro del contenedor de servicio
+tests/
+docs/
+ejemplos/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

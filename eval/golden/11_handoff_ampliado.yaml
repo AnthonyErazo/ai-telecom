@@ -1,0 +1,254 @@
+# ============================================================================
+# HAND-OFF AMPLIADO — fichero GENERADO. No editar a mano.
+#
+#   python -m eval.generar_golden
+#
+# Con tres casos positivos, Recall_handoff solo podía valer 0, 33, 67 o 100 %: la métrica
+# primaria de la ficha no tenía resolución. Aquí hay uno por cada forma de disparar una
+# regla dura —cada patrón de PATRONES_PETICION_HUMANO y cada intención regulatoria de
+# rules.yaml—, de modo que si alguien borra un patrón se ve qué patrón era.
+#
+# Todos van sobre recibos que concilian y son perfectamente explicables: lo que obliga a
+# derivar es la frase del cliente, no un fallo del motor. El payload de derivación debe
+# llegar con los siete campos, incluido el resumen para el asesor.
+# ============================================================================
+
+- caso_id: HDF01_asesor
+  descripcion: >-
+    Hand-off por regla dura PETICION_HUMANO. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00031
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "no entendí nada, ¿me pasa con un asesor?"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_MORATORIO]
+  delta_esperado_cent: 10595
+  total_esperado_cent: 22761
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF02_persona_real
+  descripcion: >-
+    Hand-off por regla dura PETICION_HUMANO. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00009
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "no quiero un bot, quiero una persona real"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 7678
+  total_esperado_cent: 11537
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF03_ejecutivo
+  descripcion: >-
+    Hand-off por regla dura PETICION_HUMANO. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00228
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "necesito que un ejecutivo revise mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 2122
+  total_esperado_cent: 19836
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF04_representante
+  descripcion: >-
+    Hand-off por regla dura PETICION_HUMANO. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00151
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "quiero que un representante me explique este cobro"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, DEUDA_ANTERIOR]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, INTERES_MORATORIO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 5757
+  total_esperado_cent: 19117
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF05_atencion_cliente
+  descripcion: >-
+    Hand-off por regla dura PETICION_HUMANO. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00212
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "esto no me sirve, quiero atencion al cliente de verdad"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, FIN_DESCUENTO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 17517
+  total_esperado_cent: 23457
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF06_hablar_con
+  descripcion: >-
+    Hand-off por regla dura PETICION_HUMANO. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00185
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "quiero hablar con alguien que me explique el monto"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 2587
+  total_esperado_cent: 34535
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF07_osiptel
+  descripcion: >-
+    Hand-off por regla dura INTENCION_REGULATORIA. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00033
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me están cobrando de más, voy a ir a Osiptel"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [ALTA_PAQUETE, CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, COMPRA_DE_PAQUETES]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, IGV, PAQUETE_TV_PREMIUM, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 6534
+  total_esperado_cent: 27035
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF08_indecopi
+  descripcion: >-
+    Hand-off por regla dura INTENCION_REGULATORIA. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00074
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "esto es abusivo, lo llevo a Indecopi"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 13746
+  total_esperado_cent: 21289
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF09_libro_reclamaciones
+  descripcion: >-
+    Hand-off por regla dura INTENCION_REGULATORIA. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00078
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "quiero el libro de reclamaciones para dejar constancia de este cobro"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -3529
+  total_esperado_cent: 4755
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: HDF10_reclamo_formal
+  descripcion: >-
+    Hand-off por regla dura INTENCION_REGULATORIA. El recibo es explicable y concilia al
+    céntimo, pero la frase del cliente obliga a pasar la conversación a una persona: la
+    regla dura gana sobre cualquier score de incomprensión. El payload de derivación
+    tiene que llegar completo, con el resumen para el asesor y la referencia de la
+    traza.
+  seed: 20260804
+  cuenta_id: C-00140
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "voy a presentar un reclamo formal por este monto"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1711
+  total_esperado_cent: 11603
+  debe_derivar: true
+  no_debe_contener: []

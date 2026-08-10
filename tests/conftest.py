@@ -1,0 +1,100 @@
+"""Configuración común de la suite.
+
+Dos garantías que toda la suite da por sentadas y que se fijan aquí:
+
+1. **Nada sale a la red.** ``LLM_MODE=mock`` y ``VERIFICADOR_ESTRICTO=true`` se imponen
+   para toda la sesión salvo que el propio test los cambie. Un test que dependa de
+   Gemini debe pedirlo explícitamente con la marca ``gemini``, y se omite si no hay
+   ``GEMINI_API_KEY``.
+2. **El dataset es opcional.** ``data/`` está en ``.gitignore`` por la cláusula de
+   confidencialidad de diez años de las bases, así que en un clon limpio no existe. Las
+   pruebas que lo necesitan se **omiten con un motivo legible** en vez de fallar; las de
+   unidad y de propiedad no lo necesitan y corren siempre.
+"""
+
+from __future__ import annotations
+
+import os
+import tempfile
+from pathlib import Path
+
+import pytest
+
+RAIZ = Path(__file__).resolve().parents[1]
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Fija el entorno determinístico de la suite **antes de recolectar nada**.
+
+    ``ENTORNO=dev`` se pone aquí y no en una fixture porque ``apps/api`` resuelve sus
+    ajustes una sola vez, al importar la aplicación: si el primer test que la importa la
+    construye con otro entorno, el router ``/dev`` queda fuera y todos los tests de
+    contrato que piden un token se saltarían en silencio con un 404. Es la diferencia
+    entre una suite verde y una suite que no probó nada.
+    """
+    os.environ.setdefault("LLM_MODE", "mock")
+    os.environ.setdefault("VERIFICADOR_ESTRICTO", "true")
+    os.environ.setdefault("ENTORNO", "dev")
+    # El retriever cae solo a índice en memoria sin DATABASE_URL; se explicita para que
+    # ninguna prueba toque una base de datos por accidente.
+    os.environ.pop("DATABASE_URL", None)
+    # Los *checkpoints* del grafo van a un fichero temporal propio de la sesión, no al
+    # `data/checkpoints/turnos.sqlite` del proyecto. Sigue siendo SQLite **en disco**
+    # —la suite tiene que ejercitar el almacén de verdad, no uno en memoria—, pero cada
+    # ejecución arranca limpia y no acumula el estado de la anterior en el almacén con
+    # el que se hace la demostración.
+    os.environ.setdefault("CHECKPOINT_PATH", str(_checkpoints_de_la_sesion()))
+
+
+def _checkpoints_de_la_sesion() -> Path:
+    """Fichero de *checkpoints* de esta ejecución de la suite, recién vaciado."""
+    destino = Path(tempfile.gettempdir()) / "recibo-claro-tests" / "checkpoints.sqlite"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.unlink(missing_ok=True)
+    return destino
+
+
+@pytest.fixture(scope="session")
+def raiz_proyecto() -> Path:
+    """Raíz del repositorio."""
+    return RAIZ
+
+
+@pytest.fixture(scope="session")
+def reglas():
+    """Configuración de negocio cargada una sola vez para toda la sesión."""
+    from packages.core_domain.reglas import cargar_reglas
+
+    return cargar_reglas()
+
+
+@pytest.fixture(scope="session")
+def ruta_dataset() -> Path:
+    """Directorio del dataset sintético (puede no existir)."""
+    from eval.datos import ruta_dataset as resolver
+
+    return resolver()
+
+
+@pytest.fixture(scope="session")
+def dataset_disponible(ruta_dataset: Path) -> bool:
+    """``True`` si el dataset sintético está generado."""
+    return (ruta_dataset / "bills").is_dir() and (ruta_dataset / "ground_truth.csv").is_file()
+
+
+@pytest.fixture(scope="session")
+def exige_dataset(dataset_disponible: bool) -> None:
+    """Omite la prueba con un motivo accionable si falta el dataset."""
+    if not dataset_disponible:
+        pytest.skip(
+            "falta el dataset sintético: ejecute "
+            "`python -m packages.datagen.generar --seed 20260804 --clientes 300`"
+        )
+
+
+@pytest.fixture(scope="session")
+def casos_golden(exige_dataset: None):
+    """Los casos golden de ``eval/golden`` ya validados."""
+    from eval.datos import cargar_golden
+
+    return cargar_golden()

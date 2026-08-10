@@ -1,0 +1,3284 @@
+{
+  "components": {
+    "schemas": {
+      "Accion": {
+        "additionalProperties": false,
+        "description": "Siguiente acción sugerida al cliente. Ninguna es irreversible en el MVP.",
+        "properties": {
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/AccionSiguiente"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "riesgo": {
+            "default": "INFORMATIVA",
+            "enum": [
+              "INFORMATIVA",
+              "REVERSIBLE"
+            ],
+            "title": "Riesgo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "etiqueta"
+        ],
+        "title": "Accion",
+        "type": "object"
+      },
+      "AccionSiguiente": {
+        "description": "Siguientes acciones recomendables (lista literal de la ficha del desafío).",
+        "enum": [
+          "PAGAR",
+          "VER_DETALLE",
+          "REGISTRAR_CONSULTA",
+          "VER_ALTERNATIVAS",
+          "DERIVAR_ASESOR"
+        ],
+        "title": "AccionSiguiente",
+        "type": "string"
+      },
+      "Asercion": {
+        "additionalProperties": false,
+        "description": "Una cifra encontrada en el texto generado y su veredicto de anclaje.\n\nLa lista completa de aserciones va al evento ``VERIFY`` de la auditoría: es la\nprueba \"comprobable mediante logs de la terminal\" que exige la ficha.",
+        "properties": {
+          "derivacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Álgebra aplicada si el estado es DERIVADA",
+            "title": "Derivacion"
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoAsercion"
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "fuente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "fact_id que la ancla, si la hay",
+            "title": "Fuente"
+          },
+          "inicio": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inicio"
+          },
+          "texto_original": {
+            "description": "Tal como apareció: \"S/ 124,90\"",
+            "title": "Texto Original",
+            "type": "string"
+          },
+          "token": {
+            "description": "Token normalizado: cent:12490",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "texto_original",
+          "token",
+          "estado"
+        ],
+        "title": "Asercion",
+        "type": "object"
+      },
+      "BarraPuente": {
+        "additionalProperties": false,
+        "description": "Una barra del gráfico puente previo -> actual.",
+        "properties": {
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "monto_cent": {
+            "title": "Monto Cent",
+            "type": "integer"
+          },
+          "tipo": {
+            "enum": [
+              "entrada",
+              "incremento",
+              "decremento",
+              "total",
+              "proyeccion"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "etiqueta",
+          "monto_cent",
+          "tipo"
+        ],
+        "title": "BarraPuente",
+        "type": "object"
+      },
+      "BloqueAviso": {
+        "additionalProperties": false,
+        "description": "Aviso: derivación en curso, información no disponible por nivel, etc.",
+        "properties": {
+          "fact_ids": {
+            "description": "Campos del FactSet que respaldan el bloque",
+            "items": {
+              "type": "string"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "severidad": {
+            "default": "info",
+            "enum": [
+              "info",
+              "advertencia",
+              "critico"
+            ],
+            "title": "Severidad",
+            "type": "string"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          },
+          "tipo": {
+            "const": "aviso",
+            "default": "aviso",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          }
+        },
+        "required": [
+          "texto"
+        ],
+        "title": "BloqueAviso",
+        "type": "object"
+      },
+      "BloqueKV": {
+        "additionalProperties": false,
+        "description": "Lista de pares clave/valor: el desglose corto que cabe en un chat.",
+        "properties": {
+          "fact_ids": {
+            "description": "Campos del FactSet que respaldan el bloque",
+            "items": {
+              "type": "string"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemKV"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "tipo": {
+            "const": "kv",
+            "default": "kv",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          }
+        },
+        "title": "BloqueKV",
+        "type": "object"
+      },
+      "BloquePuente": {
+        "additionalProperties": false,
+        "description": "Gráfico de cascada que reconstruye el recibo previo hasta el actual.\n\nEs la pieza visual que responde \"¿por qué me vino más caro?\": barra de entrada\n(recibo previo), una barra por causa (incremento/decremento) y barra de total.",
+        "properties": {
+          "barras": {
+            "items": {
+              "$ref": "#/components/schemas/BarraPuente"
+            },
+            "title": "Barras",
+            "type": "array"
+          },
+          "fact_ids": {
+            "description": "Campos del FactSet que respaldan el bloque",
+            "items": {
+              "type": "string"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "tipo": {
+            "const": "puente",
+            "default": "puente",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          }
+        },
+        "title": "BloquePuente",
+        "type": "object"
+      },
+      "BloqueTabla": {
+        "additionalProperties": false,
+        "description": "Tabla ya renderizada como texto: tramos, cuotas, comparativa de conceptos.",
+        "properties": {
+          "columnas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columnas",
+            "type": "array"
+          },
+          "fact_ids": {
+            "description": "Campos del FactSet que respaldan el bloque",
+            "items": {
+              "type": "string"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "filas": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Filas",
+            "type": "array"
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          },
+          "tipo": {
+            "const": "tabla",
+            "default": "tabla",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          }
+        },
+        "title": "BloqueTabla",
+        "type": "object"
+      },
+      "BloqueTexto": {
+        "additionalProperties": false,
+        "description": "Párrafo en lenguaje natural.",
+        "properties": {
+          "enfasis": {
+            "default": false,
+            "title": "Enfasis",
+            "type": "boolean"
+          },
+          "fact_ids": {
+            "description": "Campos del FactSet que respaldan el bloque",
+            "items": {
+              "type": "string"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          },
+          "tipo": {
+            "const": "texto",
+            "default": "texto",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          }
+        },
+        "required": [
+          "texto"
+        ],
+        "title": "BloqueTexto",
+        "type": "object"
+      },
+      "Canal": {
+        "description": "Canal por el que llega la consulta (condiciona formato y nivel de detalle).",
+        "enum": [
+          "APP",
+          "BOT",
+          "WHATSAPP",
+          "ASESOR"
+        ],
+        "title": "Canal",
+        "type": "string"
+      },
+      "CausaAgregada": {
+        "additionalProperties": false,
+        "description": "Agrupación de deltas por causa, en el vocabulario del cliente.\n\nEs lo que se narra: \"S/ 45.00 por el cambio de plan y S/ 12.90 por el paquete\nde datos\". ``participacion_bp`` va en puntos básicos (10000 = 100 %) para no\nintroducir ``float`` en nada que se parezca a un reparto.",
+        "properties": {
+          "causa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TipoMovimiento"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "causa_oficial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CausaOficial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conceptos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conceptos",
+            "type": "array"
+          },
+          "confianza": {
+            "default": 1.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confianza",
+            "type": "number"
+          },
+          "etiqueta_cliente": {
+            "title": "Etiqueta Cliente",
+            "type": "string"
+          },
+          "evidencia": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencia",
+            "type": "array"
+          },
+          "monto_cent": {
+            "title": "Monto Cent",
+            "type": "integer"
+          },
+          "movimientos": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Movimientos",
+            "type": "array"
+          },
+          "participacion_bp": {
+            "default": 0,
+            "description": "Peso sobre |delta total|, en bp",
+            "title": "Participacion Bp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "etiqueta_cliente",
+          "monto_cent"
+        ],
+        "title": "CausaAgregada",
+        "type": "object"
+      },
+      "CausaOficial": {
+        "description": "Las nueve causas de variación que enumera literalmente la ficha.\n\n``TipoMovimiento`` es el vocabulario técnico del CRM; ``CausaOficial`` es el\nvocabulario del enunciado y de la evaluación. Nunca se mezclan: se traducen con\n``causa_oficial_de``.",
+        "enum": [
+          "CAMBIO_DE_PLAN",
+          "EQUIPO_FINANCIADO",
+          "COMPRA_DE_PAQUETES",
+          "CARGOS_ADICIONALES",
+          "PROMOCIONES_VENCIDAS",
+          "NOTAS_CREDITO_DEBITO",
+          "PRORRATEOS",
+          "RECONEXIONES",
+          "AJUSTES_POR_DIAS_DE_SUSPENSION"
+        ],
+        "title": "CausaOficial",
+        "type": "string"
+      },
+      "Cita": {
+        "additionalProperties": false,
+        "description": "Ancla entre un fragmento del texto y el campo del FactSet que lo respalda.",
+        "properties": {
+          "bloque_indice": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bloque Indice"
+          },
+          "fact_id": {
+            "description": "Campo del FactSet, p. ej. \"linea:RENTA_PLAN.delta_cent\"",
+            "title": "Fact Id",
+            "type": "string"
+          },
+          "fin": {
+            "description": "Índice final (exclusivo) del span",
+            "minimum": 0.0,
+            "title": "Fin",
+            "type": "integer"
+          },
+          "inicio": {
+            "description": "Índice inicial del span dentro de `texto`",
+            "minimum": 0.0,
+            "title": "Inicio",
+            "type": "integer"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token normalizado citado",
+            "title": "Token"
+          }
+        },
+        "required": [
+          "inicio",
+          "fin",
+          "fact_id"
+        ],
+        "title": "Cita",
+        "type": "object"
+      },
+      "ClaseDelta": {
+        "description": "Resultado de comparar una misma línea entre el recibo actual y el previo.",
+        "enum": [
+          "NUEVO",
+          "DESAPARECIDO",
+          "SUBIO",
+          "BAJO",
+          "IGUAL"
+        ],
+        "title": "ClaseDelta",
+        "type": "string"
+      },
+      "CuotaFinanciamiento": {
+        "additionalProperties": false,
+        "description": "Una cuota del cronograma francés. Clave explicativa: \"cuota 3 de 18\".",
+        "properties": {
+          "amortizacion_cent": {
+            "default": 0,
+            "title": "Amortizacion Cent",
+            "type": "integer"
+          },
+          "de_total": {
+            "minimum": 1.0,
+            "title": "De Total",
+            "type": "integer"
+          },
+          "interes_cent": {
+            "default": 0,
+            "title": "Interes Cent",
+            "type": "integer"
+          },
+          "monto_cent": {
+            "title": "Monto Cent",
+            "type": "integer"
+          },
+          "numero": {
+            "minimum": 1.0,
+            "title": "Numero",
+            "type": "integer"
+          },
+          "saldo_final_cent": {
+            "default": 0,
+            "title": "Saldo Final Cent",
+            "type": "integer"
+          },
+          "saldo_inicial_cent": {
+            "default": 0,
+            "title": "Saldo Inicial Cent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "numero",
+          "de_total",
+          "monto_cent"
+        ],
+        "title": "CuotaFinanciamiento",
+        "type": "object"
+      },
+      "Derivacion": {
+        "additionalProperties": false,
+        "description": "Hand-off a un asesor humano con el contexto de la interacción cargado.",
+        "properties": {
+          "context_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Referencia del contexto guardado",
+            "title": "Context Ref"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "motivo_codigo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MotivoDerivacion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requerida": {
+            "default": false,
+            "title": "Requerida",
+            "type": "boolean"
+          },
+          "resumen_asesor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumen Asesor"
+          },
+          "score_incomprension": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Incomprension"
+          },
+          "senal_disparadora": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Regla dura o score que la disparó",
+            "title": "Senal Disparadora"
+          }
+        },
+        "title": "Derivacion",
+        "type": "object"
+      },
+      "ElementoCola": {
+        "additionalProperties": false,
+        "description": "Una derivación esperando a que alguien la recoja.",
+        "properties": {
+          "context_ref": {
+            "title": "Context Ref",
+            "type": "string"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "creado_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado En"
+          },
+          "cuenta_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuenta Id"
+          },
+          "motivo_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Codigo"
+          },
+          "resumen_asesor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumen Asesor"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "context_ref",
+          "conversation_id"
+        ],
+        "title": "ElementoCola",
+        "type": "object"
+      },
+      "EstadoAsercion": {
+        "description": "Estado de una cifra encontrada en el texto generado.\n\nANCLADA: el token está literalmente en el FactSet.\nDERIVADA: se obtiene del FactSet por álgebra permitida (lista cerrada, se registra).\nNO_ANCLADA: no se puede justificar -> el texto no sale, se reintenta o va a plantilla.",
+        "enum": [
+          "ANCLADA",
+          "DERIVADA",
+          "NO_ANCLADA"
+        ],
+        "title": "EstadoAsercion",
+        "type": "string"
+      },
+      "EstadoSala": {
+        "additionalProperties": false,
+        "description": "Estado de la conversación: quién la atiende y qué se ha dicho.",
+        "properties": {
+          "asesor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asesor"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "cuenta_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuenta Id"
+          },
+          "derivada": {
+            "default": false,
+            "title": "Derivada",
+            "type": "boolean"
+          },
+          "modo": {
+            "description": "AUTONOMA cuando responde la IA, ASISTIDA con asesor dentro",
+            "title": "Modo",
+            "type": "string"
+          },
+          "resumen_asesor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumen Asesor"
+          },
+          "turnos": {
+            "items": {
+              "$ref": "#/components/schemas/TurnoPublicado"
+            },
+            "title": "Turnos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "modo"
+        ],
+        "title": "EstadoSala",
+        "type": "object"
+      },
+      "EstadoServicio": {
+        "description": "Estado del servicio dentro de un tramo del ciclo.",
+        "enum": [
+          "ACTIVO",
+          "SUSPENDIDO"
+        ],
+        "title": "EstadoServicio",
+        "type": "string"
+      },
+      "FactSet": {
+        "additionalProperties": false,
+        "description": "Fotografía verificada de la variación de un recibo. Contrato con el LLM.\n\nSe construye en ``packages.facts_engine.motor`` y viaja intacto hasta el prompt,\nel verificador y la auditoría. Su ``sha256`` demuestra que el texto entregado se\ngeneró sobre estos y no otros hechos.",
+        "properties": {
+          "beneficios_vigentes": {
+            "description": "Beneficios que el cliente YA tiene (efecto efervescente); solo texto",
+            "items": {
+              "type": "string"
+            },
+            "title": "Beneficios Vigentes",
+            "type": "array"
+          },
+          "causas_agregadas": {
+            "items": {
+              "$ref": "#/components/schemas/CausaAgregada"
+            },
+            "title": "Causas Agregadas",
+            "type": "array"
+          },
+          "ciclo_fin": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exclusivo",
+            "title": "Ciclo Fin"
+          },
+          "ciclo_inicio": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ciclo Inicio"
+          },
+          "confianza_global": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confianza Global",
+            "type": "number"
+          },
+          "cuenta_id": {
+            "description": "Ficticio tokenizado, jamás DNI ni teléfono",
+            "title": "Cuenta Id",
+            "type": "string"
+          },
+          "delta_total_cent": {
+            "title": "Delta Total Cent",
+            "type": "integer"
+          },
+          "deuda_anterior_cent": {
+            "default": 0,
+            "title": "Deuda Anterior Cent",
+            "type": "integer"
+          },
+          "dias_ciclo": {
+            "exclusiveMinimum": 0.0,
+            "title": "Dias Ciclo",
+            "type": "integer"
+          },
+          "estado_servicio": {
+            "$ref": "#/components/schemas/EstadoServicio",
+            "default": "ACTIVO"
+          },
+          "factset_id": {
+            "format": "uuid",
+            "title": "Factset Id",
+            "type": "string"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "financiamientos": {
+            "items": {
+              "$ref": "#/components/schemas/PlanFinanciamiento"
+            },
+            "title": "Financiamientos",
+            "type": "array"
+          },
+          "generado_en": {
+            "format": "date-time",
+            "title": "Generado En",
+            "type": "string"
+          },
+          "invariante": {
+            "$ref": "#/components/schemas/Invariante"
+          },
+          "lineas": {
+            "items": {
+              "$ref": "#/components/schemas/LineaDelta"
+            },
+            "title": "Lineas",
+            "type": "array"
+          },
+          "modalidad_renta": {
+            "$ref": "#/components/schemas/ModalidadRenta"
+          },
+          "movimientos_ciclo": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Movimientos Ciclo",
+            "type": "array"
+          },
+          "periodo_actual": {
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Periodo Actual",
+            "type": "string"
+          },
+          "periodo_previo": {
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Periodo Previo",
+            "type": "string"
+          },
+          "plan_vigente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Vigente"
+          },
+          "rules_version": {
+            "title": "Rules Version",
+            "type": "string"
+          },
+          "sha256": {
+            "default": "",
+            "description": "Integridad de lo que vio el LLM",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "total_actual_cent": {
+            "title": "Total Actual Cent",
+            "type": "integer"
+          },
+          "total_previo_cent": {
+            "title": "Total Previo Cent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "factset_id",
+          "cuenta_id",
+          "modalidad_renta",
+          "periodo_actual",
+          "periodo_previo",
+          "dias_ciclo",
+          "total_actual_cent",
+          "total_previo_cent",
+          "delta_total_cent",
+          "invariante",
+          "confianza_global",
+          "rules_version"
+        ],
+        "title": "FactSet",
+        "type": "object"
+      },
+      "FamiliaConcepto": {
+        "description": "Naturaleza contable del concepto; decide si se prorratea y cómo se narra.",
+        "enum": [
+          "RECURRENTE",
+          "UNICO",
+          "AJUSTE",
+          "FINANCIAMIENTO",
+          "IMPUESTO",
+          "CREDITO"
+        ],
+        "title": "FamiliaConcepto",
+        "type": "string"
+      },
+      "FichaConcepto": {
+        "additionalProperties": false,
+        "description": "Ficha de un concepto tal como se le muestra al cliente.",
+        "properties": {
+          "afecto_igv": {
+            "default": true,
+            "title": "Afecto Igv",
+            "type": "boolean"
+          },
+          "causa_oficial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CausaOficial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "causas_permitidas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Causas Permitidas",
+            "type": "array"
+          },
+          "cifras_retiradas": {
+            "description": "Marcadores que el saneador puso en lugar de las cifras del corpus",
+            "items": {
+              "type": "string"
+            },
+            "title": "Cifras Retiradas",
+            "type": "array"
+          },
+          "concepto_id": {
+            "title": "Concepto Id",
+            "type": "string"
+          },
+          "definicion_cliente": {
+            "title": "Definicion Cliente",
+            "type": "string"
+          },
+          "detalle_rag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Texto ampliado del corpus, ya saneado de cifras",
+            "title": "Detalle Rag"
+          },
+          "ejemplo_variacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ejemplo Variacion"
+          },
+          "familia": {
+            "$ref": "#/components/schemas/FamiliaConcepto"
+          },
+          "nombre_comercial": {
+            "title": "Nombre Comercial",
+            "type": "string"
+          },
+          "prorrateable": {
+            "default": false,
+            "title": "Prorrateable",
+            "type": "boolean"
+          },
+          "sinonimos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sinonimos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "concepto_id",
+          "nombre_comercial",
+          "familia",
+          "definicion_cliente"
+        ],
+        "title": "FichaConcepto",
+        "type": "object"
+      },
+      "Gobernanza": {
+        "additionalProperties": false,
+        "description": "Trazabilidad de la respuesta: qué se verificó, con qué versión y con qué resultado.",
+        "properties": {
+          "anclado": {
+            "title": "Anclado",
+            "type": "boolean"
+          },
+          "aserciones": {
+            "description": "Detalle completo para la auditoría",
+            "items": {
+              "$ref": "#/components/schemas/Asercion"
+            },
+            "title": "Aserciones",
+            "type": "array"
+          },
+          "aserciones_ancladas": {
+            "default": 0,
+            "title": "Aserciones Ancladas",
+            "type": "integer"
+          },
+          "aserciones_no_ancladas": {
+            "default": 0,
+            "title": "Aserciones No Ancladas",
+            "type": "integer"
+          },
+          "aserciones_totales": {
+            "default": 0,
+            "title": "Aserciones Totales",
+            "type": "integer"
+          },
+          "citas": {
+            "items": {
+              "$ref": "#/components/schemas/Cita"
+            },
+            "title": "Citas",
+            "type": "array"
+          },
+          "confianza": {
+            "default": 1.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confianza",
+            "type": "number"
+          },
+          "factset_sha256": {
+            "title": "Factset Sha256",
+            "type": "string"
+          },
+          "latencia_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latencia Ms"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "modo": {
+            "$ref": "#/components/schemas/ModoGeneracion"
+          },
+          "rules_version": {
+            "title": "Rules Version",
+            "type": "string"
+          },
+          "verificacion_numerica": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NO_APLICA"
+            ],
+            "title": "Verificacion Numerica",
+            "type": "string"
+          }
+        },
+        "required": [
+          "anclado",
+          "verificacion_numerica",
+          "modo",
+          "rules_version",
+          "model_version",
+          "factset_sha256"
+        ],
+        "title": "Gobernanza",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Invariante": {
+        "additionalProperties": false,
+        "description": "Conciliación entre el delta total y la suma de deltas por línea.\n\nSi ``|residual_cent| > 1`` el sistema **no explica**: responde 409\n``INVARIANTE_FALLIDO`` y deriva a un asesor. Nunca hay \"explicación aproximada\".",
+        "properties": {
+          "delta_total_cent": {
+            "title": "Delta Total Cent",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "residual_cent": {
+            "description": "Debe ser 0 (tolerancia ±1 céntimo)",
+            "title": "Residual Cent",
+            "type": "integer"
+          },
+          "suma_deltas_cent": {
+            "title": "Suma Deltas Cent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "residual_cent",
+          "suma_deltas_cent",
+          "delta_total_cent"
+        ],
+        "title": "Invariante",
+        "type": "object"
+      },
+      "ItemEvidencia": {
+        "additionalProperties": false,
+        "description": "Item de ``GET /v1/evidencia/{explicacion_id}``.",
+        "properties": {
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "ref_id": {
+            "title": "Ref Id",
+            "type": "string"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "tipo": {
+            "description": "\"linea\" | \"mov\" | \"cat\" | \"tramo\" | \"faq\" | \"casuistica\"",
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "ref_id",
+          "snippet"
+        ],
+        "title": "ItemEvidencia",
+        "type": "object"
+      },
+      "ItemKV": {
+        "additionalProperties": false,
+        "description": "Par clave/valor de un bloque ``kv``.",
+        "properties": {
+          "clave": {
+            "title": "Clave",
+            "type": "string"
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "monto_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Si el valor es monetario, su importe exacto en céntimos",
+            "title": "Monto Cent"
+          },
+          "valor": {
+            "title": "Valor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "valor"
+        ],
+        "title": "ItemKV",
+        "type": "object"
+      },
+      "LineaDelta": {
+        "additionalProperties": false,
+        "description": "Diferencia de un concepto entre el recibo actual y el previo.\n\n``delta_cent`` siempre es ``monto_actual_cent - monto_previo_cent`` y ``clase`` se\ndeduce de ambos montos: las dos cosas se validan, no se confía en el llamador.\nLas líneas ``IGUAL`` existen en el FactSet pero **no se explican**.",
+        "properties": {
+          "causa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TipoMovimiento"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "causa_oficial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CausaOficial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clase": {
+            "$ref": "#/components/schemas/ClaseDelta"
+          },
+          "concepto_id": {
+            "title": "Concepto Id",
+            "type": "string"
+          },
+          "confianza": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confianza",
+            "type": "number"
+          },
+          "cuota_numero": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuota Numero"
+          },
+          "cuotas_totales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuotas Totales"
+          },
+          "delta_cent": {
+            "title": "Delta Cent",
+            "type": "integer"
+          },
+          "dias_prorrateo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Prorrateo"
+          },
+          "evidencia": {
+            "description": "Referencias citables: [\"linea:441\", \"mov:77\", \"cat:PRORRATEO_PLAN\"]",
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencia",
+            "type": "array"
+          },
+          "familia": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FamiliaConcepto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "monto_actual_cent": {
+            "title": "Monto Actual Cent",
+            "type": "integer"
+          },
+          "monto_previo_cent": {
+            "title": "Monto Previo Cent",
+            "type": "integer"
+          },
+          "movimiento_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Movimiento Id"
+          },
+          "nombre_comercial": {
+            "title": "Nombre Comercial",
+            "type": "string"
+          },
+          "tramos": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Tramo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Explicación auditable del prorrateo",
+            "title": "Tramos"
+          }
+        },
+        "required": [
+          "concepto_id",
+          "nombre_comercial",
+          "clase",
+          "monto_actual_cent",
+          "monto_previo_cent",
+          "delta_cent",
+          "confianza"
+        ],
+        "title": "LineaDelta",
+        "type": "object"
+      },
+      "MensajeAsesor": {
+        "additionalProperties": false,
+        "description": "Lo que el asesor escribe al cliente dentro de la conversación.",
+        "properties": {
+          "texto": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Texto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "texto"
+        ],
+        "title": "MensajeAsesor",
+        "type": "object"
+      },
+      "ModalidadRenta": {
+        "description": "Cómo se cobra la renta respecto del ciclo facturado.\n\nEn ADELANTADA el recibo del ciclo *k* cobra la renta del ciclo *k+1* y corrige\nel ciclo *k*: por eso conviven dos rentas en el mismo documento y el recibo puede\nsubir aunque el plan nuevo sea más barato.",
+        "enum": [
+          "ADELANTADA",
+          "VENCIDA"
+        ],
+        "title": "ModalidadRenta",
+        "type": "string"
+      },
+      "ModoGeneracion": {
+        "description": "Cómo se produjo finalmente el texto entregado al cliente.",
+        "enum": [
+          "LLM",
+          "LLM_REINTENTO",
+          "PLANTILLA"
+        ],
+        "title": "ModoGeneracion",
+        "type": "string"
+      },
+      "MotivoDerivacion": {
+        "description": "Por qué se deriva a un asesor humano.\n\nLos cuatro primeros son reglas duras: derivan sin calcular el score.",
+        "enum": [
+          "PETICION_HUMANO",
+          "INVARIANTE_ROTO",
+          "CONCEPTO_FUERA_CATALOGO",
+          "INTENCION_REGULATORIA",
+          "UMBRAL_INCOMPRENSION",
+          "VERIFICACION_FALLIDA",
+          "NIVEL_INSUFICIENTE"
+        ],
+        "title": "MotivoDerivacion",
+        "type": "string"
+      },
+      "NivelAseguramiento": {
+        "description": "Nivel de autenticación del solicitante (LOA).\n\nLOA0 solo ve el catálogo; LOA1 (WhatsApp) ve la existencia y la dirección del\ncambio pero **ningún monto**; LOA2 (App) ve la explicación completa; LOA_ASESOR\nes LOA2 con ``acting_on_behalf_of`` obligatorio y registrado en auditoría.",
+        "enum": [
+          "LOA0",
+          "LOA1",
+          "LOA2",
+          "LOA_ASESOR"
+        ],
+        "title": "NivelAseguramiento",
+        "type": "string"
+      },
+      "PeticionAlucinar": {
+        "additionalProperties": false,
+        "description": "Cuerpo de ``POST /dev/alucinar``.",
+        "properties": {
+          "activar": {
+            "default": true,
+            "description": "Activa o desactiva el modo adversario",
+            "title": "Activar",
+            "type": "boolean"
+          },
+          "cuenta_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Si se indica, ejecuta la demo adversaria en el acto",
+            "title": "Cuenta Id"
+          },
+          "delta_cent": {
+            "default": 731,
+            "description": "Céntimos que se inventarán en el texto",
+            "title": "Delta Cent",
+            "type": "integer"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          },
+          "turnos": {
+            "default": 1,
+            "description": "Turnos de /v1/explicar afectados",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Turnos",
+            "type": "integer"
+          }
+        },
+        "title": "PeticionAlucinar",
+        "type": "object"
+      },
+      "PeticionDerivacion": {
+        "additionalProperties": false,
+        "description": "Cuerpo de ``POST /v1/derivacion``.",
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "cuenta_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuenta Id"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "motivo_codigo": {
+            "$ref": "#/components/schemas/MotivoDerivacion",
+            "default": "PETICION_HUMANO"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          },
+          "utterance": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Utterance",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id"
+        ],
+        "title": "PeticionDerivacion",
+        "type": "object"
+      },
+      "PeticionExplicacion": {
+        "additionalProperties": false,
+        "description": "Cuerpo de ``POST /v1/explicar``.\n\n``cuenta_id`` se ignora si el token ya lo determina: ``account_ref`` se deriva\nSIEMPRE del token, jamás del texto del usuario. ``utterance`` entra al prompt\ncomo dato delimitado, nunca como instrucción.",
+        "properties": {
+          "canal": {
+            "$ref": "#/components/schemas/Canal",
+            "default": "APP"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "cuenta_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuenta Id"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "YYYY-MM; por defecto, el último",
+            "title": "Periodo"
+          },
+          "utterance": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Utterance",
+            "type": "string"
+          },
+          "verbosidad": {
+            "$ref": "#/components/schemas/Verbosidad",
+            "default": "CORTO"
+          }
+        },
+        "title": "PeticionExplicacion",
+        "type": "object"
+      },
+      "PeticionToken": {
+        "additionalProperties": false,
+        "description": "Cuerpo de ``POST /dev/token``.",
+        "properties": {
+          "acting_on_behalf_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Obligatorio si el nivel es LOA_ASESOR",
+            "title": "Acting On Behalf Of"
+          },
+          "amr": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Métodos de autenticación (claim amr)",
+            "title": "Amr"
+          },
+          "canal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Canal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cuenta_id": {
+            "default": "C-DEMO-01",
+            "description": "account_ref que irá en 'sub'",
+            "title": "Cuenta Id",
+            "type": "string"
+          },
+          "minutos": {
+            "anyOf": [
+              {
+                "maximum": 1440.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutos"
+          },
+          "nivel": {
+            "$ref": "#/components/schemas/NivelAseguramiento",
+            "default": "LOA2"
+          }
+        },
+        "title": "PeticionToken",
+        "type": "object"
+      },
+      "PlanFinanciamiento": {
+        "additionalProperties": false,
+        "description": "Cronograma completo de un equipo financiado.\n\nInvariante: el saldo final de la última cuota es exactamente 0 y la suma de\namortizaciones es igual al principal.",
+        "properties": {
+          "cronograma": {
+            "items": {
+              "$ref": "#/components/schemas/CuotaFinanciamiento"
+            },
+            "title": "Cronograma",
+            "type": "array"
+          },
+          "cuotas_totales": {
+            "exclusiveMinimum": 0.0,
+            "title": "Cuotas Totales",
+            "type": "integer"
+          },
+          "equipo": {
+            "title": "Equipo",
+            "type": "string"
+          },
+          "movimiento_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Movimiento Id"
+          },
+          "principal_cent": {
+            "title": "Principal Cent",
+            "type": "integer"
+          },
+          "tasa_mensual_bp": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Tasa Mensual Bp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "equipo",
+          "principal_cent",
+          "cuotas_totales"
+        ],
+        "title": "PlanFinanciamiento",
+        "type": "object"
+      },
+      "RespuestaAlucinar": {
+        "additionalProperties": false,
+        "description": "Estado del modo adversario y, si se pidió, el resultado de la demo inmediata.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "aviso": {
+            "title": "Aviso",
+            "type": "string"
+          },
+          "delta_cent": {
+            "title": "Delta Cent",
+            "type": "integer"
+          },
+          "demo": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demo"
+          },
+          "turnos_restantes": {
+            "title": "Turnos Restantes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "activo",
+          "delta_cent",
+          "turnos_restantes",
+          "aviso"
+        ],
+        "title": "RespuestaAlucinar",
+        "type": "object"
+      },
+      "RespuestaCanalAgnostica": {
+        "additionalProperties": false,
+        "description": "Lo que devuelve ``POST /v1/explicar``: bloques, acciones, derivación y gobernanza.",
+        "properties": {
+          "acciones": {
+            "items": {
+              "$ref": "#/components/schemas/Accion"
+            },
+            "title": "Acciones",
+            "type": "array"
+          },
+          "bloques": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "aviso": "#/components/schemas/BloqueAviso",
+                  "kv": "#/components/schemas/BloqueKV",
+                  "puente": "#/components/schemas/BloquePuente",
+                  "tabla": "#/components/schemas/BloqueTabla",
+                  "texto": "#/components/schemas/BloqueTexto"
+                },
+                "propertyName": "tipo"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/BloqueTexto"
+                },
+                {
+                  "$ref": "#/components/schemas/BloqueKV"
+                },
+                {
+                  "$ref": "#/components/schemas/BloquePuente"
+                },
+                {
+                  "$ref": "#/components/schemas/BloqueTabla"
+                },
+                {
+                  "$ref": "#/components/schemas/BloqueAviso"
+                }
+              ]
+            },
+            "title": "Bloques",
+            "type": "array"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "derivacion": {
+            "$ref": "#/components/schemas/Derivacion"
+          },
+          "gobernanza": {
+            "$ref": "#/components/schemas/Gobernanza"
+          },
+          "telemetria": {
+            "additionalProperties": true,
+            "description": "Incluye silence_probe_id para la tasa de silencio post-explicación",
+            "title": "Telemetria",
+            "type": "object"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "trace_id",
+          "gobernanza"
+        ],
+        "title": "RespuestaCanalAgnostica",
+        "type": "object"
+      },
+      "RespuestaDerivacion": {
+        "additionalProperties": false,
+        "description": "Lo que devuelve ``POST /v1/derivacion``.",
+        "properties": {
+          "cola": {
+            "default": "FACTURACION_104",
+            "description": "Cola de atención destino",
+            "title": "Cola",
+            "type": "string"
+          },
+          "context_ref": {
+            "title": "Context Ref",
+            "type": "string"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
+          "derivacion": {
+            "$ref": "#/components/schemas/Derivacion"
+          },
+          "factset_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factset Sha256"
+          },
+          "lineas_brief": {
+            "default": 0,
+            "description": "Líneas del brief (control de longitud)",
+            "title": "Lineas Brief",
+            "type": "integer"
+          },
+          "prioridad": {
+            "default": "NORMAL",
+            "title": "Prioridad",
+            "type": "string"
+          },
+          "resumen_asesor": {
+            "title": "Resumen Asesor",
+            "type": "string"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "vigencia_min": {
+            "default": 120,
+            "description": "Minutos que el contexto sigue vivo",
+            "title": "Vigencia Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "trace_id",
+          "conversation_id",
+          "derivacion",
+          "context_ref",
+          "resumen_asesor",
+          "creado_en"
+        ],
+        "title": "RespuestaDerivacion",
+        "type": "object"
+      },
+      "RespuestaEvidencia": {
+        "additionalProperties": false,
+        "description": "Cuerpo de ``GET /v1/evidencia/{explicacion_id}``.",
+        "properties": {
+          "corpus_saneado": {
+            "default": true,
+            "description": "Los items de corpus vienen sin cifras, por construcción",
+            "title": "Corpus Saneado",
+            "type": "boolean"
+          },
+          "explicacion_id": {
+            "title": "Explicacion Id",
+            "type": "string"
+          },
+          "factset_sha256": {
+            "title": "Factset Sha256",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemEvidencia"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "periodo": {
+            "title": "Periodo",
+            "type": "string"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "explicacion_id",
+          "trace_id",
+          "periodo",
+          "factset_sha256"
+        ],
+        "title": "RespuestaEvidencia",
+        "type": "object"
+      },
+      "RespuestaToken": {
+        "additionalProperties": false,
+        "description": "Token emitido y sus claims, para poder inspeccionarlos sin decodificar nada.",
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "claims": {
+            "additionalProperties": true,
+            "title": "Claims",
+            "type": "object"
+          },
+          "expira_en": {
+            "format": "date-time",
+            "title": "Expira En",
+            "type": "string"
+          },
+          "expira_en_s": {
+            "title": "Expira En S",
+            "type": "integer"
+          },
+          "token_type": {
+            "default": "Bearer",
+            "title": "Token Type",
+            "type": "string"
+          },
+          "uso": {
+            "default": "Authorization: Bearer <access_token>",
+            "description": "Cómo se envía en el resto de llamadas",
+            "title": "Uso",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "expira_en",
+          "expira_en_s",
+          "claims"
+        ],
+        "title": "RespuestaToken",
+        "type": "object"
+      },
+      "ResumenConcepto": {
+        "additionalProperties": false,
+        "description": "Entrada del listado del catálogo.",
+        "properties": {
+          "causa_oficial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CausaOficial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "concepto_id": {
+            "title": "Concepto Id",
+            "type": "string"
+          },
+          "familia": {
+            "$ref": "#/components/schemas/FamiliaConcepto"
+          },
+          "nombre_comercial": {
+            "title": "Nombre Comercial",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concepto_id",
+          "nombre_comercial",
+          "familia"
+        ],
+        "title": "ResumenConcepto",
+        "type": "object"
+      },
+      "TipoMovimiento": {
+        "description": "Evento del historial de órdenes (Amdocs) capaz de explicar una variación.",
+        "enum": [
+          "CAMBIO_PLAN",
+          "SUSPENSION",
+          "RECONEXION",
+          "ALTA_SERVICIO",
+          "BAJA_SERVICIO",
+          "FIN_DESCUENTO",
+          "ALTA_PAQUETE",
+          "ALTA_EQUIPO_FINANCIADO",
+          "NOTA_CREDITO",
+          "NOTA_DEBITO",
+          "AJUSTE_SUSPENSION"
+        ],
+        "title": "TipoMovimiento",
+        "type": "string"
+      },
+      "Tramo": {
+        "additionalProperties": false,
+        "description": "Fracción homogénea del ciclo: misma tarifa y mismo estado de servicio.\n\nLa tabla de tramos **es** la explicación del prorrateo: \"del 1 al 12 de julio el\nPlan A, del 13 al 30 el Plan B\". Todo el modelo de cálculo de la sección 4.1 se\nreduce a partir el ciclo en tramos disjuntos y sumar ``P_j · len_j / D``.\n\nEl intervalo es ``[inicio, fin)``: ``fin`` es **exclusivo**, de modo que los tramos\nencadenados cumplen ``tramo[i].fin == tramo[i+1].inicio`` y ``Σ dias == dias_ciclo``.",
+        "properties": {
+          "concepto_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concepto Id"
+          },
+          "descuento_cent": {
+            "default": 0,
+            "description": "Descuento mensual ya incluido en la tarifa",
+            "title": "Descuento Cent",
+            "type": "integer"
+          },
+          "dias": {
+            "description": "(fin - inicio).days",
+            "minimum": 0.0,
+            "title": "Dias",
+            "type": "integer"
+          },
+          "estado": {
+            "$ref": "#/components/schemas/EstadoServicio",
+            "default": "ACTIVO"
+          },
+          "etiqueta": {
+            "description": "Texto legible, p. ej. \"del 1 al 12 de julio\"",
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "facturable": {
+            "default": true,
+            "description": "Falso si no se cobra (p. ej. suspensión)",
+            "title": "Facturable",
+            "type": "boolean"
+          },
+          "fin": {
+            "description": "Extremo derecho EXCLUSIVO del tramo",
+            "format": "date",
+            "title": "Fin",
+            "type": "string"
+          },
+          "inicio": {
+            "format": "date",
+            "title": "Inicio",
+            "type": "string"
+          },
+          "monto_prorrateado_cent": {
+            "default": 0,
+            "description": "tarifa · dias / dias_ciclo, o 0",
+            "title": "Monto Prorrateado Cent",
+            "type": "integer"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nombre comercial del plan vigente",
+            "title": "Plan"
+          },
+          "tarifa_mensual_cent": {
+            "description": "Tarifa mensual vigente, con descuento ya aplicado",
+            "title": "Tarifa Mensual Cent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inicio",
+          "fin",
+          "dias",
+          "tarifa_mensual_cent",
+          "etiqueta"
+        ],
+        "title": "Tramo",
+        "type": "object"
+      },
+      "TurnoPublicado": {
+        "additionalProperties": false,
+        "description": "Un turno tal y como lo ve la consola del asesor o la del cliente.",
+        "properties": {
+          "autor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Identificador del asesor, solo en los turnos de rol asesor",
+            "title": "Autor"
+          },
+          "rol": {
+            "title": "Rol",
+            "type": "string"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          }
+        },
+        "required": [
+          "rol",
+          "texto"
+        ],
+        "title": "TurnoPublicado",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "Verbosidad": {
+        "description": "Longitud pedida para la explicación.",
+        "enum": [
+          "CORTO",
+          "DETALLE"
+        ],
+        "title": "Verbosidad",
+        "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "description": "JWT HS256 emitido por /dev/token",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "contact": {
+      "email": "concursos-cis@ulima.edu.pe",
+      "name": "Equipo recibo-claro"
+    },
+    "description": "\n**Asistente de explicación de recibos Movistar** — Hackathon AI Telecom 2026, Desafío 1.\n\nExplica en lenguaje simple por qué varió el recibo de un cliente comparándolo con los\ncinco previos que expone BrainyBill, atribuye la variación a las **nueve causas\noficiales** de la ficha (cambio de plan, equipo financiado, compra de paquetes, cargos\nadicionales, promociones vencidas, notas de crédito/débito, prorrateos, reconexiones y\najustes por días de suspensión), sugiere la siguiente acción y deriva a un asesor humano\n**con el contexto cargado** cuando no puede sostener una respuesta.\n\n### Garantías de diseño\n\n* **El modelo generativo no calcula.** Todas las cifras salen de un `FactSet`\n  determinístico, conciliado al céntimo y sellado con SHA-256.\n* **Verificador numérico en código.** Cada cifra del texto final se ancla contra el\n  `FactSet`; una sola sin anclar bloquea la respuesta y dispara la derivación.\n* **Invariante de conciliación.** Si la suma de variaciones por concepto no reproduce la\n  diferencia entre totales (±1 céntimo), no se explica: se deriva.\n* **Autenticación por niveles.** `LOA0` solo ve el catálogo; `LOA1` ve la dirección del\n  cambio sin importes; `LOA2` la explicación completa; `LOA_ASESOR` actúa a nombre de\n  una cuenta y queda registrado.\n* **Auditoría encadenada.** Cada turno deja una cadena de eventos con hash verificable\n  en `GET /v1/auditoria`.\n\n### Recorrido de la demo\n\n1. `POST /dev/token` — obtener un token (solo con `ENTORNO=dev`).\n2. `GET /v1/hechos` — ver los hechos conciliados del periodo.\n3. `POST /v1/explicar` — la explicación verificada, lista para cualquier canal.\n4. `GET /v1/evidencia/{explicacion_id}` — de dónde salió cada afirmación.\n5. `GET /v1/auditoria?trace_id=...` — la prueba en el log.\n6. `POST /dev/alucinar` — el caso adversario: cifra inventada, verificador que la caza.\n",
+    "license": {
+      "name": "MIT"
+    },
+    "summary": "Explica la variación del recibo con cero invenciones financieras, verificadas en código y comprobables por logs.",
+    "title": "recibo-claro · Explicación inteligente de recibos Movistar",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/salud": {
+      "get": {
+        "description": "Indica que el proceso está vivo y con qué configuración arrancó.\n\nNo consulta sistemas externos a propósito: una sonda de liveness que depende de\nterceros convierte la caída de un tercero en un reinicio en cascada.",
+        "operationId": "salud_salud_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Salud Salud Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness del servicio",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/salud/preparacion": {
+      "get": {
+        "description": "Comprueba corpus RAG, proveedor generativo y bitácora de auditoría.\n\nDevuelve ``503`` solo si falta algo **sin lo que no se puede responder**. Que no\nhaya proveedor LLM o que el RAG esté degradado no impide explicar: la plantilla\ndeterminística funciona sin ninguno de los dos y sus cifras salen del FactSet.",
+        "operationId": "preparacion_salud_preparacion_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preparacion Salud Preparacion Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness: dependencias comprobadas",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/salud/sistemas": {
+      "get": {
+        "description": "Diagnóstico del ACL: qué transporte hay configurado y si responde.\n\nEs la comprobación que se hace antes de una demo en vivo: dice de un vistazo si se\nestá leyendo el dataset del disco o hablando con los mocks.",
+        "operationId": "sistemas_salud_sistemas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sistemas Salud Sistemas Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Conectividad con BrainyBill y Amdocs",
+        "tags": [
+          "salud"
+        ]
+      }
+    },
+    "/v1/asesor/cola": {
+      "get": {
+        "description": "Cola del 104: casos derivados que nadie ha tomado todavía.\n\nSe excluyen las conversaciones que ya tienen un asesor dentro, porque una cola que\nmuestra lo que otro está atendiendo genera dos personas sobre el mismo cliente.",
+        "operationId": "cola_v1_asesor_cola_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ElementoCola"
+                  },
+                  "title": "Response Cola V1 Asesor Cola Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Derivaciones esperando a que un asesor las recoja",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/asesor/conversacion/{conversation_id}": {
+      "get": {
+        "description": "Devuelve el estado y todos los turnos.\n\nEs lo que sondea la consola del asesor. Se eligió sondeo y no un canal permanente\nporque para una demostración el resultado visible es idéntico y la mitad de piezas\npueden fallar. El salto a eventos del servidor no cambia este contrato.",
+        "operationId": "estado_v1_asesor_conversacion__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoSala"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Estado de la sala y transcripción completa",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/asesor/conversacion/{conversation_id}/mensaje": {
+      "post": {
+        "description": "Publica un turno de rol ``asesor``.\n\n**Este texto no pasa por el verificador numérico**, y es deliberado: el verificador\ngarantiza que la *máquina* no invente cifras. Una persona responde de sus propias\npalabras. Lo que sí queda es el rastro nominal en la bitácora.\n\nRaises:\n    ErrorApi: ``409`` si quien escribe no es el asesor que ocupa la sala.",
+        "operationId": "mensaje_v1_asesor_conversacion__conversation_id__mensaje_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MensajeAsesor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoSala"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "El asesor escribe al cliente dentro de la conversación",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/asesor/conversacion/{conversation_id}/salir": {
+      "post": {
+        "description": "Libera la sala. El asistente vuelve a modo autónomo.",
+        "operationId": "salir_v1_asesor_conversacion__conversation_id__salir_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoSala"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "El asesor deja la sala y la IA vuelve a atender",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/asesor/conversacion/{conversation_id}/unirse": {
+      "post": {
+        "description": "Suma al asesor a la sala. A partir de aquí el asistente no responde al cliente.\n\nRaises:\n    ErrorApi: ``404`` si la conversación no existe; ``409`` si ya hay otro asesor.",
+        "operationId": "unirse_v1_asesor_conversacion__conversation_id__unirse_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoSala"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "El asesor entra a la conversación y la IA pasa a copiloto",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/auditoria": {
+      "get": {
+        "description": "Devuelve los eventos del turno, su resumen y si la cadena está íntegra.",
+        "operationId": "obtener_auditoria_v1_auditoria_get",
+        "parameters": [
+          {
+            "description": "Traza devuelta por /v1/explicar",
+            "in": "query",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "description": "Traza devuelta por /v1/explicar",
+              "title": "Trace Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Adjunta el detalle completo",
+            "in": "query",
+            "name": "incluir_eventos",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Adjunta el detalle completo",
+              "title": "Incluir Eventos",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Filtra por etapas separadas por coma, p. ej. VERIFY,RESPONSE",
+            "in": "query",
+            "name": "etapas",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por etapas separadas por coma, p. ej. VERIFY,RESPONSE",
+              "title": "Etapas"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Obtener Auditoria V1 Auditoria Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "TRAZA_NO_ENCONTRADA"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eventos auditados de un turno y validez de la cadena de hashes",
+        "tags": [
+          "auditoria"
+        ]
+      }
+    },
+    "/v1/auditoria/cadena": {
+      "get": {
+        "description": "Recorre toda la bitácora y dice si algún evento fue alterado.\n\nNo devuelve contenido de ningún turno: solo el veredicto y, si falla, el índice del\nprimer evento cuyo hash no cuadra.",
+        "operationId": "verificar_cadena_completa_v1_auditoria_cadena_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Verificar Cadena Completa V1 Auditoria Cadena Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Verifica la cadena de hashes completa",
+        "tags": [
+          "auditoria"
+        ]
+      }
+    },
+    "/v1/catalogo": {
+      "get": {
+        "description": "Devuelve el catálogo de conceptos que se le pueden nombrar a un cliente.",
+        "operationId": "listar_v1_catalogo_get",
+        "parameters": [
+          {
+            "description": "Filtra por familia",
+            "in": "query",
+            "name": "familia",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FamiliaConcepto"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por familia",
+              "title": "Familia"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumenConcepto"
+                  },
+                  "title": "Response Listar V1 Catalogo Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lista de conceptos visibles para el cliente",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/v1/catalogo/{concepto_id}": {
+      "get": {
+        "description": "Explica un concepto del recibo sin exponer ningún dato de cuenta.\n\nUn ``concepto_id`` desconocido es un 404, no una explicación inventada: en la\nconversación ese mismo caso dispara la regla dura *\"concepto fuera de catálogo\"* y\nderiva a un asesor.",
+        "operationId": "obtener_concepto_v1_catalogo__concepto_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concepto_id",
+            "required": true,
+            "schema": {
+              "title": "Concepto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FichaConcepto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "CONCEPTO_NO_ENCONTRADO"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Definición de un concepto en lenguaje de cliente",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/v1/catalogo/{concepto_id}/crudo": {
+      "get": {
+        "description": "Vuelca la entrada de ``rules.yaml`` del concepto, incluida su parte técnica.\n\nSirve para auditar qué causas admite cada concepto (``regla_concepto_causa``) sin\nabrir el fichero de reglas en el servidor.",
+        "operationId": "obtener_concepto_crudo_v1_catalogo__concepto_id__crudo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concepto_id",
+            "required": true,
+            "schema": {
+              "title": "Concepto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Obtener Concepto Crudo V1 Catalogo  Concepto Id  Crudo Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ficha completa del concepto (diagnóstico)",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/v1/derivacion": {
+      "post": {
+        "description": "Crea el contexto del hand-off y devuelve la referencia y el brief del asesor.\n\nReutiliza el FactSet del último turno de la conversación si existe; si no —por\nejemplo, el cliente pide asesor sin haber pedido explicación—, lo construye. Un\nhand-off sin hechos sería exactamente la derivación \"a ciegas\" que este proyecto\nquiere eliminar.",
+        "operationId": "derivar_v1_derivacion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionDerivacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespuestaDerivacion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Deriva a un asesor humano con el contexto de la interacción",
+        "tags": [
+          "derivacion"
+        ]
+      }
+    },
+    "/v1/derivacion/{context_ref}": {
+      "get": {
+        "description": "Devuelve el contexto que dejó el hand-off.\n\nEs lo que abre el asesor del 104 al recibir la llamada: la ficha, el FactSet sellado\ny la explicación que ya se le dio al cliente, para no repetírsela.",
+        "operationId": "obtener_contexto_v1_derivacion__context_ref__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_ref",
+            "required": true,
+            "schema": {
+              "title": "Context Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Obtener Contexto V1 Derivacion  Context Ref  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Contexto completo de una derivación (consola del asesor)",
+        "tags": [
+          "derivacion"
+        ]
+      }
+    },
+    "/v1/evidencia/{explicacion_id}": {
+      "get": {
+        "description": "Devuelve la evidencia del turno identificado por ``explicacion_id``.\n\nEl identificador es el ``trace_id`` del turno, que la respuesta de ``/v1/explicar``\npublica en ``telemetria.explicacion_id`` y en la cabecera ``X-Trace-Id``.",
+        "operationId": "obtener_evidencia_v1_evidencia__explicacion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "explicacion_id",
+            "required": true,
+            "schema": {
+              "title": "Explicacion Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filtra por tipo: linea, mov, tramo, cat, faq, casuistica",
+            "in": "query",
+            "name": "solo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por tipo: linea, mov, tramo, cat, faq, casuistica",
+              "title": "Solo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespuestaEvidencia"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "EXPLICACION_NO_ENCONTRADA"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Evidencia que respalda una explicación entregada",
+        "tags": [
+          "evidencia"
+        ]
+      }
+    },
+    "/v1/explicar": {
+      "post": {
+        "description": "Explica por qué varió el recibo del periodo pedido.\n\nArgs:\n    peticion: cuerpo con ``conversation_id``, ``periodo``, ``verbosidad``,\n        ``utterance`` y ``canal``. El ``cuenta_id`` del cuerpo es redundante: la\n        cuenta sale del token y, si no coincide, se responde ``403``.\n\nReturns:\n    La :class:`RespuestaCanalAgnostica` con bloques, acciones, derivación y\n    gobernanza. En ``LOA1`` se devuelve redactada, sin ningún importe.",
+        "operationId": "explicar_recibo_v1_explicar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeticionExplicacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespuestaCanalAgnostica"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Explica la variación del recibo (respuesta canal-agnóstica, verificada)",
+        "tags": [
+          "explicar"
+        ]
+      }
+    },
+    "/v1/hechos": {
+      "get": {
+        "description": "Devuelve el ``FactSet`` del periodo pedido.\n\nEl ``account_ref`` sale **siempre** del token: ``cuenta_id`` solo se admite como\nconfirmación explícita del cliente y, si no coincide, la petición se rechaza con\n``403 CUENTA_NO_AUTORIZADA`` en lugar de resolverse en silencio.",
+        "operationId": "obtener_hechos_v1_hechos_get",
+        "parameters": [
+          {
+            "description": "Redundante: la cuenta se deriva del token. Si difiere, 403.",
+            "in": "query",
+            "name": "cuenta_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Redundante: la cuenta se deriva del token. Si difiere, 403.",
+              "title": "Cuenta Id"
+            }
+          },
+          {
+            "description": "YYYY-MM; por defecto, el último",
+            "in": "query",
+            "name": "periodo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM; por defecto, el último",
+              "title": "Periodo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "INVARIANTE_FALLIDO: |residual_cent| > 1, el recibo no se explica"
+          },
+          "422": {
+            "description": "SIN_RECIBO_PREVIO: no hay con qué comparar"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "FactSet conciliado del periodo (409 si el recibo no cuadra)",
+        "tags": [
+          "hechos"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "Liveness, readiness y conectividad con BrainyBill/Amdocs.",
+      "name": "salud"
+    },
+    {
+      "description": "FactSet conciliado: la única fuente de cifras.",
+      "name": "hechos"
+    },
+    {
+      "description": "Explicación verificada, canal-agnóstica.",
+      "name": "explicar"
+    },
+    {
+      "description": "Respaldo de cada afirmación entregada.",
+      "name": "evidencia"
+    },
+    {
+      "description": "Hand-off a asesor humano con contexto.",
+      "name": "derivacion"
+    },
+    {
+      "description": "Bitácora encadenada del turno.",
+      "name": "auditoria"
+    },
+    {
+      "description": "Conceptos del recibo en lenguaje de cliente.",
+      "name": "catalogo"
+    },
+    {
+      "description": "Utilidades de demo. Solo con ENTORNO=dev.",
+      "name": "desarrollo"
+    }
+  ]
+}

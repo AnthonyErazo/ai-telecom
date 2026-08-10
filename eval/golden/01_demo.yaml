@@ -1,0 +1,90 @@
+# Casos de guion fijo de la demostración en vivo (ficha, B.9: "demostración funcional
+# EN VIVO abordando al menos DOS de los escenarios críticos... en ambas modalidades de
+# renta ADELANTADA y VENCIDA"). Cubren prorrateo, cambio de plan, cuota de equipo
+# financiado, reconexión tras suspensión morosa y fin de descuento.
+#
+# Los importes están tomados del dataset sintético con seed 20260804 y periodo 2026-07.
+# Si el generador cambia, estos números deben cambiar con él: son el contrato.
+
+- caso_id: G01_demo_cambio_plan_adelantada
+  descripcion: >-
+    INSIGHT CENTRAL. Renta ADELANTADA con cambio de plan a mitad de ciclo: el plan de
+    lista baja de S/ 99.90 a S/ 79.90 y aun así el recibo SUBE S/ 20.82, porque el
+    descuento promocional muere con el plan anterior. La cuota de equipo financiado
+    actúa como distractor invariante.
+    Son DOS causas de signo contrario: el fin del descuento suma S/ 49.90 y el cambio de
+    plan ahorra S/ 32.26. Por eso se exigen aquí las dos causas y las dos causas
+    oficiales: si el motor volviera a atribuir la pérdida del descuento al cambio de
+    plan, faltaría FIN_DESCUENTO y este caso fallaría.
+  seed: 20260804
+  cuenta_id: C-DEMO-01
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes si cambié a un plan más barato?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados:
+    - RENTA_PLAN_MOVIL
+    - AJUSTE_RETROACTIVO_RENTA
+    - DESCUENTO_PROMOCIONAL
+    - IGV
+  delta_esperado_cent: 2082
+  total_esperado_cent: 21637
+  debe_derivar: false
+  no_debe_contener:
+    # La frase exacta de la explicación engañosa que este caso vigila.
+    - "cambió de plan a mitad de mes"
+
+- caso_id: G02_demo_reconexion_vencida
+  descripcion: >-
+    Renta VENCIDA con corte por morosidad y reconexión: nueve días suspendidos rebajan
+    la renta S/ 17.39 pero el cargo de reconexión de S/ 25.00 deja el recibo S/ 8.98
+    por encima. Es el caso donde el cliente cree que le cobraron un mes que no usó.
+  seed: 20260804
+  cuenta_id: C-DEMO-02
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, ¿qué me están cobrando?"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [RECONEXIONES, AJUSTES_POR_DIAS_DE_SUSPENSION]
+  conceptos_esperados:
+    - CARGO_RECONEXION
+    - RENTA_PLAN_MOVIL
+    - IGV
+  delta_esperado_cent: 898
+  total_esperado_cent: 9016
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G03_demo_fin_descuento_deuda_vencida
+  descripcion: >-
+    Fin de descuento promocional más deuda arrastrada. El mes vale S/ 174.87 pero el
+    total a pagar es S/ 328.03: la deuda anterior NO entra en el total del periodo y la
+    explicación tiene que distinguir ambas cifras sin mezclarlas.
+  seed: 20260804
+  cuenta_id: C-DEMO-03
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "¿por qué me sale tanto por pagar este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO, DEUDA_ANTERIOR]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados:
+    - DESCUENTO_PROMOCIONAL
+    - INTERES_MORATORIO
+    - IGV
+  delta_esperado_cent: 2171
+  total_esperado_cent: 17487
+  debe_derivar: false
+  no_debe_contener: []

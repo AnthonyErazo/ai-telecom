@@ -1,0 +1,16 @@
+customerID,SeniorCitizen,Dependents,tenure,PhoneService,InternetService,StreamingTV,Contract,PaperlessBilling,PaymentMethod,MonthlyCharges,TotalCharges,Churn
+1001-AAAAA,0,No,24,Yes,Fiber optic,Yes,Two year,Yes,Electronic check,89.50,2148.00,No
+1002-BBBBB,0,Yes,9,Yes,DSL,No,Month-to-month,No,Mailed check,54.30,488.70,Yes
+1003-CCCCC,1,No,36,Yes,No,No,One year,No,Bank transfer (automatic),20.15,725.40,No
+1004-DDDDD,0,Yes,12,No,Fiber optic,Yes,Month-to-month,Yes,Credit card (automatic),74.90,898.80,No
+1005-EEEEE,0,No,6,Yes,DSL,Yes,One year,Yes,Electronic check,66.05,396.30,No
+1006-FFFFF,1,Yes,48,Yes,Fiber optic,Yes,Two year,Yes,Bank transfer (automatic),105.25,5052.00,No
+1007-GGGGG,0,No,18,No,DSL,No,Month-to-month,No,Mailed check,45.00,810.00,Yes
+1008-HHHHH,1,Yes,30,Yes,No,No internet service,Two year,No,Credit card (automatic),24.80,744.00,No
+1009-IIIII,0,No,15,Yes,Fiber optic,No,One year,Yes,Electronic check,80.40,1206.00,No
+1010-JJJJJ,0,No,3,Yes,DSL,No,Month-to-month,Yes,Mailed check,50.10,150.30,Yes
+1011-KKKKK,0,Yes,22,Yes,Fiber optic,Yes,Trimestral,Yes,Electronic check,92.00,2024.00,No
+1012-LLLLL,0,No,11,Yes,DSL,No,Month-to-month,No,Mailed check,61.20, ,No
+1013-MMMMM,1,No,20,Yes,Fiber optic,Yes,One year,Yes,Bank transfer (automatic),70.00,210.00,No
+1001-AAAAA,0,No,24,Yes,Fiber optic,Yes,Two year,Yes,Electronic check,89.50,2148.00,No
+1014-CCCCC,0,No,27,Yes,Fiber optic,Yes,Two year,Yes,Electronic check,95.60,2581.20,No

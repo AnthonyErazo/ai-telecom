@@ -1,0 +1,33 @@
+{# Cambio de plan con RENTA ADELANTADA — el caso central del proyecto.
+   En adelantada el recibo cobra la renta del ciclo siguiente y corrige el ciclo que
+   acaba de cerrar: conviven dos rentas en el mismo documento y el recibo puede subir
+   aunque el plan nuevo sea más barato. Eso es exactamente lo que hay que explicar. #}
+{% from "_comun.jinja" import apertura, totales, contraste, cierre_estandar, frase_generica, frase_residual_std, tabla_tramos, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }} porque cambió de plan a mitad de mes y su renta se cobra por adelantado.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{% if c.causa == "CAMBIO_PLAN" and not c.sube %}
+El cambio de plan le ahorró {{ c.monto }}: en este recibo se juntan el ajuste de los días que ya usó con el plan anterior y la renta del mes que viene con el plan nuevo, que se cobra adelantada.
+{% elif c.causa == "CAMBIO_PLAN" %}
+El cambio de plan explica {{ c.monto }}: en este recibo se juntan el ajuste de los días que ya usó con el plan anterior y la renta del mes que viene con el plan nuevo, que se cobra adelantada.
+{% elif c.causa == "FIN_DESCUENTO" %}
+Se le terminó un descuento de {{ c.monto }}: la promoción estaba atada al plan anterior y dejó de aplicarse al cambiarlo.
+{% else %}
+{{ frase_generica(d, c) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Como su renta es adelantada, cada recibo trae la mensualidad del mes que empieza y, además, la corrección de los días del mes que terminó. Por eso usted puede ver dos montos de renta en el mismo documento, incluso si su plan nuevo cuesta menos al mes. {{ contraste(d) }} {{ tabla_tramos(d) }} {{ lista_lineas(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

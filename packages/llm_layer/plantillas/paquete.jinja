@@ -1,0 +1,28 @@
+{# Compra de paquetes o alta de un servicio adicional dentro del ciclo. #}
+{% from "_comun.jinja" import apertura, totales, cierre_estandar, frase_generica, frase_residual_std, tabla_tramos, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }} porque durante el mes se activaron paquetes o servicios adicionales a su plan.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{% if c.causa == "ALTA_PAQUETE" %}
+Los paquetes que activó explican {{ c.monto }}: son compras sueltas que se le cargan al recibo del mes en que las hizo.
+{% elif c.causa == "ALTA_SERVICIO" %}
+El servicio que contrató explica {{ c.monto }}: como empezó a mitad del ciclo, se le cobró solo por los días que estuvo activo.
+{% else %}
+{{ frase_generica(d, c) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Los paquetes de datos, de roaming o de contenido se le cobran en el recibo del mes en que los activó y no se renuevan solos, salvo que usted lo haya pedido. Si el servicio se activó a mitad de mes, se le cobra solo por los días de uso. {{ tabla_tramos(d) }} {{ lista_lineas(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

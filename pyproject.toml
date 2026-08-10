@@ -1,0 +1,111 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recibo-claro"
+version = "0.1.0"
+description = "Asistente de explicacion de recibos Movistar con cero alucinaciones financieras (Hackathon AI Telecom 2026, Desafio 1)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
+authors = [{ name = "Equipo recibo-claro" }]
+keywords = ["facturacion", "rag", "llm", "movistar", "hackathon"]
+
+# Solo licencias permisivas (MIT / Apache-2.0 / BSD / PSF). Prohibido GPL/AGPL.
+dependencies = [
+    "fastapi>=0.115,<1.0",            # MIT
+    "uvicorn[standard]>=0.30,<1.0",   # BSD-3
+    "pydantic>=2.9,<3.0",             # MIT
+    "pydantic-settings>=2.4,<3.0",    # MIT
+    "sqlalchemy>=2.0,<3.0",           # MIT
+    "psycopg[binary]>=3.2,<4.0",      # LGPL-3.0: uso como biblioteca sin modificar, no es GPL/AGPL
+    "jinja2>=3.1,<4.0",               # BSD-3
+    "rank-bm25>=0.2.2,<0.3",          # Apache-2.0
+    "google-genai>=1.0,<2.0",         # Apache-2.0
+    "pyjwt>=2.9,<3.0",                # MIT
+    "pyyaml>=6.0,<7.0",               # MIT
+    "httpx>=0.27,<1.0",               # BSD-3
+]
+
+[project.optional-dependencies]
+# LLM_MODE=langchain. OPCIONAL: la demo por defecto (LLM_MODE=mock) no lo necesita y
+# el sistema arranca sin el paquete. Solo langchain-core, que es MIT. Prohibido
+# langgraph-api / langgraph-cli / LangSmith: Elastic License 2.0 o servicio
+# propietario, y la clausula 9 de las bases cede la propiedad intelectual a Integratel.
+langchain = [
+    "langchain-core>=1.5,<2.0",       # MIT
+]
+# packages/orquestacion: el turno modelado como StateGraph con checkpointer persistente.
+# OPCIONAL por la misma razon: sin estos paquetes el endpoint responde igual. Las cuatro
+# dependencias son MIT. Sigue prohibido langgraph-api / langgraph-cli / LangGraph
+# Platform / LangSmith como servicio: Elastic License 2.0 o propietario.
+orquestacion = [
+    "langgraph>=1.2,<2.0",                    # MIT
+    "langchain-core>=1.5,<2.0",               # MIT
+    "langgraph-checkpoint>=4.1,<5.0",         # MIT
+    "langgraph-checkpoint-sqlite>=3.1,<4.0",  # MIT
+]
+dev = [
+    "pytest>=8.3,<9.0",
+    "pytest-cov>=5.0,<7.0",
+    "hypothesis>=6.100,<7.0",
+    "ruff>=0.6,<1.0",
+]
+
+[project.scripts]
+recibo-datagen = "packages.datagen.generar:main"
+
+[tool.setuptools.packages.find]
+include = ["packages*", "apps*"]
+exclude = ["tests*", "eval*", "data*", "docs*", "db*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "golden: casos golden que hacen fallar la build si hay alucinacion numerica",
+    "propiedad: pruebas de propiedad con Hypothesis",
+    "contrato: validacion de esquemas JSON y snapshot de OpenAPI",
+    "integracion: cruzan una frontera real (disco, proceso nuevo) en vez de simularla",
+    "lento: pruebas que tardan mas de un segundo",
+    "gemini: requiere GEMINI_API_KEY real (se omite por defecto)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["data", "db/migraciones"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "C4",  # comprehensions
+    "SIM", # simplify
+    "RUF",
+]
+ignore = [
+    "E501",   # la longitud la controla el formateador
+    "RUF001", # caracteres unicode ambiguos: el dominio es en espanol
+    "RUF002",
+    "RUF003",
+    "B008",   # Depends() en firmas de FastAPI
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+"packages/facts_engine/*" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.coverage.run]
+source = ["packages"]
+omit = ["*/__init__.py"]

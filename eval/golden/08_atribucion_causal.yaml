@@ -1,0 +1,131 @@
+# Atribución causal: casos que vigilan que cada delta lleve su causa REAL.
+#
+# El defecto que estos casos protegen: cuando un cambio de plan cancela una promoción
+# atada al plan anterior, el único movimiento del ciclo era el CAMBIO_PLAN. Atribuir por
+# "el movimiento más cercano en el tiempo" etiquetaba la desaparición del descuento como
+# cambio de plan, agregaba las tres líneas en una sola causa de +S/ 17.64 y el cliente
+# leía «su recibo subió porque cambió de plan a mitad de mes». La aritmética cerraba y
+# la explicación era falsa: el cambio de plan, por sí solo, le BAJÓ el recibo S/ 32.26.
+#
+# La corrección vive en tres sitios y estos casos la fijan por los dos extremos:
+#   · `preferencia_causa` de rules.yaml — la regla de concepto que decide la causa por
+#     lo que la variación ES, no por lo que hay cerca en el tiempo.
+#   · el generador, que ahora emite DOS movimientos (CAMBIO_PLAN y FIN_DESCUENTO).
+#   · la narrativa, que ordena por impacto absoluto, separa los signos y reconoce el
+#     ahorro en voz alta.
+#
+# Los importes salen del dataset sintético con seed 20260804 y periodo 2026-07. Si el
+# generador cambia, estos números deben cambiar con él: son el contrato.
+
+- caso_id: G35_fin_descuento_mata_promocion_adelantada
+  descripcion: >-
+    ATRIBUCIÓN CAUSAL, caso directo en renta ADELANTADA. El recibo insignia preguntado en
+    formato corto y por otro canal. La causa dominante debe ser el FIN_DESCUENTO
+    (+S/ 49.90), no el cambio de plan (−S/ 32.26), y el texto no puede atribuir la subida
+    al cambio de plan. La clase de variación del descuento es DESAPARECIDO: la promoción
+    se cae entera al morir el plan que la sostenía.
+  seed: 20260804
+  cuenta_id: C-DEMO-01
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "me pasé a un plan más barato y me cobran más, ¿qué pasó?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [FIN_DESCUENTO, CAMBIO_PLAN]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS, CAMBIO_DE_PLAN]
+  conceptos_esperados:
+    - DESCUENTO_PROMOCIONAL
+    - RENTA_PLAN_MOVIL
+    - AJUSTE_RETROACTIVO_RENTA
+  delta_esperado_cent: 2082
+  total_esperado_cent: 21637
+  debe_derivar: false
+  no_debe_contener:
+    # Si el motor volviera a atribuir el descuento al cambio de plan, la plantilla
+    # elegida sería cambio_plan_adelantada y su resumen contendría esta frase.
+    - "cambió de plan a mitad de mes"
+
+- caso_id: G36_fin_descuento_mata_promocion_vencida
+  descripcion: >-
+    ATRIBUCIÓN CAUSAL, el mismo defecto en renta VENCIDA. Aquí no hay ajuste retroactivo
+    que distraiga: la renta baja por el prorrateo de los dos planes y aun así el recibo
+    sube S/ 76.78, porque el descuento que se pierde es mucho mayor que el ahorro. Es el
+    caso que más se parece a una queja real y el que peor se explicaba antes.
+  seed: 20260804
+  cuenta_id: C-00009
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "me cambié de plan y el recibo subió, ¿por qué?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [FIN_DESCUENTO, CAMBIO_PLAN]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS, CAMBIO_DE_PLAN]
+  conceptos_esperados:
+    - DESCUENTO_PROMOCIONAL
+    - RENTA_PLAN_MOVIL
+    - IGV
+  delta_esperado_cent: 7678
+  total_esperado_cent: 11537
+  debe_derivar: false
+  no_debe_contener:
+    - "cambió de plan a mitad de mes"
+
+- caso_id: G37_cambio_plan_sin_promocion_adelantada
+  descripcion: >-
+    CASO INVERSO, el que impide que la corrección se pase de frenada. Cambio de plan en
+    renta adelantada SIN promoción que perder: no hay ninguna línea de descuento, así que
+    la regla de concepto no debe dispararse, la causa tiene que seguir siendo el cambio
+    de plan y el texto no puede hablar de ninguna promoción terminada. Si alguien
+    "arreglara" la atribución convirtiendo todo aumento en un fin de descuento, este caso
+    lo detecta.
+  seed: 20260804
+  cuenta_id: C-00129
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué subió mi recibo si solo cambié de plan?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados:
+    - RENTA_PLAN_MOVIL
+    - AJUSTE_RETROACTIVO_RENTA
+    - IGV
+  delta_esperado_cent: 3198
+  total_esperado_cent: 14101
+  debe_derivar: false
+  no_debe_contener:
+    - "Se le terminó un descuento"
+    - "promociones vencidas"
+
+- caso_id: G38_fin_descuento_prorrateado_vencida
+  descripcion: >-
+    La otra clase de variación de la regla de concepto. Aquí la promoción no desaparece:
+    vence a mitad del ciclo y el descuento se cobra solo por los días que estuvo vigente,
+    así que la línea SUBE en lugar de desaparecer. La preferencia por concepto tiene que
+    cubrir también esa clase, y con la deuda anterior de distractor la causa del mes debe
+    seguir siendo la promoción vencida.
+  seed: 20260804
+  cuenta_id: C-DEMO-03
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "mi descuento ya no aparece completo, ¿por qué?"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO, DEUDA_ANTERIOR]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados:
+    - DESCUENTO_PROMOCIONAL
+    - IGV
+  delta_esperado_cent: 2171
+  total_esperado_cent: 17487
+  debe_derivar: false
+  no_debe_contener: []

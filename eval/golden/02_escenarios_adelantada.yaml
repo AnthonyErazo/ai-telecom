@@ -1,0 +1,144 @@
+# Los siete escenarios con variación en modalidad RENTA ADELANTADA.
+# El octavo (ESTABLE) es el grupo de control y vive en 05_controles_estable.yaml.
+#
+# En ADELANTADA el recibo del ciclo k cobra la renta del ciclo k+1 y corrige el ciclo k
+# con un ajuste retroactivo: conviven dos rentas en el mismo documento.
+
+- caso_id: G04_cambio_plan_adelantada
+  descripcion: Cambio de plan a mitad de ciclo con ajuste retroactivo positivo.
+  seed: 20260804
+  cuenta_id: C-00017
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué cambió mi recibo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [RENTA_PLAN_MOVIL, AJUSTE_RETROACTIVO_RENTA, IGV]
+  delta_esperado_cent: 1359
+  total_esperado_cent: 8876
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G05_cuota_equipo_adelantada
+  descripcion: >-
+    Primera cuota de un equipo financiado. La cuota NUNCA se prorratea y la clave
+    explicativa es "cuota N de M".
+  seed: 20260804
+  cuenta_id: C-00034
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "¿qué es este cargo del equipo que me aparece?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_FINANCIAMIENTO]
+  delta_esperado_cent: 5950
+  total_esperado_cent: 27166
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G06_corte_reconexion_adelantada
+  descripcion: >-
+    Reconexión tras suspensión morosa con el recibo a la BAJA. El ajuste por días de
+    suspensión pesa más que el cargo de reconexión: el sistema debe decir que bajó.
+  seed: 20260804
+  cuenta_id: C-00019
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "me suspendieron el servicio, ¿cómo queda mi recibo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [RECONEXIONES, AJUSTES_POR_DIAS_DE_SUSPENSION]
+  conceptos_esperados: [CARGO_RECONEXION, AJUSTE_DIAS_SUSPENSION, IGV]
+  delta_esperado_cent: -472
+  total_esperado_cent: 18476
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G07_fin_descuento_adelantada
+  descripcion: Promoción vencida; la tarifa vuelve a lista y el recibo sube.
+  seed: 20260804
+  cuenta_id: C-00004
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me subió el recibo y no cambié nada"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 2947
+  total_esperado_cent: 11788
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G08_alta_paquete_adelantada
+  descripcion: Compra de un paquete de TV premium dentro del ciclo.
+  seed: 20260804
+  cuenta_id: C-00085
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿qué es este cobro adicional?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [PAQUETE_TV_PREMIUM, IGV]
+  delta_esperado_cent: 2348
+  total_esperado_cent: 24300
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G09_nota_credito_adelantada
+  descripcion: Nota de crédito a favor del cliente; el recibo BAJA.
+  seed: 20260804
+  cuenta_id: C-00006
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué me vino más barato este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [NOTA_CREDITO, IGV]
+  delta_esperado_cent: -5888
+  total_esperado_cent: 1088
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G10_deuda_anterior_adelantada
+  descripcion: >-
+    Deuda arrastrada con interés moratorio. La deuda anterior queda FUERA del total del
+    periodo: el delta del mes es solo el interés.
+  seed: 20260804
+  cuenta_id: C-00007
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "¿cuánto tengo que pagar en total?"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 59
+  total_esperado_cent: 5914
+  debe_derivar: false
+  no_debe_contener: []

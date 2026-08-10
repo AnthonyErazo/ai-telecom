@@ -1,0 +1,18 @@
+# recibo-claro — desarrollo y pruebas
+#
+#   pip install -r requirements-dev.txt
+#
+# Incluye todo lo de ejecución. La fuente de verdad sigue siendo `pyproject.toml`
+# (sección [project.optional-dependencies].dev).
+
+-r requirements.txt
+
+pytest>=8.3,<9.0          # MIT
+pytest-cov>=5.0,<7.0      # MIT
+hypothesis>=6.100,<7.0    # MPL-2.0: copyleft de fichero, no se enlaza ni se
+                          # redistribuye; solo se usa para ejecutar pruebas
+ruff>=0.6,<1.0            # MIT
+
+# Comprobación rápida tras instalar:
+#   pytest -q                       → 1525 pruebas
+#   python -m ruff check packages/

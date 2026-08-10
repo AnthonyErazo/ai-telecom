@@ -1,0 +1,27 @@
+{# Deuda arrastrada de recibos anteriores. Ojo con la distinción que más confunde:
+   el consumo del mes NO cambió; lo que sube es el TOTAL A PAGAR. #}
+{% from "_comun.jinja" import apertura, totales, cierre_estandar, efervescente, frase_generica, frase_residual_std, lista_lineas %}
+
+{% macro resumen(d) -%}
+{% if d.sin_variacion %}
+Su consumo del mes no cambió: lo que le sube el total a pagar es el saldo que quedó pendiente de recibos anteriores.
+{% else %}
+{{ apertura(d) }}, y además usted arrastra un saldo pendiente de recibos anteriores.
+{% endif %}
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{{ frase_generica(d, c) }}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Su recibo tiene dos partes distintas: los cargos del mes, que suman {{ d.total_actual }}, y el saldo de recibos anteriores que quedó sin pagar, {{ d.deuda_anterior }}. Juntos, el total a pagar es {{ d.total_a_pagar }}. Ponerse al día le evita los intereses por mora y que le corten el servicio. {{ lista_lineas(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ efervescente(d) }} Si usted ya pagó, el pago puede demorar unos días en verse reflejado; con gusto se lo reviso o lo paso con un asesor.
+{%- endmacro %}

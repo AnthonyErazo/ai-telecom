@@ -1,0 +1,30 @@
+{# Notas de crédito y de débito: ajustes formales sobre recibos ya emitidos.
+   Responden a exigencias fiscales y regulatorias, y el cliente casi nunca sabe
+   qué son: se explican en lenguaje llano y sin jerga contable. #}
+{% from "_comun.jinja" import apertura, totales, cierre_estandar, frase_generica, frase_residual_std, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }} porque se aplicó un ajuste sobre un recibo anterior.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{% if c.causa == "NOTA_CREDITO" %}
+La nota de crédito le descuenta {{ c.monto }}: es la devolución de un cobro que no correspondía, aplicada directamente a este recibo.
+{% elif c.causa == "NOTA_DEBITO" %}
+La nota de débito le suma {{ c.monto }}: corrige un cobro que quedó por debajo de lo que correspondía en un recibo anterior.
+{% else %}
+{{ frase_generica(d, c) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Una nota de crédito o de débito es un documento que corrige un recibo ya emitido. Un recibo anterior no se puede borrar, así que la corrección se aplica en el siguiente. Por eso el ajuste le aparece en este recibo y no en el mes al que corresponde. {{ lista_lineas(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

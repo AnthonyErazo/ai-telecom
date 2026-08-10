@@ -1,0 +1,142 @@
+# Los mismos siete escenarios en modalidad RENTA VENCIDA.
+# En VENCIDA el recibo del ciclo k cobra el ciclo k que ya cerró: no hay ajuste
+# retroactivo y el prorrateo se ve directamente en la renta del periodo.
+
+- caso_id: G11_cambio_plan_vencida
+  descripcion: >-
+    Cambio de plan a mitad de ciclo en VENCIDA: la renta del mes es la suma de los
+    tramos y la tabla de tramos ES la explicación.
+  seed: 20260804
+  cuenta_id: C-00009
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿cómo me lo cobraron?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [RENTA_PLAN_MOVIL, IGV]
+  delta_esperado_cent: 7678
+  total_esperado_cent: 11537
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G12_cuota_equipo_vencida
+  descripcion: Cuota de equipo financiado sin intereses (sistema francés con i = 0).
+  seed: 20260804
+  cuenta_id: C-00010
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué me cobran el celular en el recibo?"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 3240
+  total_esperado_cent: 15028
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G13_corte_reconexion_vencida
+  descripcion: >-
+    Suspensión larga en VENCIDA: el descuento por los días sin servicio supera al cargo
+    de reconexión y el recibo baja S/ 8.52.
+  seed: 20260804
+  cuenta_id: C-00027
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "estuve suspendido varios días, ¿me descontaron?"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [RECONEXIONES, AJUSTES_POR_DIAS_DE_SUSPENSION]
+  conceptos_esperados: [CARGO_RECONEXION, RENTA_PLAN_MOVIL, IGV]
+  delta_esperado_cent: -1232
+  total_esperado_cent: 11724
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G14_fin_descuento_vencida
+  descripcion: Fin de descuento prorrateado dentro del ciclo.
+  seed: 20260804
+  cuenta_id: C-00028
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "se me venció una promoción, ¿cuánto me afecta?"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 912
+  total_esperado_cent: 13847
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G15_alta_paquete_vencida
+  descripcion: Paquete de roaming comprado en el ciclo.
+  seed: 20260804
+  cuenta_id: C-00029
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "compré un paquete de viaje, ¿está incluido acá?"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [PAQUETE_ROAMING, IGV]
+  delta_esperado_cent: 3528
+  total_esperado_cent: 15918
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G16_nota_debito_vencida
+  descripcion: >-
+    Nota de DÉBITO (la ficha nombra crédito Y débito). El recibo sube por una
+    regularización, no por consumo.
+  seed: 20260804
+  cuenta_id: C-00014
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me llegó un cargo que no reconozco"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [NOTA_DEBITO, IGV]
+  delta_esperado_cent: 2939
+  total_esperado_cent: 16039
+  debe_derivar: false
+  no_debe_contener: []
+
+- caso_id: G17_deuda_anterior_vencida
+  descripcion: Deuda arrastrada de S/ 97.00 más interés moratorio del mes.
+  seed: 20260804
+  cuenta_id: C-00015
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "no pagué el mes pasado, ¿cómo queda mi cuenta?"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 132
+  total_esperado_cent: 13372
+  debe_derivar: false
+  no_debe_contener: []

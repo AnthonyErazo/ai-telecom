@@ -1,0 +1,600 @@
+# =============================================================================
+# recibo-claro — reglas de negocio versionadas
+# -----------------------------------------------------------------------------
+# Este archivo es la ÚNICA fuente de parámetros de negocio. El motor determinístico
+# no tiene constantes de negocio en el código: todo lo que un analista de facturación
+# podría discutir vive aquí y viaja en `rules_version` dentro de cada respuesta.
+#
+# Etiquetas: [CONFIRMADO-OFICIAL] cita de las bases/ficha · [SUPUESTO] · [PROPUESTA]
+#            · [POR VALIDAR] pendiente de confirmar con el equipo de facturación.
+# =============================================================================
+rules_version: "1.0.0"
+descripcion: >-
+  Reglas simplificadas de facturación B2C para la explicación de recibos.
+  Valores de referencia del MVP; los marcados [POR VALIDAR] deben confirmarse con
+  el equipo de facturación de Movistar antes de cualquier uso real.
+
+# -----------------------------------------------------------------------------
+# Política de cálculo
+# -----------------------------------------------------------------------------
+politica:
+  # [POR VALIDAR] Si es false, los días en suspensión no se cobran y generan un
+  # ajuste negativo. Si es true, la renta corre igual durante la suspensión.
+  cobro_en_suspension: false
+  # [POR VALIDAR] "actual" usa los días reales del ciclo (28/29/30/31);
+  # "30_360" fuerza meses de 30 días.
+  convencion_prorrateo: actual
+  dias_base_30_360: 30
+  # Invariante de conciliación: por encima de esto NO se explica, se deriva.
+  tolerancia_residual_cent: 1
+  # IGV peruano en puntos básicos (18,00 %).
+  igv_bp: 1800
+  # Reparto del residuo de redondeo entre líneas.
+  metodo_redondeo: mayor_resto
+  # El cargo de reconexión es fijo y se cobra una sola vez en el ciclo. [SUPUESTO]
+  cargo_reconexion_cent: 2500
+  # Las cuotas de equipo financiado NUNCA se prorratean.
+  prorratear_financiamiento: false
+  # Días de gracia antes de suspender por deuda. [SUPUESTO]
+  dias_gracia_suspension: 15
+
+# -----------------------------------------------------------------------------
+# Confianza de la atribución de causa (sección 4.7)
+# -----------------------------------------------------------------------------
+confianza:
+  causa_unica: 0.98
+  sin_candidato: 0.30
+  multiples_candidatos: 0.65
+  tope_prorrateo_inconsistente: 0.50
+  tolerancia_prorrateo_cent: 1
+  minima_para_explicar: 0.35
+  # Causa fijada por `preferencia_causa` sin ninguna orden del CRM que la respalde.
+  # Alta (la regla de concepto es determinista) pero por debajo de `causa_unica`:
+  # una causa deducida del concepto no vale lo mismo que una causa documentada.
+  regla_concepto: 0.90
+
+# -----------------------------------------------------------------------------
+# Umbrales del score de incomprensión (sección 4.8)
+# U = 1 - (w1*s1 + w2*s2 + w3*(1-s3) + w6*(1-s6));  DERIVAR si U > tau_alto
+# -----------------------------------------------------------------------------
+umbrales_incomprension:
+  tau_alto: 0.65
+  tau_bajo: 0.35
+  pesos:
+    w1: 0.40 # cobertura del delta explicado
+    w2: 0.25 # unicidad de causa
+    w3: 0.20 # repregunta
+    w6: 0.15 # turnos sin progreso
+  similitud_repregunta: 0.80
+  max_turnos_sin_progreso: 2
+  histeresis: true # una vez derivado, no se vuelve atrás
+  reglas_duras:
+    - PETICION_HUMANO
+    - INVARIANTE_ROTO
+    - CONCEPTO_FUERA_CATALOGO
+    - INTENCION_REGULATORIA
+  intenciones_regulatorias:
+    - reclamo formal
+    - libro de reclamaciones
+    - osiptel
+    - indecopi
+    - dar de baja
+    - portabilidad
+    - cancelar el servicio
+
+# -----------------------------------------------------------------------------
+# Cross-selling restrictivo (literal de la ficha): doble condición
+# -----------------------------------------------------------------------------
+cross_selling:
+  habilitado: true
+  requiere_consulta_resuelta: true
+  requiere_regla_explicita: true
+  confianza_minima: 0.90
+  prohibido_si_derivacion: true
+  prohibido_si_delta_negativo: false
+  reglas_explicitas:
+    - id: MT_SI_TIENE_MOVIL_Y_HOGAR
+      descripcion: Cliente con móvil y hogar por separado; Movistar Total le ahorraría.
+      requiere_causas: []
+      requiere_conceptos: [RENTA_PLAN_MOVIL, RENTA_HOGAR_INTERNET]
+    - id: PAQUETE_DATOS_RECURRENTE
+      descripcion: Compró paquetes de datos en 3 ciclos seguidos; un plan mayor le conviene.
+      requiere_causas: [ALTA_PAQUETE]
+      requiere_conceptos: [PAQUETE_DATOS_ADICIONAL]
+
+# -----------------------------------------------------------------------------
+# Efecto efervescente: beneficios que el cliente YA tiene y se recuerdan al cerrar,
+# SIN presentarlos como adiciones nuevas (literal de la ficha).
+# -----------------------------------------------------------------------------
+efecto_efervescente:
+  habilitado: true
+  maximo_beneficios: 2
+  frase_apertura: "Recuerde que su plan ya incluye"
+
+# -----------------------------------------------------------------------------
+# Tabla regla_concepto_causa: qué movimientos pueden explicar cada concepto.
+# Fuente única: el catálogo hereda de aquí su campo `causas_permitidas`.
+# -----------------------------------------------------------------------------
+regla_concepto_causa:
+  RENTA_PLAN_MOVIL: [CAMBIO_PLAN, ALTA_SERVICIO, BAJA_SERVICIO, SUSPENSION]
+  RENTA_HOGAR_INTERNET: [CAMBIO_PLAN, ALTA_SERVICIO, BAJA_SERVICIO, SUSPENSION]
+  RENTA_TV: [CAMBIO_PLAN, ALTA_SERVICIO, BAJA_SERVICIO, SUSPENSION]
+  RENTA_LINEA_FIJA: [CAMBIO_PLAN, ALTA_SERVICIO, BAJA_SERVICIO, SUSPENSION]
+  # SUSPENSION va al final, igual que en las demás rentas: si en el mismo ciclo hubo
+  # cambio de plan y suspensión, manda el cambio de plan. Faltaba aquí y solo aquí, y
+  # el efecto era una mentira: la renta convergente de un cliente al que le cortaron el
+  # servicio se quedaba sin causa del CRM y heredaba la causa oficial del catálogo
+  # (CAMBIO_DE_PLAN), de modo que el recibo le decía «cambio de plan: -S/ 49.01» a quien
+  # nunca cambió de plan. Lo destapó la ampliación de la suite golden: son 5 cuentas de
+  # 300 (Movistar Total + CORTE_RECONEXION) y ninguna caía en los 34 casos originales.
+  RENTA_MOVISTAR_TOTAL: [CAMBIO_PLAN, ALTA_SERVICIO, BAJA_SERVICIO, SUSPENSION]
+  PRORRATEO_PLAN: [CAMBIO_PLAN, ALTA_SERVICIO, BAJA_SERVICIO]
+  AJUSTE_RETROACTIVO_RENTA: [CAMBIO_PLAN]
+  AJUSTE_DIAS_SUSPENSION: [SUSPENSION, AJUSTE_SUSPENSION]
+  CARGO_RECONEXION: [RECONEXION]
+  CUOTA_EQUIPO_FINANCIADO: [ALTA_EQUIPO_FINANCIADO]
+  INTERES_FINANCIAMIENTO: [ALTA_EQUIPO_FINANCIADO]
+  PAQUETE_DATOS_ADICIONAL: [ALTA_PAQUETE]
+  PAQUETE_ROAMING: [ALTA_PAQUETE]
+  PAQUETE_TV_PREMIUM: [ALTA_PAQUETE, ALTA_SERVICIO, BAJA_SERVICIO]
+  SERVICIO_ADICIONAL_SEGURO: [ALTA_PAQUETE, ALTA_SERVICIO, BAJA_SERVICIO]
+  ALQUILER_EQUIPO_HOGAR: [ALTA_SERVICIO, BAJA_SERVICIO]
+  INSTALACION_HOGAR: [ALTA_SERVICIO]
+  CARGO_TRASLADO: [ALTA_SERVICIO]
+  DESCUENTO_PROMOCIONAL: [FIN_DESCUENTO, CAMBIO_PLAN]
+  DESCUENTO_MOVISTAR_TOTAL: [FIN_DESCUENTO, CAMBIO_PLAN]
+  DESCUENTO_EQUIPO: [FIN_DESCUENTO]
+  NOTA_CREDITO: [NOTA_CREDITO]
+  NOTA_DEBITO: [NOTA_DEBITO]
+  LLAMADAS_FUERA_DE_PLAN: []
+  SMS_PREMIUM: []
+  LARGA_DISTANCIA: []
+  CONSUMO_DATOS_ADICIONAL: []
+  INTERES_MORATORIO: []
+  DEUDA_ANTERIOR: []
+  IGV: []
+  REDONDEO: []
+
+# -----------------------------------------------------------------------------
+# Preferencia de causa por REGLA DE CONCEPTO.
+#
+# `regla_concepto_causa` dice qué movimientos PUEDEN explicar un concepto; esta tabla
+# dice cuál de ellos DEBE ganar cuando la variación es de una clase determinada, aunque
+# el CRM no haya emitido esa orden y aunque haya otro movimiento más cercano en el
+# tiempo. Es el arreglo del defecto de atribución causal:
+#
+#   Un cambio de plan cancela una promoción atada al plan anterior. En la ventana del
+#   ciclo solo hay un CAMBIO_PLAN, así que la atribución por movimiento etiquetaba la
+#   desaparición del descuento como "cambio de plan" y el cliente leía que su recibo
+#   subió por haber cambiado de plan, cuando el cambio de plan por sí solo se lo BAJÓ.
+#   Un descuento que se encoge o desaparece es, por definición del concepto, una
+#   promoción que terminó: FIN_DESCUENTO.
+#
+# Formato: concepto_id -> {ClaseDelta: TipoMovimiento}. Las clases son las de
+# `LineaDelta.clasificar`; para una línea de crédito (importe negativo), SUBIO significa
+# que el crédito se encogió y DESAPARECIDO que dejó de aplicarse. La causa preferida
+# debe estar en `regla_concepto_causa` del mismo concepto: si no, la carga aborta.
+# -----------------------------------------------------------------------------
+preferencia_causa:
+  DESCUENTO_PROMOCIONAL:
+    DESAPARECIDO: FIN_DESCUENTO
+    SUBIO: FIN_DESCUENTO
+  DESCUENTO_MOVISTAR_TOTAL:
+    DESAPARECIDO: FIN_DESCUENTO
+    SUBIO: FIN_DESCUENTO
+  DESCUENTO_EQUIPO:
+    DESAPARECIDO: FIN_DESCUENTO
+    SUBIO: FIN_DESCUENTO
+
+# -----------------------------------------------------------------------------
+# Catálogo base de conceptos (31 entradas).
+# `definicion_cliente` es lo que puede llegar al cliente: sin tecnicismos, de usted
+# y SIN CIFRAS (las cifras solo salen del FactSet).
+# -----------------------------------------------------------------------------
+catalogo:
+  - concepto_id: RENTA_PLAN_MOVIL
+    nombre_comercial: Plan móvil
+    nombre_tecnico: RENTA MENSUAL MOVIL
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: CAMBIO_DE_PLAN
+    definicion_cliente: >-
+      Es el cobro mensual de su plan móvil. Cubre lo que su plan incluye:
+      minutos, mensajes y datos.
+    definicion_tecnica: Renta recurrente del plan móvil, prorrateable por días de vigencia.
+    sinonimos: [plan, renta, mensualidad, cargo fijo, plan celular]
+    ejemplo_variacion: Si cambió de plan a mitad de mes, verá esta renta partida en dos periodos.
+
+  - concepto_id: RENTA_HOGAR_INTERNET
+    nombre_comercial: Internet hogar
+    nombre_tecnico: RENTA MENSUAL BANDA ANCHA
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: CAMBIO_DE_PLAN
+    definicion_cliente: Es el cobro mensual de su servicio de internet en casa.
+    definicion_tecnica: Renta recurrente de banda ancha fija, prorrateable.
+    sinonimos: [internet, wifi, banda ancha, fibra]
+    ejemplo_variacion: Sube si mejoró la velocidad contratada a mitad de ciclo.
+
+  - concepto_id: RENTA_TV
+    nombre_comercial: Televisión
+    nombre_tecnico: RENTA MENSUAL TV
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: CAMBIO_DE_PLAN
+    definicion_cliente: Es el cobro mensual de su servicio de televisión.
+    definicion_tecnica: Renta recurrente de TV, prorrateable.
+    sinonimos: [cable, tv, televisión]
+    ejemplo_variacion: Cambia si sumó o quitó paquetes de canales.
+
+  - concepto_id: RENTA_LINEA_FIJA
+    nombre_comercial: Teléfono fijo
+    nombre_tecnico: RENTA MENSUAL TELEFONIA FIJA
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: CAMBIO_DE_PLAN
+    definicion_cliente: Es el cobro mensual de su línea de teléfono fijo.
+    definicion_tecnica: Renta recurrente de telefonía fija, prorrateable.
+    sinonimos: [línea fija, teléfono de casa]
+    ejemplo_variacion: Puede variar si su paquete de minutos cambió.
+
+  - concepto_id: RENTA_MOVISTAR_TOTAL
+    nombre_comercial: Movistar Total
+    nombre_tecnico: RENTA PAQUETE CONVERGENTE MT
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: CAMBIO_DE_PLAN
+    definicion_cliente: >-
+      Es el cobro mensual de su paquete Movistar Total, que reúne sus servicios
+      móviles y de hogar en un solo plan.
+    definicion_tecnica: Renta convergente MT, sustituye a las rentas individuales.
+    sinonimos: [movistar total, paquete completo, MT]
+    ejemplo_variacion: Aparece cuando sus servicios se unifican en un solo plan.
+
+  - concepto_id: PRORRATEO_PLAN
+    nombre_comercial: Ajuste por días
+    nombre_tecnico: PRORRATEO RENTA
+    familia: AJUSTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: PRORRATEOS
+    definicion_cliente: >-
+      Es el cobro proporcional a los días que estuvo vigente cada plan dentro del
+      mes. Se usa cuando un cambio no ocurre justo el primer día del ciclo.
+    definicion_tecnica: Prorrateo de renta por tramos de vigencia dentro del ciclo.
+    sinonimos: [prorrateo, proporcional, días, cobro parcial]
+    ejemplo_variacion: Si cambió de plan a mitad de mes, se cobra una parte de cada plan.
+
+  - concepto_id: AJUSTE_RETROACTIVO_RENTA
+    nombre_comercial: Ajuste del mes anterior
+    nombre_tecnico: AJUSTE RETROACTIVO RENTA ADELANTADA
+    familia: AJUSTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: PRORRATEOS
+    definicion_cliente: >-
+      Su plan se cobra por adelantado. Cuando algo cambia a mitad del mes ya
+      cobrado, este ajuste corrige la diferencia en el recibo siguiente.
+    definicion_tecnica: >-
+      Corrección (P_new - P_old) * d_new / D del ciclo anterior en modalidad de renta
+      adelantada. Convive con la renta anticipada del ciclo siguiente.
+    sinonimos: [ajuste, retroactivo, regularización, diferencia]
+    ejemplo_variacion: >-
+      Con renta adelantada, un cambio de plan hace convivir dos rentas en el mismo
+      recibo, por lo que el total puede subir aunque el plan nuevo sea más barato.
+
+  - concepto_id: AJUSTE_DIAS_SUSPENSION
+    nombre_comercial: Ajuste por días sin servicio
+    nombre_tecnico: AJUSTE POR SUSPENSION
+    familia: AJUSTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: AJUSTES_POR_DIAS_DE_SUSPENSION
+    definicion_cliente: >-
+      Es la devolución proporcional por los días en que su servicio estuvo
+      suspendido y usted no pudo usarlo.
+    definicion_tecnica: Ajuste negativo por tramos con estado SUSPENDIDO no facturables.
+    sinonimos: [descuento por suspensión, días sin servicio, corte]
+    ejemplo_variacion: Aparece en el recibo posterior a un periodo de suspensión.
+
+  - concepto_id: CARGO_RECONEXION
+    nombre_comercial: Reconexión del servicio
+    nombre_tecnico: CARGO POR RECONEXION
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: RECONEXIONES
+    definicion_cliente: >-
+      Es el cobro único por volver a activar su servicio después de una suspensión.
+      Se cobra una sola vez, en el recibo del mes en que se reactivó.
+    definicion_tecnica: Cargo fijo no prorrateable asociado a un movimiento de reconexión.
+    sinonimos: [reconexión, reactivación, volver a activar]
+    ejemplo_variacion: Aparece solo en el ciclo en que se reconectó el servicio.
+
+  - concepto_id: CUOTA_EQUIPO_FINANCIADO
+    nombre_comercial: Cuota de su equipo
+    nombre_tecnico: CUOTA FINANCIAMIENTO EQUIPO
+    familia: FINANCIAMIENTO
+    prorrateable: false
+    afecto_igv: false
+    causa_oficial: EQUIPO_FINANCIADO
+    definicion_cliente: >-
+      Es la cuota mensual del equipo que compró en cuotas. Siempre se cobra
+      completa: no se parte por días. Termina cuando paga la última cuota.
+    definicion_tecnica: >-
+      Cuota de sistema francés. Nunca se prorratea. La última cuota absorbe el
+      céntimo residual para que el saldo cierre exactamente en cero.
+    sinonimos: [cuota, equipo, celular en cuotas, financiamiento]
+    ejemplo_variacion: Deja de aparecer cuando termina de pagar todas las cuotas.
+
+  - concepto_id: INTERES_FINANCIAMIENTO
+    nombre_comercial: Interés del financiamiento
+    nombre_tecnico: INTERES CUOTA EQUIPO
+    familia: FINANCIAMIENTO
+    prorrateable: false
+    afecto_igv: false
+    causa_oficial: EQUIPO_FINANCIADO
+    definicion_cliente: Es la parte de intereses incluida en la cuota de su equipo.
+    definicion_tecnica: Componente de interés de la cuota francesa del periodo.
+    sinonimos: [intereses, financiamiento]
+    ejemplo_variacion: Disminuye mes a mes conforme avanza el pago del equipo.
+
+  - concepto_id: PAQUETE_DATOS_ADICIONAL
+    nombre_comercial: Paquete de datos
+    nombre_tecnico: PAQUETE ADICIONAL DATOS
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: COMPRA_DE_PAQUETES
+    definicion_cliente: >-
+      Es el cobro por los gigas adicionales que compró durante el mes, aparte de
+      los que ya incluye su plan.
+    definicion_tecnica: Compra puntual de bolsa de datos; cargo único no prorrateable.
+    sinonimos: [gigas, datos, recarga de datos, bolsa]
+    ejemplo_variacion: Aparece en el mes en que compró el paquete.
+
+  - concepto_id: PAQUETE_ROAMING
+    nombre_comercial: Paquete de roaming
+    nombre_tecnico: PAQUETE ROAMING INTERNACIONAL
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: COMPRA_DE_PAQUETES
+    definicion_cliente: Es el cobro por el paquete que activó para usar su línea en el extranjero.
+    definicion_tecnica: Paquete de roaming internacional; cargo único.
+    sinonimos: [roaming, viaje, extranjero]
+    ejemplo_variacion: Aparece únicamente en el mes del viaje.
+
+  - concepto_id: PAQUETE_TV_PREMIUM
+    nombre_comercial: Canales premium
+    nombre_tecnico: PAQUETE ADICIONAL TV PREMIUM
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: COMPRA_DE_PAQUETES
+    definicion_cliente: Es el cobro mensual de los canales adicionales que contrató.
+    definicion_tecnica: Paquete recurrente de TV, prorrateable desde la fecha de alta.
+    sinonimos: [canales, premium, fútbol, deportes]
+    ejemplo_variacion: El primer mes se cobra solo por los días desde que lo contrató.
+
+  - concepto_id: SERVICIO_ADICIONAL_SEGURO
+    nombre_comercial: Seguro de equipo
+    nombre_tecnico: SERVICIO ADICIONAL SEGURO
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: COMPRA_DE_PAQUETES
+    definicion_cliente: Es el cobro mensual del seguro que contrató para su equipo.
+    definicion_tecnica: Servicio adicional recurrente, prorrateable.
+    sinonimos: [seguro, protección, garantía extendida]
+    ejemplo_variacion: Empieza a cobrarse desde el día en que lo contrató.
+
+  - concepto_id: ALQUILER_EQUIPO_HOGAR
+    nombre_comercial: Alquiler de equipos
+    nombre_tecnico: ALQUILER DECODIFICADOR/ROUTER
+    familia: RECURRENTE
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: null
+    definicion_cliente: Es el alquiler mensual del decodificador o del router de su casa.
+    definicion_tecnica: Renta de equipos en comodato, prorrateable.
+    sinonimos: [decodificador, router, módem, equipos]
+    ejemplo_variacion: Cambia si sumó o devolvió un equipo durante el mes.
+
+  - concepto_id: INSTALACION_HOGAR
+    nombre_comercial: Instalación
+    nombre_tecnico: CARGO INSTALACION
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: null
+    definicion_cliente: Es el cobro único por la instalación de su servicio en casa.
+    definicion_tecnica: Cargo único por alta de servicio fijo.
+    sinonimos: [instalación, alta, visita técnica]
+    ejemplo_variacion: Aparece solo en el primer recibo del servicio.
+
+  - concepto_id: CARGO_TRASLADO
+    nombre_comercial: Traslado del servicio
+    nombre_tecnico: CARGO TRASLADO DOMICILIO
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: null
+    definicion_cliente: Es el cobro único por mudar su servicio a otra dirección.
+    definicion_tecnica: Cargo único por traslado de servicio fijo.
+    sinonimos: [mudanza, traslado, cambio de domicilio]
+    ejemplo_variacion: Aparece en el mes en que se realizó el traslado.
+
+  - concepto_id: LLAMADAS_FUERA_DE_PLAN
+    nombre_comercial: Llamadas fuera de su plan
+    nombre_tecnico: CONSUMO VOZ FUERA DE PLAN
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: CARGOS_ADICIONALES
+    definicion_cliente: >-
+      Son las llamadas que hizo por encima de lo que incluye su plan, o a destinos
+      que su plan no cubre.
+    definicion_tecnica: Consumo de voz tasado fuera de bolsa incluida.
+    sinonimos: [llamadas, minutos, consumo de voz]
+    ejemplo_variacion: Sube en los meses en que habló más de lo que incluye su plan.
+
+  - concepto_id: CONSUMO_DATOS_ADICIONAL
+    nombre_comercial: Datos fuera de su plan
+    nombre_tecnico: CONSUMO DATOS FUERA DE PLAN
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: CARGOS_ADICIONALES
+    definicion_cliente: Son los datos que usó por encima de los que incluye su plan.
+    definicion_tecnica: Consumo de datos tasado fuera de bolsa incluida.
+    sinonimos: [datos extra, megas, consumo de internet]
+    ejemplo_variacion: Aparece cuando agotó los gigas incluidos y siguió navegando.
+
+  - concepto_id: SMS_PREMIUM
+    nombre_comercial: Mensajes premium
+    nombre_tecnico: SMS CONTENIDO PREMIUM
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: CARGOS_ADICIONALES
+    definicion_cliente: Son los mensajes a números especiales o servicios de contenido.
+    definicion_tecnica: Tráfico SMS de tarificación especial.
+    sinonimos: [mensajes, sms, suscripción de contenido]
+    ejemplo_variacion: Aparece si se suscribió a un servicio de mensajes.
+
+  - concepto_id: LARGA_DISTANCIA
+    nombre_comercial: Llamadas de larga distancia
+    nombre_tecnico: CONSUMO LARGA DISTANCIA
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: CARGOS_ADICIONALES
+    definicion_cliente: Son las llamadas que hizo a otros países.
+    definicion_tecnica: Consumo de larga distancia internacional tasado por destino.
+    sinonimos: [internacional, larga distancia, llamadas al extranjero]
+    ejemplo_variacion: Aparece solo si realizó llamadas internacionales.
+
+  - concepto_id: DESCUENTO_PROMOCIONAL
+    nombre_comercial: Descuento promocional
+    nombre_tecnico: DESCUENTO PROMOCION TEMPORAL
+    familia: CREDITO
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: PROMOCIONES_VENCIDAS
+    definicion_cliente: >-
+      Es el descuento por una promoción con fecha de fin. Mientras está vigente
+      resta de su recibo; cuando termina, su recibo vuelve al precio de lista.
+    definicion_tecnica: Crédito recurrente con vigencia limitada; su fin genera FIN_DESCUENTO.
+    sinonimos: [descuento, promoción, oferta, rebaja]
+    ejemplo_variacion: Su recibo sube cuando la promoción llega a su fecha de fin.
+
+  - concepto_id: DESCUENTO_MOVISTAR_TOTAL
+    nombre_comercial: Descuento Movistar Total
+    nombre_tecnico: DESCUENTO CONVERGENCIA MT
+    familia: CREDITO
+    prorrateable: true
+    afecto_igv: true
+    causa_oficial: PROMOCIONES_VENCIDAS
+    definicion_cliente: Es el descuento que recibe por tener sus servicios juntos en Movistar Total.
+    definicion_tecnica: Crédito por convergencia; se pierde al desagrupar servicios.
+    sinonimos: [descuento total, beneficio MT]
+    ejemplo_variacion: Se pierde si deja de tener todos los servicios del paquete.
+
+  - concepto_id: DESCUENTO_EQUIPO
+    nombre_comercial: Descuento por su equipo
+    nombre_tecnico: DESCUENTO CAMPAÑA EQUIPO
+    familia: CREDITO
+    prorrateable: false
+    afecto_igv: false
+    causa_oficial: PROMOCIONES_VENCIDAS
+    definicion_cliente: Es el descuento de campaña aplicado a la cuota de su equipo.
+    definicion_tecnica: Crédito ligado al financiamiento del equipo, con vigencia limitada.
+    sinonimos: [descuento del celular, campaña]
+    ejemplo_variacion: Termina cuando se acaba la campaña con la que compró el equipo.
+
+  - concepto_id: NOTA_CREDITO
+    nombre_comercial: Nota de crédito
+    nombre_tecnico: NOTA DE CREDITO
+    familia: CREDITO
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: NOTAS_CREDITO_DEBITO
+    definicion_cliente: >-
+      Es un documento que resta de su recibo. Se emite para devolverle un cobro
+      que no correspondía o para aplicar una compensación.
+    definicion_tecnica: Documento tributario de crédito que corrige facturación anterior.
+    sinonimos: [nota de crédito, devolución, compensación, abono]
+    ejemplo_variacion: Su recibo baja en el mes en que se aplica la nota.
+
+  - concepto_id: NOTA_DEBITO
+    nombre_comercial: Nota de débito
+    nombre_tecnico: NOTA DE DEBITO
+    familia: AJUSTE
+    prorrateable: false
+    afecto_igv: true
+    causa_oficial: NOTAS_CREDITO_DEBITO
+    definicion_cliente: >-
+      Es un documento que suma a su recibo. Se emite para cobrar algo que no se
+      había facturado antes.
+    definicion_tecnica: Documento tributario de débito que corrige facturación anterior.
+    sinonimos: [nota de débito, cobro adicional, regularización]
+    ejemplo_variacion: Su recibo sube en el mes en que se aplica la nota.
+
+  - concepto_id: INTERES_MORATORIO
+    nombre_comercial: Interés por pago fuera de fecha
+    nombre_tecnico: INTERES MORATORIO
+    familia: UNICO
+    prorrateable: false
+    afecto_igv: false
+    causa_oficial: CARGOS_ADICIONALES
+    definicion_cliente: Es el interés por haber pagado un recibo después de su fecha de vencimiento.
+    definicion_tecnica: Interés moratorio sobre saldo vencido.
+    sinonimos: [mora, interés, recargo]
+    ejemplo_variacion: Aparece cuando un recibo anterior se pagó tarde.
+
+  - concepto_id: DEUDA_ANTERIOR
+    nombre_comercial: Saldo pendiente de meses anteriores
+    nombre_tecnico: SALDO ANTERIOR
+    familia: AJUSTE
+    prorrateable: false
+    afecto_igv: false
+    causa_oficial: null
+    definicion_cliente: >-
+      Es lo que quedó pendiente de recibos anteriores. No es un cobro nuevo de
+      este mes: se arrastra hasta que se paga.
+    definicion_tecnica: Saldo deudor arrastrado; no forma parte del total del periodo.
+    sinonimos: [deuda, saldo anterior, pendiente, atrasado]
+    ejemplo_variacion: Se mantiene mientras no se cancele el recibo anterior.
+
+  - concepto_id: IGV
+    nombre_comercial: IGV
+    nombre_tecnico: IMPUESTO GENERAL A LAS VENTAS
+    familia: IMPUESTO
+    prorrateable: false
+    afecto_igv: false
+    causa_oficial: null
+    definicion_cliente: >-
+      Es el impuesto general a las ventas que se aplica sobre los servicios
+      afectos de su recibo. Es un tributo de ley, no un cobro de Movistar.
+    definicion_tecnica: IGV calculado sobre la base afecta del periodo, con residuo por mayor resto.
+    sinonimos: [impuesto, igv, tributo]
+    ejemplo_variacion: Sube o baja junto con el importe de los servicios afectos.
+
+  - concepto_id: REDONDEO
+    nombre_comercial: Redondeo
+    nombre_tecnico: AJUSTE POR REDONDEO
+    familia: AJUSTE
+    prorrateable: false
+    afecto_igv: false
+    causa_oficial: null
+    visible_cliente: false
+    definicion_cliente: Es un ajuste de céntimos para que el total del recibo cuadre exactamente.
+    definicion_tecnica: Residuo del reparto por mayor resto asignado a una línea técnica.
+    sinonimos: [redondeo, céntimos]
+    ejemplo_variacion: Nunca supera un céntimo.

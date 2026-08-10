@@ -1,0 +1,76 @@
+# Casos POSITIVOS de hand-off: aquí el sistema DEBE derivar a un asesor humano.
+#
+# La ficha define la Precisión del Hand-off como "exactitud lógica al decidir cuándo
+# derivar a un humano basándose en umbrales de incomprensión". Los tres casos disparan
+# reglas duras distintas de `facts_engine.confianza`, que derivan sin calcular el score:
+#
+#   PETICION_HUMANO        el cliente pide explícitamente un asesor
+#   INTENCION_REGULATORIA  reclamo formal / Osiptel / Indecopi / libro de reclamaciones
+#   INTENCION_REGULATORIA  baja del servicio o portabilidad
+#
+# El error asimétrico importa: el falso negativo (no derivar cuando había que derivar)
+# es el daño grave, por eso Recall_handoff es la métrica primaria.
+
+- caso_id: G29_handoff_peticion_humano
+  descripcion: >-
+    El recibo es explicable y el motor concilia, pero el cliente pide un asesor. La
+    petición explícita gana sobre cualquier score: se deriva con el contexto cargado.
+  seed: 20260804
+  cuenta_id: C-00017
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "no me convence su explicación, quiero hablar con un asesor por favor"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [RENTA_PLAN_MOVIL, AJUSTE_RETROACTIVO_RENTA, IGV]
+  delta_esperado_cent: 1359
+  total_esperado_cent: 8876
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: G30_handoff_reclamo_formal
+  descripcion: >-
+    Intención regulatoria: el cliente anuncia un reclamo formal ante Osiptel. Sale del
+    alcance de facturación y se deriva con el resumen para el asesor.
+  seed: 20260804
+  cuenta_id: C-00028
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "esto es un cobro indebido, voy a presentar un reclamo formal ante Osiptel"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 912
+  total_esperado_cent: 13847
+  debe_derivar: true
+  no_debe_contener: []
+
+- caso_id: G31_handoff_baja_portabilidad
+  descripcion: >-
+    Intención regulatoria de baja y portabilidad. Un asistente de facturación no
+    gestiona bajas: deriva, y no intenta retener con una oferta (cross-selling
+    prohibido si hay derivación).
+  seed: 20260804
+  cuenta_id: C-00010
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "quiero dar de baja el servicio y hacer portabilidad a otro operador"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 3240
+  total_esperado_cent: 15028
+  debe_derivar: true
+  no_debe_contener: []

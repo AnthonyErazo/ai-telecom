@@ -1,0 +1,30 @@
+{# Corte y reconexión por deuda: el cargo de reconexión y el ajuste por los días en
+   los que el servicio estuvo suspendido. Tono especialmente cuidadoso: el cliente
+   viene de una mala experiencia. #}
+{% from "_comun.jinja" import apertura, totales, cierre_estandar, frase_generica, frase_residual_std, tabla_tramos, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }} porque le cortaron el servicio y luego se lo reactivaron.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{% if c.causa == "RECONEXION" %}
+La reactivación del servicio explica {{ c.monto }}: es el cargo que se cobra una sola vez por volver a conectarle la línea después del corte.
+{% elif c.causa in ("SUSPENSION", "AJUSTE_SUSPENSION") %}
+Por los días que estuvo sin servicio se le aplicó un ajuste de {{ c.monto }}: los días cortados no se le cobran.
+{% else %}
+{{ frase_generica(d, c) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Cuando le cortan el servicio por deuda y después se lo reactivan, en su recibo aparecen dos cosas distintas: la devolución de los días en que no tuvo servicio y el cargo de reconexión, que se cobra una sola vez. {{ tabla_tramos(d) }} {{ lista_lineas(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

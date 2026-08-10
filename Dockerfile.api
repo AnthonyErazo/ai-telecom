@@ -1,0 +1,97 @@
+# syntax=docker/dockerfile:1
+# =============================================================================
+# recibo-claro — imagen de la API (y de los dos mocks, que reusan esta misma).
+#
+# Multi-stage en dos etapas:
+#
+#   constructor  instala las dependencias en un entorno virtual aislado.
+#                Aquí sí hay pip, ruedas descargadas y cachés.
+#   runtime      copia SOLO ese entorno ya resuelto y el código fuente.
+#                No instala nada, no compila nada y no lleva compilador:
+#                lo que no está en la imagen no se puede explotar ni se
+#                paga en tiempo de arranque durante un pico de 3x.
+#
+# La lista de dependencias NO se duplica aquí: se lee de `pyproject.toml`, que
+# es la única fuente de verdad (y la que declara las licencias permitidas).
+# =============================================================================
+
+# --------------------------------------------------------------------------- #
+# Etapa 1 — constructor
+# --------------------------------------------------------------------------- #
+FROM python:3.12-slim AS constructor
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /origen
+
+# Solo el manifiesto: así, mientras las dependencias no cambien, esta capa
+# (la cara) se reutiliza aunque cambie todo el código.
+COPY pyproject.toml ./
+
+# tomllib es de la biblioteca estándar en 3.11+: no hace falta instalar nada
+# para leer el manifiesto y extraer las dependencias de ejecución.
+RUN python -c "import tomllib, pathlib; manifiesto = tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8')); pathlib.Path('/tmp/requisitos.txt').write_text('\n'.join(manifiesto['project']['dependencies']) + '\n', encoding='utf-8')" \
+ && python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
+ && /opt/venv/bin/pip install --require-virtualenv -r /tmp/requisitos.txt \
+ && find /opt/venv -name '__pycache__' -type d -prune -exec rm -rf {} + \
+ && find /opt/venv -name '*.pyc' -delete
+
+# --------------------------------------------------------------------------- #
+# Etapa 2 — runtime
+# --------------------------------------------------------------------------- #
+FROM python:3.12-slim AS runtime
+
+LABEL org.opencontainers.image.title="recibo-claro" \
+      org.opencontainers.image.description="Explicacion verificada de recibos Movistar (Hackathon AI Telecom 2026, Desafio 1)" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://example.invalid/recibo-claro"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=0 \
+    PATH="/opt/venv/bin:${PATH}" \
+    TZ=America/Lima
+
+# Usuario sin privilegios con UID 1000: coincide con el usuario habitual de un
+# equipo de desarrollo Linux, de modo que lo que el contenedor escriba en el
+# bind mount de ./data quede legible fuera sin `sudo`.
+RUN groupadd --gid 1000 recibo \
+ && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin recibo
+
+WORKDIR /app
+
+# El entorno virtual ya resuelto. Nada de pip install en esta etapa.
+COPY --from=constructor /opt/venv /opt/venv
+
+# Código fuente. Se copia explícitamente lo que el servicio necesita en
+# ejecución; `tests/`, `.git/` y demás quedan fuera (ver .dockerignore).
+COPY --chown=recibo:recibo apps/     ./apps/
+COPY --chown=recibo:recibo packages/ ./packages/
+COPY --chown=recibo:recibo db/       ./db/
+COPY --chown=recibo:recibo eval/     ./eval/
+COPY --chown=recibo:recibo docker/   ./docker/
+# Verificadores de la demo (`smoke.py` y `probar_e2e.py`): solo biblioteca
+# estándar, así que corren dentro del contenedor sin curl ni jq instalados.
+COPY --chown=recibo:recibo scripts/ ./scripts/
+COPY --chown=recibo:recibo pyproject.toml README.md ./
+
+# `data/` se monta como volumen; el directorio debe existir y ser escribible
+# aunque nadie monte nada (auditoría y telemetría escriben ahí).
+RUN mkdir -p /app/data/sintetico /app/data/auditoria /app/data/telemetria \
+ && chown -R recibo:recibo /app/data
+
+USER recibo
+
+EXPOSE 8000
+
+# El liveness usa la biblioteca estándar: no se instala `curl` solo para esto.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=6 \
+  CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/salud', timeout=4).status == 200 else 1)"]
+
+# Un solo worker por contenedor y escalado horizontal por réplicas: el estado
+# de conversación vive en memoria del proceso (ver docs/pendientes.md, riesgo
+# R-03) y varios workers en el mismo contenedor lo fragmentarían en silencio.
+CMD ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-server-header"]

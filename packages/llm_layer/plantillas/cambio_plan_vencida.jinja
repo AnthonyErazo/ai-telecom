@@ -1,0 +1,32 @@
+{# Cambio de plan con RENTA VENCIDA: el recibo cobra el ciclo que ya cerró, así que
+   la explicación es la tabla de tramos — tantos días con el plan viejo, el resto con
+   el nuevo. #}
+{% from "_comun.jinja" import apertura, totales, contraste, cierre_estandar, frase_generica, frase_residual_std, tabla_tramos, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }} porque cambió de plan a mitad de mes y se le cobró por los días de cada uno.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{% if c.causa == "CAMBIO_PLAN" and not c.sube %}
+El cambio de plan le ahorró {{ c.monto }}: se le cobró cada plan solo por los días que estuvo vigente, no el mes completo de los dos.
+{% elif c.causa == "CAMBIO_PLAN" %}
+El cambio de plan explica {{ c.monto }}: se le cobró cada plan solo por los días que estuvo vigente, no el mes completo de los dos.
+{% elif c.causa == "FIN_DESCUENTO" %}
+Se le terminó un descuento de {{ c.monto }}: la promoción estaba atada al plan anterior y dejó de aplicarse al cambiarlo.
+{% else %}
+{{ frase_generica(d, c) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Su renta es vencida: este recibo corresponde al mes que acaba de terminar. Cuando el cambio ocurre a mitad del ciclo, el mes se parte en tramos y se le cobra cada tarifa solo por los días que usted la tuvo activa. {{ contraste(d) }} {{ tabla_tramos(d) }} {{ lista_lineas(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

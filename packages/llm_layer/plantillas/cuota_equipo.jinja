@@ -1,0 +1,27 @@
+{# Facturación de cuota de equipo financiado. La clave explicativa es "cuota N de M":
+   el cliente necesita saber cuántas le quedan. Las cuotas NUNCA se prorratean. #}
+{% from "_comun.jinja" import apertura, totales, cierre_estandar, frase_generica, frase_residual_std, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }} por la cuota del equipo que compró en cuotas{% if d.cuota %}, que este mes es la {{ d.cuota.texto }}{% endif %}.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{% if c.causa == "ALTA_EQUIPO_FINANCIADO" %}
+La cuota de su equipo explica {{ c.monto }}{% if d.cuota %}; en este recibo va la {{ d.cuota.texto }}{% endif %}. Es un monto fijo: no cambia con el uso ni se reparte por días.
+{% else %}
+{{ frase_generica(d, c) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+El equipo que compró se paga en cuotas mensuales fijas dentro del mismo recibo del servicio. Cada mes avanza una cuota{% if d.cuota %} y ahora va la {{ d.cuota.texto }}{% endif %}. Cuando pague la última, ese monto desaparece de su recibo para siempre. {{ lista_lineas(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

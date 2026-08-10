@@ -1,0 +1,80 @@
+# GRUPO DE CONTROL: recibos que NO variaron (Δ = 0).
+#
+# Son el contraejemplo que impide que el sistema apruebe la evaluación "explicando"
+# siempre algo. Con delta cero el motor no tiene ninguna línea que explicar, y la
+# respuesta correcta es decir que el recibo se mantuvo igual — sin inventar una causa,
+# sin sugerir que subió y sin derivar a un asesor.
+#
+# `no_debe_contener` recoge aquí el vocabulario de variación: si aparece, el sistema
+# está narrando un cambio que no existe.
+
+- caso_id: G26_control_estable_adelantada
+  descripcion: Recibo idéntico al del mes anterior en modalidad ADELANTADA.
+  seed: 20260804
+  cuenta_id: C-00008
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 12673
+  debe_derivar: false
+  no_debe_contener:
+    - "más caro"
+    - "más alto"
+    - "subió"
+    - "aumentó"
+
+- caso_id: G27_control_estable_vencida
+  descripcion: Recibo idéntico al del mes anterior en modalidad VENCIDA.
+  seed: 20260804
+  cuenta_id: C-00016
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 10280
+  debe_derivar: false
+  no_debe_contener:
+    - "más caro"
+    - "más alto"
+    - "subió"
+    - "aumentó"
+
+- caso_id: G28_control_estable_detalle
+  descripcion: >-
+    Control estable pedido en verbosidad DETALLE: ni siquiera con el modo extenso puede
+    aparecer una tabla de tramos o una causa que no existe.
+  seed: 20260804
+  cuenta_id: C-00024
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "muéstreme el detalle de mi recibo, por favor"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 23968
+  debe_derivar: false
+  no_debe_contener:
+    - "más caro"
+    - "más alto"
+    - "subió"
+    - "aumentó"

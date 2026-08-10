@@ -1,0 +1,24 @@
+{# Plantilla de último recurso: hay variación pero la causa dominante no encaja en
+   ninguna de las nueve causas oficiales, o hay varias repartidas. Se narra lo que
+   sí se sabe con certeza y no se especula. #}
+{% from "_comun.jinja" import apertura, totales, cierre_estandar, frase_generica, frase_residual_std, tabla_tramos, lista_lineas %}
+
+{% macro resumen(d) -%}
+{{ apertura(d) }}. Le explico concepto por concepto qué se movió respecto del mes pasado.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{{ frase_generica(d, c) }}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+{{ lista_lineas(d) }} {{ tabla_tramos(d) }} {{ totales(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}

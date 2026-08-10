@@ -1,0 +1,72 @@
+{
+  "properties": {
+    "causas": {
+      "description": "Una entrada por causa de variación presente en FACTSET.",
+      "items": {
+        "properties": {
+          "concepto_id": {
+            "description": "Copiado tal cual de FACTSET.lineas[].concepto_id",
+            "type": "string"
+          },
+          "frase": {
+            "description": "Por qué varió, sin tecnicismos y sin inventar cifras.",
+            "maxLength": 320,
+            "type": "string"
+          },
+          "monto_cent_citado": {
+            "description": "delta_cent de FACTSET, copiado como entero con signo.",
+            "type": "integer"
+          }
+        },
+        "propertyOrdering": [
+          "concepto_id",
+          "frase",
+          "monto_cent_citado"
+        ],
+        "required": [
+          "concepto_id",
+          "frase",
+          "monto_cent_citado"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "cifras_usadas": {
+      "description": "Enteros en céntimos copiados de FACTSET. Nada más.",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "resumen": {
+      "description": "Explicación en una frase, español de Perú, trato de usted.",
+      "maxLength": 180,
+      "type": "string"
+    },
+    "siguiente_paso": {
+      "enum": [
+        "PAGAR",
+        "VER_DETALLE",
+        "REGISTRAR_CONSULTA",
+        "VER_ALTERNATIVAS",
+        "DERIVAR_ASESOR"
+      ],
+      "type": "string"
+    }
+  },
+  "propertyOrdering": [
+    "resumen",
+    "causas",
+    "siguiente_paso",
+    "cifras_usadas"
+  ],
+  "required": [
+    "resumen",
+    "causas",
+    "siguiente_paso",
+    "cifras_usadas"
+  ],
+  "title": "explicacion_v1",
+  "type": "object"
+}

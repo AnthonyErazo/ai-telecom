@@ -1,0 +1,3953 @@
+# ============================================================================
+# MUESTREO ESTRATIFICADO DEL DATASET — fichero GENERADO. No editar a mano.
+#
+#   python -m eval.generar_golden
+#
+# Estos casos existen porque 34 no son suficientes para sostener la métrica que el
+# proyecto compromete. Con 34 casos, «TA_respuesta = 0,00 %» es compatible con una
+# alucinación cada cien respuestas (0,99^34 = 71 % de probabilidad de no verla). El
+# muestreo estratificado sube la muestra por encima de 200 y, sobre todo, deja escrito
+# DÓNDE se midió: cada caso declara en su descripción a qué celdas de cobertura
+# pertenece.
+#
+# Las cifras NO salen del motor. `total_esperado_cent` y `delta_esperado_cent` salen de
+# los documentos BrainyBill de `data/sintetico/bills`; los conceptos y las causas salen
+# de `ground_truth.csv`, que el generador de datos escribe en el mismo acto de inyectar
+# el escenario. Si el motor discrepa, el que está mal es el motor.
+#
+# `no_debe_contener` lleva aquí la GUARDA DE DIRECCIÓN: un recibo que sube no puede
+# describirse como «más barato que el de …» ni al revés. Es el error más caro de todos
+# porque suena natural, y con 200 casos se detecta aunque ocurra una vez.
+# ============================================================================
+
+- caso_id: EST001_cambio_plan_mas_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + NOTA_CREDITO en renta ADELANTADA,
+    segmento MASIVO, ciclo de 31 días: el recibo baja S/ 18.54 hasta S/ 46.95. Celdas de
+    cobertura: delta_negativo, sin_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00001
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, NOTA_CREDITO]
+  causas_esperadas: [CAMBIO_PLAN, NOTA_CREDITO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, IGV, NOTA_CREDITO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: -1854
+  total_esperado_cent: 4695
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST002_equipo_mas_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO + DEUDA_ANTERIOR en renta
+    ADELANTADA, segmento MASIVO, ciclo de 31 días: el recibo sube S/ 105.01 hasta S/ 152.09.
+    Arrastra S/ 47.08 de deuda anterior, que NO entra en el total del periodo. Lleva la
+    cuota 1 de 6 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, cuota_primera, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00002
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_FINANCIAMIENTO, INTERES_MORATORIO]
+  delta_esperado_cent: 10501
+  total_esperado_cent: 15209
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST003_paquete_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta ADELANTADA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 35.29 hasta S/ 178.42. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00005
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_ROAMING]
+  delta_esperado_cent: 3529
+  total_esperado_cent: 17842
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST004_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta ADELANTADA, segmento MASIVO, ciclo
+    de 31 días: el recibo sube S/ 0.59 hasta S/ 59.14. Arrastra S/ 58.55 de deuda
+    anterior, que NO entra en el total del periodo. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00007
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "no pagué el mes pasado, ¿cuánto debo ahora?"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 59
+  total_esperado_cent: 5914
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST005_estable_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento MASIVO, ciclo de 31
+    días: el recibo no varía hasta S/ 126.73. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00008
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 12673
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST006_cambio_plan_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA, segmento MASIVO,
+    ciclo de 31 días: el recibo sube S/ 76.78 hasta S/ 115.37. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00009
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 7678
+  total_esperado_cent: 11537
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST007_paquete_mas_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + NOTA_CREDITO en renta VENCIDA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 11.80 hasta S/ 258.68. Lleva la cuota 20
+    de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_avanzada, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00013
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, NOTA_CREDITO]
+  causas_esperadas: [ALTA_PAQUETE, NOTA_CREDITO]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO, PAQUETE_ROAMING]
+  delta_esperado_cent: 1180
+  total_esperado_cent: 25868
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST008_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento MASIVO, ciclo de 31
+    días: el recibo sube S/ 29.39 hasta S/ 160.39. Lleva la cuota 15 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_avanzada, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00014
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me llegó más barato este mes, ¿por qué?"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO]
+  delta_esperado_cent: 2939
+  total_esperado_cent: 16039
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST009_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta VENCIDA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 1.32 hasta S/ 133.72. Arrastra S/ 132.40 de deuda
+    anterior, que NO entra en el total del periodo. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00015
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "no pagué el mes pasado, ¿cuánto debo ahora?"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 132
+  total_esperado_cent: 13372
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST010_cambio_plan_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 13.59 hasta S/ 88.76. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00017
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 1359
+  total_esperado_cent: 8876
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST011_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 36.06 hasta S/ 153.94. Lleva la cuota 1
+    de 18 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00018
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 3606
+  total_esperado_cent: 15394
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST012_reconexion_mas_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + DEUDA_ANTERIOR en renta ADELANTADA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 21.09 hasta S/ 115.37.
+    Arrastra S/ 47.14 de deuda anterior, que NO entra en el total del periodo. Celdas de
+    cobertura: delta_positivo, con_deuda_anterior, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00023
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION, DEUDA_ANTERIOR]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV, INTERES_MORATORIO]
+  delta_esperado_cent: 2109
+  total_esperado_cent: 11537
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST013_cambio_plan_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA, segmento PREMIUM,
+    ciclo de 31 días: el recibo sube S/ 44.54 hasta S/ 103.42. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00025
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "me pasé a otro plan y no me cuadra el monto"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 4454
+  total_esperado_cent: 10342
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST014_equipo_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento PREMIUM,
+    ciclo de 31 días: el recibo sube S/ 183.28 hasta S/ 314.73. Lleva la cuota 1 de 18
+    de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00026
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 18328
+  total_esperado_cent: 31473
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST015_fin_descuento_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 9.12 hasta S/ 138.47. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00028
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "se me venció la promoción y el recibo subió"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 912
+  total_esperado_cent: 13847
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST016_nota_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento PREMIUM, ciclo de 31
+    días: el recibo baja S/ 17.58 hasta S/ 161.70. Lleva la cuota 8 de 24 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, cuota_intermedia, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00030
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿me devolvieron algo en el recibo?"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -1758
+  total_esperado_cent: 16170
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST017_equipo_mas_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO + DEUDA_ANTERIOR en renta VENCIDA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 105.95 hasta S/ 227.61.
+    Arrastra S/ 121.66 de deuda anterior, que NO entra en el total del periodo. Lleva la
+    cuota 1 de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, cuota_primera, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00031
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_MORATORIO]
+  delta_esperado_cent: 10595
+  total_esperado_cent: 22761
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST018_cambio_plan_mas_equipo_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + CUOTA_EQUIPO_FINANCIADO en renta
+    VENCIDA, segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 113.08 hasta S/ 124.76.
+    Lleva la cuota 1 de 18 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00032
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, EQUIPO_FINANCIADO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 11308
+  total_esperado_cent: 12476
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST019_paquete_mas_cambio_plan_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA,
+    segmento HOGAR, ciclo de 31 días: el recibo sube S/ 65.34 hasta S/ 270.35. Lleva la
+    cuota 17 de 18 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_avanzada, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00033
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [ALTA_PAQUETE, CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, COMPRA_DE_PAQUETES]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, IGV, PAQUETE_TV_PREMIUM, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 6534
+  total_esperado_cent: 27035
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST020_reconexion_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta ADELANTADA, segmento HOGAR, ciclo
+    de 31 días: el recibo baja S/ 12.33 hasta S/ 180.72. Lleva la cuota 7 de 12 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, cuota_intermedia, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00035
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV]
+  delta_esperado_cent: -1233
+  total_esperado_cent: 18072
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST021_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento HOGAR, ciclo de
+    31 días: el recibo sube S/ 21.21 hasta S/ 188.56. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00036
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "se me venció la promoción y el recibo subió"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 2121
+  total_esperado_cent: 18856
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST022_deuda_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta ADELANTADA, segmento HOGAR, ciclo de
+    31 días: el recibo sube S/ 4.38 hasta S/ 223.51. Arrastra S/ 219.13 de deuda
+    anterior, que NO entra en el total del periodo. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00039
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "ya cancelé mi recibo y todavía me sale deuda, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 438
+  total_esperado_cent: 22351
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST023_estable_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento HOGAR, ciclo de 31
+    días: el recibo no varía hasta S/ 317.56. Lleva la cuota 17 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, cuota_avanzada, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00040
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 31756
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST024_paquete_mas_reconexion_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + CORTE_RECONEXION en renta VENCIDA, segmento
+    HOGAR, ciclo de 31 días: el recibo sube S/ 54.52 hasta S/ 168.74. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00043
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, CORTE_RECONEXION]
+  causas_esperadas: [ALTA_PAQUETE, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, COMPRA_DE_PAQUETES, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, PAQUETE_ROAMING, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 5452
+  total_esperado_cent: 16874
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST025_paquete_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo sube S/ 23.48 hasta S/ 137.14. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00045
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 2348
+  total_esperado_cent: 13714
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST026_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo baja S/ 17.58 hasta S/ 347.18. Lleva la cuota 6 de 12 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, cuota_intermedia, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00046
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "veo un abono en mi factura, q es"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -1758
+  total_esperado_cent: 34718
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST027_deuda_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo sube S/ 2.65 hasta S/ 179.44. Arrastra S/ 176.79 de deuda anterior,
+    que NO entra en el total del periodo. Lleva la cuota 11 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, cuota_intermedia, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00047
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "ya cancelé mi recibo y todavía me sale deuda, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 265
+  total_esperado_cent: 17944
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST028_estable_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento HOGAR, ciclo de 31 días:
+    el recibo no varía hasta S/ 208.86. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00048
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 20886
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST029_cambio_plan_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 54.62 hasta S/ 165.54. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00049
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me pasé a otro plan y no me cuadra el monto"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 5462
+  total_esperado_cent: 16554
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST030_equipo_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 104.13 hasta S/ 254.49. Lleva la
+    cuota 1 de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00050
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "me cobraron la cuota del celu, ¿cuántas me faltan?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 10413
+  total_esperado_cent: 25449
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST031_paquete_mas_deuda_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + DEUDA_ANTERIOR en renta ADELANTADA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 25.07 hasta S/ 237.14. Arrastra S/ 106.04
+    de deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, compuesto, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00053
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, PAQUETE_TV_PREMIUM]
+  delta_esperado_cent: 2507
+  total_esperado_cent: 23714
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST032_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo baja S/ 58.88 hasta S/ 212.40. Celdas de cobertura:
+    delta_negativo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00054
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me llegó más barato este mes, ¿por qué?"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -5888
+  total_esperado_cent: 21240
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST033_estable_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento CONVERGENTE, ciclo de
+    31 días: el recibo no varía hasta S/ 204.85. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00056
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 20485
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST034_reconexion_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta VENCIDA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo baja S/ 28.33 hasta S/ 241.30. Celdas de cobertura:
+    delta_negativo, sin_deuda_anterior, segmento_convergente,
+    renta_convergente_suspendida.
+  seed: 20260804
+  cuenta_id: C-00059
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: -2833
+  total_esperado_cent: 24130
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST035_paquete_mas_nota_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + NOTA_CREDITO en renta VENCIDA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo baja S/ 24.08 hasta S/ 159.76. Celdas de
+    cobertura: delta_negativo, sin_deuda_anterior, compuesto, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00062
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "q es ese cobro adicional en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, NOTA_CREDITO]
+  causas_esperadas: [ALTA_PAQUETE, NOTA_CREDITO]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO, PAQUETE_TV_PREMIUM]
+  delta_esperado_cent: -2408
+  total_esperado_cent: 15976
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST036_reconexion_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta ADELANTADA, segmento MASIVO, ciclo
+    de 31 días: el recibo sube S/ 11.26 hasta S/ 166.94. Lleva la cuota 16 de 18 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_avanzada, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00067
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "estuve sin servicio unos días, ¿me descontaron algo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV]
+  delta_esperado_cent: 1126
+  total_esperado_cent: 16694
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST037_paquete_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta ADELANTADA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 17.58 hasta S/ 111.86. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00069
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "q es ese cobro adicional en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 1758
+  total_esperado_cent: 11186
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST038_nota_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento MASIVO, ciclo de
+    31 días: el recibo baja S/ 11.68 hasta S/ 199.11. Lleva la cuota 22 de 24 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, cuota_avanzada, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00070
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿me devolvieron algo en el recibo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -1168
+  total_esperado_cent: 19911
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST039_cambio_plan_mas_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + CUOTA_EQUIPO_FINANCIADO en renta
+    ADELANTADA, segmento MASIVO, ciclo de 31 días: el recibo sube S/ 129.26 hasta S/ 194.04.
+    Lleva la cuota 1 de 6 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00072
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, EQUIPO_FINANCIADO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, CUOTA_EQUIPO_FINANCIADO, DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 12926
+  total_esperado_cent: 19404
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST040_cambio_plan_mas_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + DEUDA_ANTERIOR en renta VENCIDA,
+    segmento MASIVO, ciclo de 31 días: el recibo sube S/ 16.95 hasta S/ 255.69. Arrastra
+    S/ 238.74 de deuda anterior, que NO entra en el total del periodo. Lleva la cuota 15
+    de 18 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, cuota_avanzada, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00073
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, DEUDA_ANTERIOR]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 1695
+  total_esperado_cent: 25569
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST041_equipo_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento MASIVO,
+    ciclo de 31 días: el recibo sube S/ 137.46 hasta S/ 212.89. Lleva la cuota 1 de 24
+    de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00074
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "me cobraron la cuota del celu, ¿cuántas me faltan?"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 13746
+  total_esperado_cent: 21289
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST042_reconexion_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta VENCIDA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 4.43 hasta S/ 68.76. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00075
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "estuve sin servicio unos días, ¿me descontaron algo?"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 443
+  total_esperado_cent: 6876
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST043_fin_descuento_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento MASIVO, ciclo de 31
+    días: el recibo sube S/ 21.89 hasta S/ 153.90. Lleva la cuota 7 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00076
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "ya no me aparece mi descuento, xq"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 2189
+  total_esperado_cent: 15390
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST044_paquete_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta VENCIDA, segmento MASIVO, ciclo de 31
+    días: el recibo sube S/ 4.43 hasta S/ 157.71. Lleva la cuota 19 de 24 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_avanzada, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00077
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "q es ese cobro adicional en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, SERVICIO_ADICIONAL_SEGURO]
+  delta_esperado_cent: 443
+  total_esperado_cent: 15771
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST045_nota_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento MASIVO, ciclo de 31
+    días: el recibo baja S/ 35.29 hasta S/ 47.55. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00078
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "mi recibo bajó y no sé xq"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -3529
+  total_esperado_cent: 4755
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST046_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta VENCIDA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 2.28 hasta S/ 230.07. Arrastra S/ 113.90 de deuda
+    anterior, que NO entra en el total del periodo. Lleva la cuota 18 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, cuota_avanzada, cuota_ultima, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00079
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "cuánto tengo q pagar en total"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 228
+  total_esperado_cent: 23007
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST047_cambio_plan_mas_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + DEUDA_ANTERIOR en renta
+    ADELANTADA, segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 31.68 hasta S/ 125.96.
+    Arrastra S/ 47.14 de deuda anterior, que NO entra en el total del periodo. Celdas de
+    cobertura: delta_positivo, con_deuda_anterior, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00081
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, DEUDA_ANTERIOR]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, IGV, INTERES_MORATORIO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 3168
+  total_esperado_cent: 12596
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST048_equipo_mas_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO + NOTA_CREDITO en renta ADELANTADA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 85.30 hasta S/ 221.83. Lleva
+    la cuota 1 de 18 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00082
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, NOTA_CREDITO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, NOTA_DEBITO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO, NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, IGV, INTERES_FINANCIAMIENTO, NOTA_DEBITO]
+  delta_esperado_cent: 8530
+  total_esperado_cent: 22183
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST049_paquete_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta ADELANTADA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 23.48 hasta S/ 243.00. Lleva la cuota 11 de 12 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00085
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "contraté un paquete de datos, ¿cuánto me costó?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_TV_PREMIUM]
+  delta_esperado_cent: 2348
+  total_esperado_cent: 24300
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST050_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 29.39 hasta S/ 217.66. Lleva la cuota 12 de 12 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, cuota_ultima, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00086
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "veo un abono en mi factura, q es"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO]
+  delta_esperado_cent: 2939
+  total_esperado_cent: 21766
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST051_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta ADELANTADA, segmento PREMIUM, ciclo
+    de 31 días: el recibo sube S/ 1.86 hasta S/ 249.21. Arrastra S/ 123.68 de deuda
+    anterior, que NO entra en el total del periodo. Lleva la cuota 18 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, cuota_avanzada, cuota_ultima, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00087
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "cuánto tengo q pagar en total"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 186
+  total_esperado_cent: 24921
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST052_estable_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento PREMIUM, ciclo de 31
+    días: el recibo no varía hasta S/ 157.45. Lleva la cuota 17 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, cuota_avanzada, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00088
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 15745
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST053_equipo_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento PREMIUM,
+    ciclo de 31 días: el recibo sube S/ 116.50 hasta S/ 239.24. Lleva la cuota 1 de 6 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00090
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "xq aparece el equipo en la factura"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 11650
+  total_esperado_cent: 23924
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST054_reconexion_mas_fin_descuento_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + FIN_DESCUENTO en renta VENCIDA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 27.22 hasta S/ 166.93. Lleva la cuota
+    11 de 12 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_intermedia, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00091
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION, FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, PROMOCIONES_VENCIDAS, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 2722
+  total_esperado_cent: 16693
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST055_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento PREMIUM, ciclo de 31
+    días: el recibo baja S/ 17.58 hasta S/ 115.90. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00094
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "aparece un ajuste a mi favor, ¿de qué es?"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -1758
+  total_esperado_cent: 11590
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST056_deuda_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta VENCIDA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 1.03 hasta S/ 104.52. Arrastra S/ 103.49 de deuda
+    anterior, que NO entra en el total del periodo. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00095
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me sale un saldo del mes anterior, ¿eso qué es?"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 103
+  total_esperado_cent: 10452
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST057_cambio_plan_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 23.98 hasta S/ 98.91. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00097
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "q pasó con mi recibo después del cambio de plan"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 2398
+  total_esperado_cent: 9891
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST058_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 573.16 hasta S/ 771.66. Lleva la cuota 1 de 6 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00098
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "xq aparece el equipo en la factura"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_FINANCIAMIENTO]
+  delta_esperado_cent: 57316
+  total_esperado_cent: 77166
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST059_paquete_mas_fin_descuento_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + FIN_DESCUENTO en renta ADELANTADA, segmento
+    HOGAR, ciclo de 31 días: el recibo sube S/ 27.59 hasta S/ 211.10. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00101
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, FIN_DESCUENTO]
+  causas_esperadas: [ALTA_PAQUETE, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 2759
+  total_esperado_cent: 21110
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST060_fin_descuento_mas_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO + NOTA_CREDITO en renta ADELANTADA, segmento
+    HOGAR, ciclo de 31 días: el recibo baja S/ 25.87 hasta S/ 122.76. Lleva la cuota 11
+    de 12 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_negativo, sin_deuda_anterior, cuota_intermedia, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00102
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "se me venció la promoción y el recibo subió"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO, NOTA_CREDITO]
+  causas_esperadas: [FIN_DESCUENTO, NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, NOTA_CREDITO]
+  delta_esperado_cent: -2587
+  total_esperado_cent: 12276
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST061_reconexion_mas_deuda_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + DEUDA_ANTERIOR en renta ADELANTADA,
+    segmento HOGAR, ciclo de 31 días: el recibo baja S/ 5.63 hasta S/ 245.73. Arrastra
+    S/ 251.36 de deuda anterior, que NO entra en el total del periodo. Lleva la cuota 12
+    de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_negativo, con_deuda_anterior, cuota_intermedia, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00103
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "estuve sin servicio unos días, ¿me descontaron algo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION, DEUDA_ANTERIOR]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV, INTERES_MORATORIO]
+  delta_esperado_cent: -563
+  total_esperado_cent: 24573
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST062_estable_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento HOGAR, ciclo de 31
+    días: el recibo no varía hasta S/ 361.93. Lleva la cuota 18 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, cuota_avanzada, cuota_ultima, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00104
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "mi recibo de este mes, ¿tiene algún cambio?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 36193
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST063_cambio_plan_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 11.42 hasta S/ 178.53. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00105
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "q pasó con mi recibo después del cambio de plan"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 1142
+  total_esperado_cent: 17853
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST064_nota_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo sube S/ 29.39 hasta S/ 217.95. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00110
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me llegó más barato este mes, ¿por qué?"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO]
+  delta_esperado_cent: 2939
+  total_esperado_cent: 21795
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST065_paquete_mas_deuda_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + DEUDA_ANTERIOR en renta VENCIDA, segmento
+    HOGAR, ciclo de 31 días: el recibo sube S/ 8.41 hasta S/ 207.21. Arrastra S/ 198.80
+    de deuda anterior, que NO entra en el total del periodo. Lleva la cuota 24 de 24 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, cuota_avanzada, cuota_ultima, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00111
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, SERVICIO_ADICIONAL_SEGURO]
+  delta_esperado_cent: 841
+  total_esperado_cent: 20721
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST066_paquete_mas_cambio_plan_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA,
+    segmento HOGAR, ciclo de 31 días: el recibo sube S/ 53.10 hasta S/ 338.80. Lleva la
+    cuota 7 de 12 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_intermedia, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00112
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [ALTA_PAQUETE, CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, COMPRA_DE_PAQUETES, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, PAQUETE_TV_PREMIUM, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 5310
+  total_esperado_cent: 33880
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST067_reconexion_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo baja S/ 49.27 hasta S/ 193.48. Celdas de cobertura:
+    delta_negativo, sin_deuda_anterior, segmento_convergente,
+    renta_convergente_suspendida.
+  seed: 20260804
+  cuenta_id: C-00115
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me reconectaron, xq sale ese cobro extra"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV]
+  delta_esperado_cent: -4927
+  total_esperado_cent: 19348
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST068_fin_descuento_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo sube S/ 35.37 hasta S/ 176.88. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00116
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "ya no me aparece mi descuento, xq"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 3537
+  total_esperado_cent: 17688
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST069_deuda_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo sube S/ 1.09 hasta S/ 218.12. Arrastra S/ 108.52 de
+    deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00119
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me sale un saldo del mes anterior, ¿eso qué es?"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 109
+  total_esperado_cent: 21812
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST070_cambio_plan_mas_deuda_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + DEUDA_ANTERIOR en renta VENCIDA,
+    segmento CONVERGENTE, ciclo de 31 días: el recibo sube S/ 43.51 hasta S/ 239.27.
+    Arrastra S/ 195.76 de deuda anterior, que NO entra en el total del periodo. Celdas
+    de cobertura: delta_positivo, con_deuda_anterior, compuesto, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00121
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "me pasé a otro plan y no me cuadra el monto"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, DEUDA_ANTERIOR]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 4351
+  total_esperado_cent: 23927
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST071_equipo_mas_fin_descuento_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO + FIN_DESCUENTO en renta VENCIDA,
+    segmento CONVERGENTE, ciclo de 31 días: el recibo sube S/ 581.34 hasta S/ 818.31.
+    Lleva la cuota 1 de 6 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00122
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, FIN_DESCUENTO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 58134
+  total_esperado_cent: 81831
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST072_reconexion_mas_equipo_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + CUOTA_EQUIPO_FINANCIADO en renta VENCIDA,
+    segmento CONVERGENTE, ciclo de 31 días: el recibo sube S/ 54.68 hasta S/ 278.76.
+    Lleva la cuota 1 de 12 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_convergente, renta_convergente_suspendida.
+  seed: 20260804
+  cuenta_id: C-00123
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, EQUIPO_FINANCIADO, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, CUOTA_EQUIPO_FINANCIADO, IGV, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 5468
+  total_esperado_cent: 27876
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST073_fin_descuento_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento CONVERGENTE, ciclo
+    de 31 días: el recibo sube S/ 15.17 hasta S/ 205.65. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00124
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me llegó más caro y no cambié nada"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1517
+  total_esperado_cent: 20565
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST074_estable_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento CONVERGENTE, ciclo de 31
+    días: el recibo no varía hasta S/ 190.48. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00128
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 19048
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST075_paquete_mas_reconexion_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + CORTE_RECONEXION en renta ADELANTADA,
+    segmento MASIVO, ciclo de 31 días: el recibo sube S/ 75.73 hasta S/ 152.57. Celdas
+    de cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00131
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, CORTE_RECONEXION]
+  causas_esperadas: [ALTA_PAQUETE, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, COMPRA_DE_PAQUETES, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV, PAQUETE_ROAMING]
+  delta_esperado_cent: 7573
+  total_esperado_cent: 15257
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST076_deuda_mas_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR + FIN_DESCUENTO en renta ADELANTADA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 19.42 hasta S/ 94.85. Arrastra S/ 37.72
+    de deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00132
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "no pagué el mes pasado, ¿cuánto debo ahora?"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR, FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, INTERES_MORATORIO]
+  delta_esperado_cent: 1942
+  total_esperado_cent: 9485
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST077_paquete_mas_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + FIN_DESCUENTO en renta ADELANTADA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 41.16 hasta S/ 107.85. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00133
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "q es ese cobro adicional en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, FIN_DESCUENTO]
+  causas_esperadas: [ALTA_PAQUETE, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 4116
+  total_esperado_cent: 10785
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST078_nota_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento MASIVO, ciclo de
+    31 días: el recibo baja S/ 29.39 hasta S/ 5.92. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00134
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "mi recibo bajó y no sé xq"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -2939
+  total_esperado_cent: 592
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST079_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta ADELANTADA, segmento MASIVO, ciclo
+    de 31 días: el recibo sube S/ 1.61 hasta S/ 109.11. Arrastra S/ 107.50 de deuda
+    anterior, que NO entra en el total del periodo. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00135
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "arrastro una deuda, ¿me están cobrando intereses?"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 161
+  total_esperado_cent: 10911
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST080_equipo_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento MASIVO,
+    ciclo de 31 días: el recibo sube S/ 416.50 hasta S/ 493.32. Lleva la cuota 1 de 6 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00138
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "compré mi celular en cuotas, ¿cómo me lo están cobrando?"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 41650
+  total_esperado_cent: 49332
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST081_reconexion_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta VENCIDA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 18.09 hasta S/ 170.07. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00139
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me reconectaron, xq sale ese cobro extra"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 1809
+  total_esperado_cent: 17007
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST082_fin_descuento_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento MASIVO, ciclo de 31
+    días: el recibo sube S/ 17.11 hasta S/ 116.03. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00140
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿dónde está el descuento que tenía?"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1711
+  total_esperado_cent: 11603
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST083_cambio_plan_mas_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + DEUDA_ANTERIOR en renta VENCIDA,
+    segmento MASIVO, ciclo de 31 días: el recibo sube S/ 46.14 hasta S/ 107.85. Arrastra
+    S/ 30.86 de deuda anterior, que NO entra en el total del periodo. Celdas de
+    cobertura: delta_positivo, con_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00143
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "q pasó con mi recibo después del cambio de plan"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, DEUDA_ANTERIOR]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 4614
+  total_esperado_cent: 10785
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST084_estable_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento MASIVO, ciclo de 31 días:
+    el recibo no varía hasta S/ 70.68. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00144
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 7068
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST085_equipo_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 108.17 hasta S/ 236.91. Lleva la cuota
+    1 de 6 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00146
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "compré mi celular en cuotas, ¿cómo me lo están cobrando?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 10817
+  total_esperado_cent: 23691
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST086_reconexion_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta ADELANTADA, segmento PREMIUM,
+    ciclo de 31 días: el recibo sube S/ 14.29 hasta S/ 108.57. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00147
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "no tuve señal varios días y el recibo no bajó, ¿por qué?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV]
+  delta_esperado_cent: 1429
+  total_esperado_cent: 10857
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST087_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento PREMIUM, ciclo
+    de 31 días: el recibo sube S/ 23.57 hasta S/ 117.88. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00148
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me llegó más caro y no cambié nada"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 2357
+  total_esperado_cent: 11788
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST088_paquete_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta ADELANTADA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 23.48 hasta S/ 270.36. Lleva la cuota 7 de 18 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00149
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me sale un cargo extra que no reconozco"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_TV_PREMIUM]
+  delta_esperado_cent: 2348
+  total_esperado_cent: 27036
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST089_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento PREMIUM, ciclo de
+    31 días: el recibo baja S/ 11.68 hasta S/ 86.87. Celdas de cobertura:
+    delta_negativo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00150
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "aparece un ajuste a mi favor, ¿de qué es?"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -1168
+  total_esperado_cent: 8687
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST090_cambio_plan_mas_deuda_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + DEUDA_ANTERIOR en renta
+    ADELANTADA, segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 57.57 hasta S/ 191.17.
+    Arrastra S/ 133.60 de deuda anterior, que NO entra en el total del periodo. Lleva la
+    cuota 24 de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, cuota_avanzada, cuota_ultima, compuesto,
+    segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00151
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "me pasé a otro plan y no me cuadra el monto"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, DEUDA_ANTERIOR]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, INTERES_MORATORIO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 5757
+  total_esperado_cent: 19117
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST091_cambio_plan_mas_equipo_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + CUOTA_EQUIPO_FINANCIADO en renta
+    ADELANTADA, segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 70.53 hasta S/ 143.34.
+    Lleva la cuota 1 de 12 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00152
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me pasé a otro plan y no me cuadra el monto"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, EQUIPO_FINANCIADO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, CUOTA_EQUIPO_FINANCIADO, DESCUENTO_PROMOCIONAL, IGV, INTERES_FINANCIAMIENTO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 7053
+  total_esperado_cent: 14334
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST092_paquete_mas_cambio_plan_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 87.69 hasta S/ 185.55. Lleva
+    la cuota 10 de 18 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_intermedia, compuesto,
+    segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00153
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "q es ese cobro adicional en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [ALTA_PAQUETE, CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, COMPRA_DE_PAQUETES, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, PAQUETE_DATOS_ADICIONAL, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 8769
+  total_esperado_cent: 18555
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST093_equipo_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento PREMIUM,
+    ciclo de 31 días: el recibo sube S/ 416.50 hasta S/ 510.78. Lleva la cuota 1 de 6 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00154
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "¿la cuota del equipo la reparten por días?"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 41650
+  total_esperado_cent: 51078
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST094_paquete_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta VENCIDA, segmento PREMIUM, ciclo de 31
+    días: el recibo sube S/ 70.57 hasta S/ 164.85. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00157
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "contraté un paquete de datos, ¿cuánto me costó?"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_ROAMING]
+  delta_esperado_cent: 7057
+  total_esperado_cent: 16485
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST095_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta VENCIDA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 1.77 hasta S/ 119.65. Arrastra S/ 117.88 de deuda
+    anterior, que NO entra en el total del periodo. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00159
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "arrastro una deuda, ¿me están cobrando intereses?"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 177
+  total_esperado_cent: 11965
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST096_cambio_plan_mas_nota_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + NOTA_CREDITO en renta ADELANTADA,
+    segmento HOGAR, ciclo de 31 días: el recibo sube S/ 40.31 hasta S/ 114.53. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00161
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me pasé a otro plan y no me cuadra el monto"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, NOTA_CREDITO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO, NOTA_DEBITO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, NOTAS_CREDITO_DEBITO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, NOTA_DEBITO, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 4031
+  total_esperado_cent: 11453
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST097_paquete_mas_equipo_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA,
+    segmento HOGAR, ciclo de 31 días: el recibo sube S/ 68.56 hasta S/ 261.40. Lleva la
+    cuota 1 de 18 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00162
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, IGV, PAQUETE_ROAMING]
+  delta_esperado_cent: 6856
+  total_esperado_cent: 26140
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST098_fin_descuento_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento HOGAR, ciclo de
+    31 días: el recibo sube S/ 31.82 hasta S/ 106.08. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00164
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿dónde está el descuento que tenía?"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 3182
+  total_esperado_cent: 10608
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST099_paquete_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta ADELANTADA, segmento HOGAR, ciclo de
+    31 días: el recibo sube S/ 70.56 hasta S/ 175.96. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00165
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "activé un paquete el mes pasado, ¿está acá?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_ROAMING]
+  delta_esperado_cent: 7056
+  total_esperado_cent: 17596
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST100_estable_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento HOGAR, ciclo de 31
+    días: el recibo no varía hasta S/ 122.01. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00168
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 12201
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST101_cambio_plan_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 49.86 hasta S/ 206.92. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00169
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "cambié mi plan, ¿cuánto tengo q pagar ahora?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 4986
+  total_esperado_cent: 20692
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST102_equipo_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 31.28 hasta S/ 223.50. Lleva la cuota 1 de 24 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00170
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "me sale un monto por el equipo, no me cuadra"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_FINANCIAMIENTO]
+  delta_esperado_cent: 3128
+  total_esperado_cent: 22350
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST103_reconexion_mas_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + DEUDA_ANTERIOR en renta VENCIDA, segmento
+    HOGAR, ciclo de 31 días: el recibo sube S/ 2.18 hasta S/ 309.02. Arrastra S/ 306.84
+    de deuda anterior, que NO entra en el total del periodo. Lleva la cuota 8 de 18 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, cuota_intermedia, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00171
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION, DEUDA_ANTERIOR]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, INTERES_MORATORIO, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 218
+  total_esperado_cent: 30902
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST104_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo baja S/ 35.28 hasta S/ 330.07. Lleva la cuota 6 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, cuota_intermedia, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00174
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿me devolvieron algo en el recibo?"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -3528
+  total_esperado_cent: 33007
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST105_estable_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento HOGAR, ciclo de 31 días:
+    el recibo no varía hasta S/ 371.25. Lleva la cuota 8 de 18 de un equipo financiado,
+    que nunca se prorratea. Celdas de cobertura: delta_cero, sin_deuda_anterior,
+    cuota_intermedia, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00176
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 37125
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST106_cambio_plan_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 37.69 hasta S/ 213.75. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00177
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "cambié mi plan, ¿cuánto tengo q pagar ahora?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 3769
+  total_esperado_cent: 21375
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST107_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo sube S/ 54.25 hasta S/ 276.47. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00180
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "mi promoción se acabó, ¿cuánto me afecta?"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 5425
+  total_esperado_cent: 27647
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST108_paquete_mas_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + NOTA_CREDITO en renta ADELANTADA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 58.76 hasta S/ 291.81. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00182
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, NOTA_CREDITO]
+  causas_esperadas: [ALTA_PAQUETE, NOTA_DEBITO]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 5876
+  total_esperado_cent: 29181
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST109_paquete_mas_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + DEUDA_ANTERIOR en renta ADELANTADA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 14.38 hasta S/ 193.76. Arrastra S/ 179.38
+    de deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, compuesto, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00183
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "q es ese cobro adicional en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 1438
+  total_esperado_cent: 19376
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST110_estable_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento CONVERGENTE, ciclo de
+    31 días: el recibo no varía hasta S/ 346.03. Lleva la cuota 12 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, cuota_intermedia, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00184
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 34603
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST111_cambio_plan_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 25.87 hasta S/ 345.35. Lleva la
+    cuota 20 de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_avanzada, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00185
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "mi plan nuevo es más barato pero el recibo no bajó, xq"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 2587
+  total_esperado_cent: 34535
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST112_fin_descuento_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento CONVERGENTE, ciclo
+    de 31 días: el recibo sube S/ 52.50 hasta S/ 243.63. Lleva la cuota 6 de 12 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00188
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "mi promoción se acabó, ¿cuánto me afecta?"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 5250
+  total_esperado_cent: 24363
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST113_paquete_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta VENCIDA, segmento CONVERGENTE, ciclo
+    de 31 días: el recibo sube S/ 17.58 hasta S/ 227.53. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00189
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "me sale un cargo extra que no reconozco"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 1758
+  total_esperado_cent: 22753
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST114_deuda_mas_fin_descuento_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR + FIN_DESCUENTO en renta VENCIDA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 37.32 hasta S/ 327.79. Arrastra S/ 290.47
+    de deuda anterior, que NO entra en el total del periodo. Lleva la cuota 22 de 24 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, cuota_avanzada, compuesto, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00191
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "no pagué el mes pasado, ¿cuánto debo ahora?"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR, FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, INTERES_MORATORIO]
+  delta_esperado_cent: 3732
+  total_esperado_cent: 32779
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST115_cambio_plan_mas_equipo_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + CUOTA_EQUIPO_FINANCIADO en renta
+    VENCIDA, segmento CONVERGENTE, ciclo de 31 días: el recibo sube S/ 97.58 hasta S/ 274.46.
+    Lleva la cuota 1 de 12 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00192
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me pasé a otro plan y no me cuadra el monto"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, IGV, INTERES_FINANCIAMIENTO, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 9758
+  total_esperado_cent: 27446
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST116_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 108.17 hasta S/ 211.07. Lleva la cuota 1
+    de 6 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00194
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿la cuota del equipo la reparten por días?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 10817
+  total_esperado_cent: 21107
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST117_reconexion_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta ADELANTADA, segmento MASIVO, ciclo
+    de 31 días: el recibo sube S/ 11.26 hasta S/ 88.81. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00195
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "¿me están cobrando los días que estuve cortado?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV]
+  delta_esperado_cent: 1126
+  total_esperado_cent: 8881
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST118_paquete_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta ADELANTADA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 35.28 hasta S/ 112.10. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00197
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_ROAMING]
+  delta_esperado_cent: 3528
+  total_esperado_cent: 11210
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST119_nota_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 47.08 hasta S/ 151.51. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00198
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me llegó más barato este mes, ¿por qué?"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO]
+  delta_esperado_cent: 4708
+  total_esperado_cent: 15151
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST120_deuda_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta ADELANTADA, segmento MASIVO, ciclo
+    de 31 días: el recibo sube S/ 0.69 hasta S/ 138.55. Arrastra S/ 68.93 de deuda
+    anterior, que NO entra en el total del periodo. Lleva la cuota 18 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, cuota_avanzada, cuota_ultima, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00199
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "no pagué el mes pasado, ¿cuánto debo ahora?"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 69
+  total_esperado_cent: 13855
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST121_equipo_mas_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO + NOTA_CREDITO en renta VENCIDA,
+    segmento MASIVO, ciclo de 31 días: el recibo sube S/ 159.80 hasta S/ 213.02. Lleva
+    la cuota 1 de 18 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00202
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, NOTA_CREDITO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, NOTA_CREDITO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO, NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, IGV, NOTA_CREDITO]
+  delta_esperado_cent: 15980
+  total_esperado_cent: 21302
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST122_reconexion_mas_fin_descuento_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + FIN_DESCUENTO en renta VENCIDA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 21.74 hasta S/ 77.12. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00203
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "estuve sin servicio unos días, ¿me descontaron algo?"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION, FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, PROMOCIONES_VENCIDAS, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 2174
+  total_esperado_cent: 7712
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST123_fin_descuento_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento MASIVO, ciclo de 31
+    días: el recibo sube S/ 13.37 hasta S/ 71.83. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00204
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "se me venció la promoción y el recibo subió"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1337
+  total_esperado_cent: 7183
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST124_estable_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento MASIVO, ciclo de 31 días:
+    el recibo no varía hasta S/ 174.94. Lleva la cuota 9 de 24 de un equipo financiado,
+    que nunca se prorratea. Celdas de cobertura: delta_cero, sin_deuda_anterior,
+    cuota_intermedia, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00208
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "mi recibo de este mes, ¿tiene algún cambio?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 17494
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST125_equipo_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 164.70 hasta S/ 279.40. Lleva la cuota
+    1 de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00210
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me sale un monto por el equipo, no me cuadra"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_FINANCIAMIENTO]
+  delta_esperado_cent: 16470
+  total_esperado_cent: 27940
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST126_reconexion_mas_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + NOTA_CREDITO en renta ADELANTADA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 22.56 hasta S/ 157.79. Celdas
+    de cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00211
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION, NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, NOTAS_CREDITO_DEBITO, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV, NOTA_DEBITO]
+  delta_esperado_cent: 2256
+  total_esperado_cent: 15779
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST127_equipo_mas_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO + FIN_DESCUENTO en renta ADELANTADA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 175.17 hasta S/ 234.57. Lleva
+    la cuota 1 de 24 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00212
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO, FIN_DESCUENTO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 17517
+  total_esperado_cent: 23457
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST128_equipo_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento PREMIUM,
+    ciclo de 31 días: el recibo sube S/ 73.25 hasta S/ 167.53. Lleva la cuota 1 de 12 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00218
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_FINANCIAMIENTO]
+  delta_esperado_cent: 7325
+  total_esperado_cent: 16753
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST129_reconexion_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta VENCIDA, segmento PREMIUM, ciclo
+    de 31 días: el recibo baja S/ 3.96 hasta S/ 180.75. Lleva la cuota 7 de 12 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, cuota_intermedia, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00219
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "no tuve señal varios días y el recibo no bajó, ¿por qué?"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: -396
+  total_esperado_cent: 18075
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST130_paquete_mas_deuda_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + DEUDA_ANTERIOR en renta VENCIDA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 35.75 hasta S/ 130.03. Arrastra S/ 47.14
+    de deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00221
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "q es ese cobro adicional en mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, PAQUETE_ROAMING]
+  delta_esperado_cent: 3575
+  total_esperado_cent: 13003
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST131_deuda_mas_fin_descuento_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR + FIN_DESCUENTO en renta VENCIDA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 28.72 hasta S/ 118.44. Arrastra S/ 89.72
+    de deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00223
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "ya cancelé mi recibo y todavía me sale deuda, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR, FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, INTERES_MORATORIO]
+  delta_esperado_cent: 2872
+  total_esperado_cent: 11844
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST132_estable_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento PREMIUM, ciclo de 31
+    días: el recibo no varía hasta S/ 100.18. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00224
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 10018
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST133_cambio_plan_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 41.11 hasta S/ 289.54. Lleva la cuota 6 de 18 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00225
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "mi plan nuevo es más barato pero el recibo no bajó, xq"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, IGV, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 4111
+  total_esperado_cent: 28954
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST134_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 54.09 hasta S/ 163.26. Lleva la cuota 1 de 12 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00226
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "q es este cobro del equipo en mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 5409
+  total_esperado_cent: 16326
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST135_fin_descuento_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento HOGAR, ciclo de
+    31 días: el recibo sube S/ 21.22 hasta S/ 198.36. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00228
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "se me venció la promoción y el recibo subió"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 2122
+  total_esperado_cent: 19836
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST136_equipo_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta VENCIDA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 416.50 hasta S/ 628.66. Lleva la cuota 1 de 6 de
+    un equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_primera, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00234
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me cobraron la cuota del celu, ¿cuántas me faltan?"
+  modalidad_renta: VENCIDA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 41650
+  total_esperado_cent: 62866
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST137_fin_descuento_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo sube S/ 18.41 hasta S/ 242.87. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00236
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "ya no me aparece mi descuento, xq"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1841
+  total_esperado_cent: 24287
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST138_paquete_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo sube S/ 13.75 hasta S/ 239.72. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00237
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "activé un paquete el mes pasado, ¿está acá?"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, SERVICIO_ADICIONAL_SEGURO]
+  delta_esperado_cent: 1375
+  total_esperado_cent: 23972
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST139_nota_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento HOGAR, ciclo de 31
+    días: el recibo baja S/ 17.58 hasta S/ 105.49. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00238
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "veo un abono en mi factura, q es"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -1758
+  total_esperado_cent: 10549
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST140_cambio_plan_mas_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + NOTA_CREDITO en renta ADELANTADA,
+    segmento CONVERGENTE, ciclo de 31 días: el recibo sube S/ 9.83 hasta S/ 233.91.
+    Lleva la cuota 12 de 18 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_intermedia, compuesto,
+    segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00241
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "q pasó con mi recibo después del cambio de plan"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, NOTA_CREDITO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO, NOTA_CREDITO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, NOTAS_CREDITO_DEBITO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, NOTA_CREDITO, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 983
+  total_esperado_cent: 23391
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST141_cambio_plan_mas_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + CUOTA_EQUIPO_FINANCIADO en renta
+    ADELANTADA, segmento CONVERGENTE, ciclo de 31 días: el recibo sube S/ 67.45 hasta S/ 249.29.
+    Lleva la cuota 1 de 24 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00242
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "q pasó con mi recibo después del cambio de plan"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, EQUIPO_FINANCIADO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, CUOTA_EQUIPO_FINANCIADO, DESCUENTO_PROMOCIONAL, IGV, INTERES_FINANCIAMIENTO, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 6745
+  total_esperado_cent: 24929
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST142_reconexion_mas_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + CUOTA_EQUIPO_FINANCIADO en renta
+    ADELANTADA, segmento CONVERGENTE, ciclo de 31 días: el recibo sube S/ 44.38 hasta S/ 241.23.
+    Lleva la cuota 1 de 12 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_convergente, renta_convergente_suspendida.
+  seed: 20260804
+  cuenta_id: C-00243
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, EQUIPO_FINANCIADO, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, CUOTA_EQUIPO_FINANCIADO, IGV]
+  delta_esperado_cent: 4438
+  total_esperado_cent: 24123
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST143_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo sube S/ 56.02 hasta S/ 283.08. Lleva la cuota 22 de 24
+    de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_avanzada, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00244
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "ya no me aparece mi descuento, xq"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 5602
+  total_esperado_cent: 28308
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST144_nota_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo sube S/ 17.58 hasta S/ 194.46. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00246
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿me devolvieron algo en el recibo?"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO]
+  delta_esperado_cent: 1758
+  total_esperado_cent: 19446
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST145_deuda_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta ADELANTADA, segmento CONVERGENTE,
+    ciclo de 31 días: el recibo sube S/ 4.25 hasta S/ 216.77. Arrastra S/ 212.52 de
+    deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00247
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "ya cancelé mi recibo y todavía me sale deuda, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 425
+  total_esperado_cent: 21677
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST146_estable_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento CONVERGENTE, ciclo de
+    31 días: el recibo no varía hasta S/ 278.95. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00248
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 27895
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST147_cambio_plan_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 16.75 hasta S/ 266.56. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00249
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me cambiaron el plan a mitad del ciclo, ¿cómo me lo cobraron?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 1675
+  total_esperado_cent: 26656
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST148_reconexion_mas_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + NOTA_CREDITO en renta VENCIDA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 36.06 hasta S/ 225.21. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_convergente,
+    renta_convergente_suspendida.
+  seed: 20260804
+  cuenta_id: C-00251
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION, NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, NOTAS_CREDITO_DEBITO, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, NOTA_DEBITO, RENTA_MOVISTAR_TOTAL]
+  delta_esperado_cent: 3606
+  total_esperado_cent: 22521
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST149_fin_descuento_mas_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO + NOTA_CREDITO en renta VENCIDA, segmento
+    CONVERGENTE, ciclo de 31 días: el recibo sube S/ 13.43 hasta S/ 166.38. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00252
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "se me venció la promoción y el recibo subió"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO, NOTA_CREDITO]
+  causas_esperadas: [FIN_DESCUENTO, NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, NOTA_CREDITO]
+  delta_esperado_cent: 1343
+  total_esperado_cent: 16638
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST150_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento CONVERGENTE, ciclo
+    de 31 días: el recibo sube S/ 23.48 hasta S/ 206.38. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00254
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "mi recibo bajó y no sé xq"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO]
+  delta_esperado_cent: 2348
+  total_esperado_cent: 20638
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST151_estable_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento CONVERGENTE, ciclo de 31
+    días: el recibo no varía hasta S/ 224.08. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_convergente.
+  seed: 20260804
+  cuenta_id: C-00256
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 22408
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST152_cambio_plan_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 36.36 hasta S/ 60.31. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00257
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me cambiaron el plan a mitad del ciclo, ¿cómo me lo cobraron?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 3636
+  total_esperado_cent: 6031
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST153_equipo_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 104.13 hasta S/ 204.34. Lleva la cuota 1
+    de 24 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00258
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "me cobraron la cuota del celu, ¿cuántas me faltan?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO]
+  delta_esperado_cent: 10413
+  total_esperado_cent: 20434
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST154_reconexion_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta ADELANTADA, segmento MASIVO, ciclo
+    de 31 días: el recibo sube S/ 18.87 hasta S/ 77.28. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00259
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, IGV]
+  delta_esperado_cent: 1887
+  total_esperado_cent: 7728
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST155_fin_descuento_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 17.67 hasta S/ 143.13. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00260
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me llegó más caro y no cambié nada"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1767
+  total_esperado_cent: 14313
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST156_paquete_mas_deuda_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + DEUDA_ANTERIOR en renta ADELANTADA, segmento
+    MASIVO, ciclo de 31 días: el recibo sube S/ 23.79 hasta S/ 65.70. Arrastra S/ 41.91
+    de deuda anterior, que NO entra en el total del periodo. Celdas de cobertura:
+    delta_positivo, con_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00261
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "contraté un paquete de datos, ¿cuánto me costó?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ALTA_PAQUETE, DEUDA_ANTERIOR]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, INTERES_MORATORIO, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 2379
+  total_esperado_cent: 6570
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST157_fin_descuento_mas_nota_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO + NOTA_CREDITO en renta ADELANTADA, segmento
+    MASIVO, ciclo de 31 días: el recibo baja S/ 49.46 hasta S/ 16.05. Celdas de
+    cobertura: delta_negativo, sin_deuda_anterior, compuesto, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00262
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "ya no me aparece mi descuento, xq"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO, NOTA_CREDITO]
+  causas_esperadas: [FIN_DESCUENTO, NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV, NOTA_CREDITO]
+  delta_esperado_cent: -4946
+  total_esperado_cent: 1605
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST158_cambio_plan_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta VENCIDA, segmento MASIVO,
+    ciclo de 31 días: el recibo sube S/ 29.69 hasta S/ 121.77. Lleva la cuota 14 de 18
+    de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_avanzada, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00265
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN]
+  conceptos_esperados: [IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 2969
+  total_esperado_cent: 12177
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST159_reconexion_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta VENCIDA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 23.44 hasta S/ 153.12. Lleva la cuota 8 de 18 de un
+    equipo financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00267
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "¿me están cobrando los días que estuve cortado?"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 2344
+  total_esperado_cent: 15312
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST160_nota_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta VENCIDA, segmento MASIVO, ciclo de 31
+    días: el recibo baja S/ 17.58 hasta S/ 61.01. Celdas de cobertura: delta_negativo,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-00270
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "aparece un ajuste a mi favor, ¿de qué es?"
+  modalidad_renta: VENCIDA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_CREDITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO]
+  delta_esperado_cent: -1758
+  total_esperado_cent: 6101
+  debe_derivar: false
+  no_debe_contener: ["más caro que el de"]
+
+- caso_id: EST161_equipo_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CUOTA_EQUIPO_FINANCIADO en renta ADELANTADA, segmento
+    PREMIUM, ciclo de 31 días: el recibo sube S/ 64.08 hasta S/ 197.07. Lleva la cuota 1
+    de 12 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_primera, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00274
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "xq aparece el equipo en la factura"
+  modalidad_renta: ADELANTADA
+  escenarios: [CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO]
+  causas_oficiales_esperadas: [EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, INTERES_FINANCIAMIENTO]
+  delta_esperado_cent: 6408
+  total_esperado_cent: 19707
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST162_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta ADELANTADA, segmento PREMIUM, ciclo
+    de 31 días: el recibo sube S/ 18.85 hasta S/ 94.28. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00276
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿dónde está el descuento que tenía?"
+  modalidad_renta: ADELANTADA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1885
+  total_esperado_cent: 9428
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST163_nota_adelantada_corto
+  descripcion: >-
+    Muestreo estratificado. NOTA_CREDITO en renta ADELANTADA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 58.88 hasta S/ 163.78. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00278
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "veo un abono en mi factura, q es"
+  modalidad_renta: ADELANTADA
+  escenarios: [NOTA_CREDITO]
+  causas_esperadas: [NOTA_DEBITO]
+  causas_oficiales_esperadas: [NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_DEBITO]
+  delta_esperado_cent: 5888
+  total_esperado_cent: 16378
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST164_estable_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta ADELANTADA, segmento PREMIUM, ciclo de 31
+    días: el recibo no varía hasta S/ 178.98. Lleva la cuota 12 de 18 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, cuota_intermedia, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00280
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 17898
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST165_cambio_plan_mas_nota_vencida_corto
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO + NOTA_CREDITO en renta VENCIDA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 5.83 hasta S/ 186.02. Lleva la
+    cuota 8 de 12 de un equipo financiado, que nunca se prorratea. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, cuota_intermedia, compuesto, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00281
+  periodo: "2026-07"
+  verbosidad: CORTO
+  canal: APP
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: VENCIDA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO, NOTA_CREDITO]
+  causas_esperadas: [CAMBIO_PLAN, NOTA_CREDITO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, NOTAS_CREDITO_DEBITO]
+  conceptos_esperados: [IGV, NOTA_CREDITO, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 583
+  total_esperado_cent: 18602
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST166_paquete_mas_equipo_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE + CUOTA_EQUIPO_FINANCIADO en renta VENCIDA,
+    segmento PREMIUM, ciclo de 31 días: el recibo sube S/ 185.91 hasta S/ 280.19. Lleva
+    la cuota 1 de 24 de un equipo financiado, que nunca se prorratea. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, cuota_primera, compuesto,
+    segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00282
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE, CUOTA_EQUIPO_FINANCIADO]
+  causas_esperadas: [ALTA_EQUIPO_FINANCIADO, ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES, EQUIPO_FINANCIADO]
+  conceptos_esperados: [CUOTA_EQUIPO_FINANCIADO, IGV, INTERES_FINANCIAMIENTO, PAQUETE_TV_PREMIUM]
+  delta_esperado_cent: 18591
+  total_esperado_cent: 28019
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST167_fin_descuento_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. FIN_DESCUENTO en renta VENCIDA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 19.78 hasta S/ 95.11. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00284
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "me llegó más caro y no cambié nada"
+  modalidad_renta: VENCIDA
+  escenarios: [FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO]
+  causas_oficiales_esperadas: [PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 1978
+  total_esperado_cent: 9511
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST168_paquete_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ALTA_PAQUETE en renta VENCIDA, segmento PREMIUM, ciclo de 31
+    días: el recibo sube S/ 11.68 hasta S/ 156.11. Lleva la cuota 9 de 12 de un equipo
+    financiado, que nunca se prorratea. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, cuota_intermedia, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00285
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "compré un paquete, xq me cobran aparte"
+  modalidad_renta: VENCIDA
+  escenarios: [ALTA_PAQUETE]
+  causas_esperadas: [ALTA_PAQUETE]
+  causas_oficiales_esperadas: [COMPRA_DE_PAQUETES]
+  conceptos_esperados: [IGV, PAQUETE_DATOS_ADICIONAL]
+  delta_esperado_cent: 1168
+  total_esperado_cent: 15611
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST169_deuda_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. DEUDA_ANTERIOR en renta VENCIDA, segmento PREMIUM, ciclo de
+    31 días: el recibo sube S/ 0.91 hasta S/ 91.79. Arrastra S/ 90.88 de deuda anterior,
+    que NO entra en el total del periodo. Celdas de cobertura: delta_positivo,
+    con_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00287
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "no pagué el mes pasado, ¿cuánto debo ahora?"
+  modalidad_renta: VENCIDA
+  escenarios: [DEUDA_ANTERIOR]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: [INTERES_MORATORIO]
+  delta_esperado_cent: 91
+  total_esperado_cent: 9179
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST170_estable_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. ESTABLE en renta VENCIDA, segmento PREMIUM, ciclo de 31
+    días: el recibo no varía hasta S/ 102.92. Celdas de cobertura: delta_cero,
+    sin_deuda_anterior, segmento_premium.
+  seed: 20260804
+  cuenta_id: C-00288
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 10292
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: EST171_cambio_plan_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CAMBIO_PLAN_MEDIO_CICLO en renta ADELANTADA, segmento HOGAR,
+    ciclo de 31 días: el recibo sube S/ 17.13 hasta S/ 191.42. Celdas de cobertura:
+    delta_positivo, sin_deuda_anterior, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00289
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "cambié de plan a mitad de mes, ¿por qué me cobran distinto?"
+  modalidad_renta: ADELANTADA
+  escenarios: [CAMBIO_PLAN_MEDIO_CICLO]
+  causas_esperadas: [CAMBIO_PLAN, FIN_DESCUENTO]
+  causas_oficiales_esperadas: [CAMBIO_DE_PLAN, PROMOCIONES_VENCIDAS]
+  conceptos_esperados: [AJUSTE_RETROACTIVO_RENTA, DESCUENTO_PROMOCIONAL, IGV, RENTA_HOGAR_INTERNET]
+  delta_esperado_cent: 1713
+  total_esperado_cent: 19142
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST172_reconexion_mas_fin_descuento_adelantada_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION + FIN_DESCUENTO en renta ADELANTADA,
+    segmento HOGAR, ciclo de 31 días: el recibo sube S/ 28.65 hasta S/ 114.22. Celdas de
+    cobertura: delta_positivo, sin_deuda_anterior, compuesto, segmento_hogar.
+  seed: 20260804
+  cuenta_id: C-00291
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: ADELANTADA
+  escenarios: [CORTE_RECONEXION, FIN_DESCUENTO]
+  causas_esperadas: [FIN_DESCUENTO, RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, PROMOCIONES_VENCIDAS, RECONEXIONES]
+  conceptos_esperados: [AJUSTE_DIAS_SUSPENSION, CARGO_RECONEXION, DESCUENTO_PROMOCIONAL, IGV]
+  delta_esperado_cent: 2865
+  total_esperado_cent: 11422
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]
+
+- caso_id: EST173_reconexion_vencida_detalle
+  descripcion: >-
+    Muestreo estratificado. CORTE_RECONEXION en renta VENCIDA, segmento MASIVO, ciclo de
+    31 días: el recibo sube S/ 8.98 hasta S/ 90.16. Celdas de cobertura: delta_positivo,
+    sin_deuda_anterior, segmento_masivo.
+  seed: 20260804
+  cuenta_id: C-DEMO-02
+  periodo: "2026-07"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "me cortaron el servicio y me cobran igual, q pasó"
+  modalidad_renta: VENCIDA
+  escenarios: [CORTE_RECONEXION]
+  causas_esperadas: [RECONEXION, SUSPENSION]
+  causas_oficiales_esperadas: [AJUSTES_POR_DIAS_DE_SUSPENSION, RECONEXIONES]
+  conceptos_esperados: [CARGO_RECONEXION, IGV, RENTA_PLAN_MOVIL]
+  delta_esperado_cent: 898
+  total_esperado_cent: 9016
+  debe_derivar: false
+  no_debe_contener: ["más barato que el de"]

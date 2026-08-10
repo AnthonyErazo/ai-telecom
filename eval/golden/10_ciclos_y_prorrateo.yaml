@@ -1,0 +1,575 @@
+# ============================================================================
+# CONTROLES DE LONGITUD DE CICLO — fichero GENERADO. No editar a mano.
+#
+#   python -m eval.generar_golden
+#
+# Un ciclo va del día d de un mes al día d del siguiente, así que su longitud la fija el
+# calendario: 28 días en febrero, 30 en abril y junio, 31 en marzo, mayo y julio. Estos
+# casos explican periodos de 30 y de 31 días comparándolos con el ciclo anterior, que a
+# veces tiene otra longitud (marzo, de 31, se compara con febrero, de 28).
+#
+# Dos límites que conviene decir en voz alta en vez de disimularlos:
+#   · 28 días NO puede ser el ciclo explicado: febrero es el primer periodo del dataset
+#     y no tiene recibo anterior. Entra como ciclo previo de los casos de marzo.
+#   · 29 días NO existe: haría falta un febrero bisiesto y 2026 no lo es.
+#
+# Los escenarios se inyectan solo en 2026-07, así que estos son controles ESTABLES: el
+# recibo repite el del mes anterior al céntimo aunque el ciclo cambie de longitud, y la
+# respuesta correcta es decir que no varió. `no_debe_contener` recoge el vocabulario de
+# variación: si aparece, el sistema está narrando un cambio que no existe.
+#
+# La otra convención de prorrateo (30/360) no es un campo del caso porque es política
+# global. Se cubre ejecutando la misma suite con CONVENCION_PRORRATEO=30_360.
+# ============================================================================
+
+- caso_id: CIC001_31dias_adelantada_202603
+  descripcion: >-
+    Control de ciclo. Periodo 2026-03 (31 días) frente a 2026-02 (28 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00260
+  periodo: "2026-03"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 12546
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC002_31dias_adelantada_202603
+  descripcion: >-
+    Control de ciclo. Periodo 2026-03 (31 días) frente a 2026-02 (28 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00066
+  periodo: "2026-03"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 11753
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC003_31dias_adelantada_202603
+  descripcion: >-
+    Control de ciclo. Periodo 2026-03 (31 días) frente a 2026-02 (28 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00083
+  periodo: "2026-03"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 11788
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC004_31dias_vencida_202603
+  descripcion: >-
+    Control de ciclo. Periodo 2026-03 (31 días) frente a 2026-02 (28 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00284
+  periodo: "2026-03"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "mi recibo de este mes, ¿tiene algún cambio?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 7533
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC005_31dias_vencida_202603
+  descripcion: >-
+    Control de ciclo. Periodo 2026-03 (31 días) frente a 2026-02 (28 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00236
+  periodo: "2026-03"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 22446
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC006_31dias_vencida_202603
+  descripcion: >-
+    Control de ciclo. Periodo 2026-03 (31 días) frente a 2026-02 (28 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00155
+  periodo: "2026-03"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 9428
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC007_30dias_adelantada_202604
+  descripcion: >-
+    Control de ciclo. Periodo 2026-04 (30 días) frente a 2026-03 (31 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00085
+  periodo: "2026-04"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 21952
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC008_30dias_adelantada_202604
+  descripcion: >-
+    Control de ciclo. Periodo 2026-04 (30 días) frente a 2026-03 (31 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00034
+  periodo: "2026-04"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 21216
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC009_30dias_adelantada_202604
+  descripcion: >-
+    Control de ciclo. Periodo 2026-04 (30 días) frente a 2026-03 (31 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00292
+  periodo: "2026-04"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "mi recibo de este mes, ¿tiene algún cambio?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 8451
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC010_30dias_vencida_202604
+  descripcion: >-
+    Control de ciclo. Periodo 2026-04 (30 días) frente a 2026-03 (31 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00235
+  periodo: "2026-04"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 13440
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC011_30dias_vencida_202604
+  descripcion: >-
+    Control de ciclo. Periodo 2026-04 (30 días) frente a 2026-03 (31 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00191
+  periodo: "2026-04"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 29047
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC012_30dias_vencida_202604
+  descripcion: >-
+    Control de ciclo. Periodo 2026-04 (30 días) frente a 2026-03 (31 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00207
+  periodo: "2026-04"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 23626
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC013_31dias_adelantada_202605
+  descripcion: >-
+    Control de ciclo. Periodo 2026-05 (31 días) frente a 2026-04 (30 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00022
+  periodo: "2026-05"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 8182
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC014_31dias_adelantada_202605
+  descripcion: >-
+    Control de ciclo. Periodo 2026-05 (31 días) frente a 2026-04 (30 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00007
+  periodo: "2026-05"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "mi recibo de este mes, ¿tiene algún cambio?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 5855
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC015_31dias_adelantada_202605
+  descripcion: >-
+    Control de ciclo. Periodo 2026-05 (31 días) frente a 2026-04 (30 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00292
+  periodo: "2026-05"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 8451
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC016_31dias_vencida_202605
+  descripcion: >-
+    Control de ciclo. Periodo 2026-05 (31 días) frente a 2026-04 (30 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00174
+  periodo: "2026-05"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 36535
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC017_31dias_vencida_202605
+  descripcion: >-
+    Control de ciclo. Periodo 2026-05 (31 días) frente a 2026-04 (30 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00169
+  periodo: "2026-05"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 15706
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC018_31dias_vencida_202605
+  descripcion: >-
+    Control de ciclo. Periodo 2026-05 (31 días) frente a 2026-04 (30 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00078
+  periodo: "2026-05"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 8284
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC019_30dias_adelantada_202606
+  descripcion: >-
+    Control de ciclo. Periodo 2026-06 (30 días) frente a 2026-05 (31 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00248
+  periodo: "2026-06"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "mi recibo de este mes, ¿tiene algún cambio?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 27895
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC020_30dias_adelantada_202606
+  descripcion: >-
+    Control de ciclo. Periodo 2026-06 (30 días) frente a 2026-05 (31 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00007
+  periodo: "2026-06"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "¿me cobraron algo distinto este mes?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 5855
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC021_30dias_adelantada_202606
+  descripcion: >-
+    Control de ciclo. Periodo 2026-06 (30 días) frente a 2026-05 (31 días) en renta
+    ADELANTADA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo
+    y la respuesta correcta es decirlo, sin narrar una variación que no existe pese a
+    que el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00039
+  periodo: "2026-06"
+  verbosidad: CORTO
+  canal: BOT
+  nivel: LOA2
+  utterance: "reviso mi recibo, ¿está igual que el mes pasado?"
+  modalidad_renta: ADELANTADA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 21913
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC022_30dias_vencida_202606
+  descripcion: >-
+    Control de ciclo. Periodo 2026-06 (30 días) frente a 2026-05 (31 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00140
+  periodo: "2026-06"
+  verbosidad: DETALLE
+  canal: WHATSAPP
+  nivel: LOA2
+  utterance: "¿por qué me vino más caro este mes?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 9892
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC023_30dias_vencida_202606
+  descripcion: >-
+    Control de ciclo. Periodo 2026-06 (30 días) frente a 2026-05 (31 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00297
+  periodo: "2026-06"
+  verbosidad: CORTO
+  canal: ASESOR
+  nivel: LOA2
+  utterance: "quiero ver el detalle de mi recibo"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 21559
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]
+
+- caso_id: CIC024_30dias_vencida_202606
+  descripcion: >-
+    Control de ciclo. Periodo 2026-06 (30 días) frente a 2026-05 (31 días) en renta
+    VENCIDA. Sin escenario inyectado: el recibo repite el del mes anterior al céntimo y
+    la respuesta correcta es decirlo, sin narrar una variación que no existe pese a que
+    el ciclo cambia de longitud.
+  seed: 20260804
+  cuenta_id: C-00284
+  periodo: "2026-06"
+  verbosidad: DETALLE
+  canal: APP
+  nivel: LOA2
+  utterance: "mi recibo de este mes, ¿tiene algún cambio?"
+  modalidad_renta: VENCIDA
+  escenarios: [ESTABLE]
+  causas_esperadas: []
+  causas_oficiales_esperadas: []
+  conceptos_esperados: []
+  delta_esperado_cent: 0
+  total_esperado_cent: 7533
+  debe_derivar: false
+  no_debe_contener: ["más caro", "más barato", "subió", "aumentó"]

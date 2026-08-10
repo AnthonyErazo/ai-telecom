@@ -1,0 +1,215 @@
+# =============================================================================
+# recibo-claro — orquestación local (sección 12 de la especificación técnica).
+#
+#   db               PostgreSQL 16 + pgvector. Persistente y con healthcheck.
+#   api              la solución. No arranca hasta que la BD está sana.
+#   mock-brainybill  el sistema que expone el recibo actual y los cinco previos.
+#   mock-amdocs      el CRM que expone el historial de órdenes.
+#
+# Los dos mocks NO son decorado: existen para que el Anti-Corruption Layer
+# (`apps/api/acl.py`) hable HTTP contra un servicio externo desde el primer día.
+# El salto al BrainyBill y al Amdocs reales es cambiar dos URLs, no reescribir
+# el motor. Ver docs/arquitectura.md, sección "Anti-Corruption Layer".
+#
+# Sin Redis en esta fase (decisión explícita de la especificación). El estado de
+# conversación vive en memoria del proceso; ver docs/pendientes.md, riesgo R-03.
+#
+# Arranque completo en un comando:   make demo
+# =============================================================================
+
+name: recibo-claro
+
+services:
+  # ---------------------------------------------------------------------------
+  # Base de datos: PostgreSQL 16 con pgvector.
+  # La imagen oficial de pgvector trae la extensión compilada; las migraciones
+  # (`db/migraciones/002_rag.sql`) hacen el CREATE EXTENSION.
+  # ---------------------------------------------------------------------------
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: recibo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-recibo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-recibo}
+      POSTGRES_DB: ${POSTGRES_DB:-recibo}
+      # Determinismo de ordenación e idioma para el índice de texto en español.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: America/Lima
+    ports:
+      # Publicado para poder inspeccionar la BD con psql desde el equipo.
+      # Cámbielo con PUERTO_DB si ya tiene un PostgreSQL local en el 5432.
+      - "${PUERTO_DB:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` es la sonda que exige la especificación: dice que el
+      # servidor acepta conexiones, no solo que el proceso existe.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-recibo} -d ${POSTGRES_DB:-recibo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks: [recibo]
+
+  # ---------------------------------------------------------------------------
+  # La API.
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: recibo-claro:local
+    container_name: recibo-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mock-brainybill:
+        condition: service_started
+      mock-amdocs:
+        condition: service_started
+    environment:
+      # --- Sección 12 del .env.example -------------------------------------
+      ENTORNO: ${ENTORNO:-dev}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-recibo}:${POSTGRES_PASSWORD:-recibo}@db:5432/${POSTGRES_DB:-recibo}
+      # Aquí sí hay base de datos, así que se pide explícitamente. Fuera de
+      # Docker el valor por defecto es `auto`, que sin DATABASE_URL usa memoria:
+      # por eso `make dev` no necesita nada de esto.
+      MODO_ALMACENAMIENTO: ${MODO_ALMACENAMIENTO:-postgres}
+      LLM_MODE: ${LLM_MODE:-mock}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_EMBED_MODEL: ${GEMINI_EMBED_MODEL:-}
+      EMBED_DIM: ${EMBED_DIM:-768}
+      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-4}
+      DEMO_SEED: ${DEMO_SEED:-20260804}
+      RULES_VERSION: ${RULES_VERSION:-1.0.0}
+      JWT_SECRET: ${JWT_SECRET:-solo-desarrollo-cambiar}
+      VERIFICADOR_ESTRICTO: ${VERIFICADOR_ESTRICTO:-true}
+      COBRO_EN_SUSPENSION: ${COBRO_EN_SUSPENSION:-false}
+      CONVENCION_PRORRATEO: ${CONVENCION_PRORRATEO:-actual}
+      # --- Integración: el ACL habla HTTP con los mocks --------------------
+      BRAINYBILL_BASE_URL: ${BRAINYBILL_BASE_URL:-http://mock-brainybill:8801}
+      AMDOCS_BASE_URL: ${AMDOCS_BASE_URL:-http://mock-amdocs:8802}
+      HTTP_TIMEOUT_S: ${HTTP_TIMEOUT_S:-5}
+      DATOS_SINTETICOS: data/sintetico
+      # --- Orquestación del turno -------------------------------------------
+      # `grafo` (por defecto) conduce el turno con packages/orquestacion
+      # (LangGraph + checkpointer SQLite); `directo` usa la función lineal de
+      # siempre. Las dos dan la misma respuesta: la segunda es el respaldo de un
+      # solo interruptor si el grafo fallara durante la demostración.
+      ORQUESTADOR: ${ORQUESTADOR:-grafo}
+      # El fichero de checkpoints cae dentro de ./data, que ya está montado como
+      # volumen: la conversación sobrevive a `docker compose restart api`.
+      CHECKPOINT_PATH: ${CHECKPOINT_PATH:-data/checkpoints/turnos.sqlite}
+      CHECKPOINT_DURABILITY: ${CHECKPOINT_DURABILITY:-sync}
+      # --- Telemetría de terceros: APAGADA ----------------------------------
+      # `packages.orquestacion` ya fija estas variables al importarse, pero se
+      # declaran también aquí para que se vea sin leer código que ninguna
+      # conversación de cliente sale hacia LangSmith ni hacia ningún tercero.
+      # Los valores vacíos son deliberados: sin clave y sin endpoint no hay
+      # a dónde enviar nada aunque alguien encendiera el trazado.
+      LANGSMITH_TRACING: "false"
+      LANGSMITH_TRACING_V2: "false"
+      LANGCHAIN_TRACING: "false"
+      LANGCHAIN_TRACING_V2: "false"
+      LANGSMITH_OTEL_ENABLED: "false"
+      LANGCHAIN_CALLBACKS_BACKGROUND: "false"
+      LANGSMITH_API_KEY: ""
+      LANGCHAIN_API_KEY: ""
+      LANGSMITH_ENDPOINT: ""
+      LANGCHAIN_ENDPOINT: ""
+      # --- Gobernanza -------------------------------------------------------
+      LOG_TERMINAL: ${LOG_TERMINAL:-true}
+      VENTANA_SILENCIO_S: ${VENTANA_SILENCIO_S:-1800}
+    ports:
+      - "${PUERTO_API:-8000}:8000"
+    volumes:
+      # El dataset sintético, la bitácora de auditoría y la telemetría viven
+      # fuera de la imagen: se generan, se inspeccionan y se borran sin
+      # reconstruir nada.
+      - ./data:/app/data
+      # Las reglas de negocio se montan en caliente: un analista de facturación
+      # puede corregir un parámetro y reiniciar, sin rebuild.
+      - ./db/reglas:/app/db/reglas:ro
+    healthcheck:
+      test:
+        ["CMD", "python", "-c",
+         "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/salud', timeout=4).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks: [recibo]
+
+  # ---------------------------------------------------------------------------
+  # Mock de BrainyBill: recibo actual + 5 previos, en JSON.
+  # Misma imagen que la API (se construye una sola vez y se reutiliza).
+  # ---------------------------------------------------------------------------
+  mock-brainybill:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: recibo-claro:local
+    container_name: recibo-mock-brainybill
+    restart: unless-stopped
+    command:
+      ["uvicorn", "apps.mocks.brainybill.servidor:app", "--host", "0.0.0.0", "--port", "8801"]
+    environment:
+      BRAINYBILL_DATOS: /app/data/sintetico
+      TZ: America/Lima
+    ports:
+      - "${PUERTO_BRAINYBILL:-8801}:8801"
+    volumes:
+      # Solo lectura: un sistema externo no escribe en nuestro dataset.
+      - ./data:/app/data:ro
+    healthcheck:
+      test:
+        ["CMD", "python", "-c",
+         "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8801/salud', timeout=4).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks: [recibo]
+
+  # ---------------------------------------------------------------------------
+  # Mock de Amdocs (CRM): historial de órdenes, en CSV con columnas nativas.
+  # ---------------------------------------------------------------------------
+  mock-amdocs:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: recibo-claro:local
+    container_name: recibo-mock-amdocs
+    restart: unless-stopped
+    command:
+      ["uvicorn", "apps.mocks.amdocs.servidor:app", "--host", "0.0.0.0", "--port", "8802"]
+    environment:
+      AMDOCS_DATOS: /app/data/sintetico/ordenes.csv
+      TZ: America/Lima
+    ports:
+      - "${PUERTO_AMDOCS:-8802}:8802"
+    volumes:
+      - ./data:/app/data:ro
+    healthcheck:
+      test:
+        ["CMD", "python", "-c",
+         "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8802/salud', timeout=4).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks: [recibo]
+
+volumes:
+  # Persistencia de la BD entre `docker compose down` y `up`.
+  # `make limpiar` la borra a propósito (down -v).
+  pgdata:
+    name: recibo-claro-pgdata
+
+networks:
+  recibo:
+    name: recibo-claro
+    driver: bridge

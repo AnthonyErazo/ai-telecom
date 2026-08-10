@@ -1,0 +1,89 @@
+# =============================================================================
+# recibo-claro — qué NO entra jamás en el repositorio
+#
+# Este fichero no es higiene de proyecto: es un control de cumplimiento. Las dos
+# primeras secciones existen por obligaciones contractuales, no por comodidad.
+# =============================================================================
+
+# --- Datos: ninguna información de Movistar, ni siquiera derivada -------------
+# [CONFIRMADO-OFICIAL] BASES §9: «La información, datos y archivos proporcionados
+# por Movistar tendrán carácter confidencial y no podrán ser divulgados», con
+# obligación vigente durante 10 años tras el fin de la Hackathon.
+#
+# Se ignora `data/` entero en vez de enumerar lo prohibido: así el repositorio es
+# seguro por construcción y no depende de que nadie se acuerde de nada.
+data/*
+!data/README.md
+# Única excepción, y por eso está justificada aquí: el CSV de ejemplo del adaptador
+# de ensayo lo inventó el equipo (no se descargó de ninguna parte, no es de Movistar
+# y no tiene datos personales). Sin él, kaggle_map.py no se podría probar sin conexión.
+!data/ejemplos_externos/
+
+# --- Secretos ----------------------------------------------------------------
+# `.env` contiene claves de API en texto plano. `.env.example` sí se versiona:
+# documenta las variables sin valores.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credenciales*.json
+service-account*.json
+
+# --- Artefactos de ejecución -------------------------------------------------
+# Bitácora de auditoría, checkpoints del grafo y bases sueltas. Se regeneran
+# solos; versionarlos rompería la cadena de hashes de quien clone el repositorio.
+*.jsonl
+!eval/golden/*.jsonl
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+!db/
+*.log
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# --- Herramientas de prueba y análisis ---------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+# Informes JUnit de pytest (--junit-xml)
+junit*.xml
+r.xml
+
+# --- Node (por si se añade tooling auxiliar) ---------------------------------
+node_modules/
+npm-debug.log*
+
+# --- Editores / sistema operativo --------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Parches y restos de fusión ----------------------------------------------
+*.orig
+*.rej
+*.bak

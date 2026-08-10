@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>recibo-claro · consola de demostración</title>
+  <meta name="description" content="Explicación verificada de recibos Movistar: la experiencia del cliente y la terminal de gobernanza, lado a lado.">
+  <!-- Favicon embebido: la página no puede pedir NADA a la red (debe funcionar sin internet). -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b6bcb'/%3E%3Cpath d='M9 21V11h6.4a3.3 3.3 0 0 1 0 6.6H12l4.6 3.4' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <a class="salto-contenido" href="#conversacion">Ir a la conversación</a>
+
+  <!-- ===================== Barra global ===================== -->
+  <header class="barra-global">
+    <div class="marca">
+      <span class="marca__sello" aria-hidden="true">rc</span>
+      <span class="marca__texto">recibo<strong>claro</strong></span>
+      <span class="marca__leyenda">Explicación verificada de recibos · Movistar Perú</span>
+    </div>
+    <div class="barra-global__estado" id="estado-servicio" role="status" aria-live="polite">
+      <span class="chip chip--esperando">Conectando con la API…</span>
+    </div>
+  </header>
+
+  <!-- Aviso de conexión: se muestra solo cuando la API no responde. -->
+  <div class="franja-error" id="franja-error" hidden>
+    <div class="franja-error__cuerpo">
+      <strong id="franja-error-titulo">No se pudo contactar con la API</strong>
+      <span id="franja-error-detalle"></span>
+    </div>
+    <button type="button" class="boton boton--fantasma" id="boton-reintentar">Reintentar</button>
+  </div>
+
+  <main class="tablero">
+    <!-- ============ COLUMNA IZQUIERDA · el cliente ============ -->
+    <section class="panel panel--cliente" aria-labelledby="titulo-cliente">
+      <h2 class="oculto-visual" id="titulo-cliente">Experiencia del cliente</h2>
+
+      <div class="barra-cliente">
+        <fieldset class="grupo-control" id="selector-cliente">
+          <legend class="grupo-control__titulo">Cliente de guion</legend>
+          <div class="segmentado segmentado--clientes" id="opciones-cliente" role="radiogroup" aria-label="Cliente de guion"></div>
+        </fieldset>
+
+        <fieldset class="grupo-control grupo-control--derecha" id="selector-verbosidad">
+          <legend class="grupo-control__titulo">Detalle de la respuesta</legend>
+          <div class="segmentado" role="radiogroup" aria-label="Verbosidad">
+            <button type="button" class="segmentado__opcion es-activa" data-verbosidad="CORTO" role="radio" aria-checked="true">Corto</button>
+            <button type="button" class="segmentado__opcion" data-verbosidad="DETALLE" role="radio" aria-checked="false">Detalle</button>
+          </div>
+        </fieldset>
+      </div>
+
+      <!-- Ficha del recibo: sale de GET /v1/hechos, no de la explicación. -->
+      <div class="ficha-recibo" id="ficha-recibo" aria-live="polite"></div>
+
+      <ol class="conversacion" id="conversacion" tabindex="-1"></ol>
+
+      <div class="redactor">
+        <div class="rapidas" id="rapidas">
+          <button type="button" class="pastilla" data-pregunta="¿por qué me vino más caro este mes?">¿Por qué me vino más caro?</button>
+          <button type="button" class="pastilla" data-pregunta="¿qué me están cobrando en este recibo?">¿Qué me están cobrando?</button>
+          <button type="button" class="pastilla" data-pregunta="quiero hablar con un asesor">Quiero hablar con un asesor</button>
+        </div>
+        <form class="redactor__forma" id="formulario" autocomplete="off">
+          <label class="oculto-visual" for="entrada">Escriba su consulta</label>
+          <input class="redactor__entrada" id="entrada" name="entrada" type="text" maxlength="2000"
+                 placeholder="Escríbame su consulta sobre el recibo…">
+          <button class="boton boton--principal" id="boton-enviar" type="submit">Enviar</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ============ COLUMNA DERECHA · gobernanza ============ -->
+    <aside class="panel panel--gobernanza" aria-labelledby="titulo-gobernanza">
+      <h2 class="oculto-visual" id="titulo-gobernanza">Terminal de gobernanza</h2>
+
+      <!-- 7 · contador grande y fijo -->
+      <div class="contador contador--neutro" id="contador" role="status" aria-live="polite">
+        <p class="contador__linea" id="contador-linea">AFIRMACIONES NUMÉRICAS — · ANCLADAS — · NO ANCLADAS —</p>
+        <p class="contador__pie" id="contador-pie">Aún no se ha generado ninguna explicación en esta sesión.</p>
+      </div>
+
+      <!-- 9 · indicadores del turno -->
+      <div class="indicadores" id="indicadores"></div>
+
+      <!-- 10 y 11 · controles de la demo -->
+      <div class="controles-demo">
+        <button type="button" class="boton boton--peligro" id="boton-alucinar">
+          <span class="boton--peligro__icono" aria-hidden="true">!</span>
+          Inyectar alucinación
+        </button>
+        <p class="controles-demo__nota" id="nota-alucinar">
+          Fuerza una cifra falsa en el siguiente turno. Debe salir <strong>FAIL</strong>, bloquearse la
+          respuesta y caer a plantilla.
+        </p>
+        <div class="llm">
+          <span class="llm__rotulo">Modo del modelo</span>
+          <div class="segmentado segmentado--llm" id="selector-llm" role="radiogroup" aria-label="Modo del modelo generativo">
+            <button type="button" class="segmentado__opcion" data-llm="mock" role="radio" aria-checked="false">mock</button>
+            <button type="button" class="segmentado__opcion" data-llm="gemini" role="radio" aria-checked="false">gemini</button>
+          </div>
+          <p class="llm__estado" id="llm-estado">Consultando <code>GET /salud</code>…</p>
+        </div>
+      </div>
+
+      <!-- 8 · registro tipo terminal -->
+      <div class="terminal" id="terminal">
+        <div class="terminal__cabecera">
+          <span class="terminal__titulo">Bitácora encadenada · <code>GET /v1/auditoria</code></span>
+          <span class="terminal__cadena" id="terminal-cadena"></span>
+        </div>
+        <div class="terminal__cuerpo" id="terminal-cuerpo" tabindex="0">
+          <p class="terminal__vacio">Esperando el primer turno. Cada explicación deja aquí sus seis líneas
+            de pipeline, con el hash de la cadena.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- 6 · panel de evidencia desplegable -->
+  <section class="evidencia" id="evidencia" hidden aria-labelledby="evidencia-titulo">
+    <header class="evidencia__cabecera">
+      <div>
+        <h2 class="evidencia__titulo" id="evidencia-titulo">De dónde salió esta cifra</h2>
+        <p class="evidencia__sub" id="evidencia-sub"></p>
+      </div>
+      <button type="button" class="boton boton--fantasma" id="cerrar-evidencia" aria-label="Cerrar el panel de evidencia">Cerrar</button>
+    </header>
+    <div class="evidencia__cuerpo" id="evidencia-cuerpo"></div>
+  </section>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

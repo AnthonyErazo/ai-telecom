@@ -1,0 +1,23 @@
+{# Escenario de control: el recibo NO varió. El motor debe saber decirlo con
+   claridad y sin inventar causas donde no las hay. #}
+{% from "_comun.jinja" import totales, cierre_estandar, frase_generica, frase_residual_std, lista_lineas %}
+
+{% macro resumen(d) -%}
+Su recibo de {{ d.mes_actual }} es igualito al de {{ d.mes_previo }}: se mantiene en {{ d.total_actual }}, sin cargos nuevos ni cambios.
+{%- endmacro %}
+
+{% macro frase(d, c) -%}
+{{ frase_generica(d, c) }}
+{%- endmacro %}
+
+{% macro frase_residual(d) -%}
+{{ frase_residual_std(d) }}
+{%- endmacro %}
+
+{% macro detalle(d) -%}
+Revisamos concepto por concepto su recibo de {{ d.mes_actual }} contra el de {{ d.mes_previo }} y no hay ninguna diferencia: ni cambio de plan, ni paquetes nuevos, ni ajustes. {{ totales(d) }} {{ lista_lineas(d) }}
+{%- endmacro %}
+
+{% macro cierre(d) -%}
+{{ cierre_estandar(d) }}
+{%- endmacro %}
