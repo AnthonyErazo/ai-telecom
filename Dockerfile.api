@@ -2,7 +2,7 @@
 # =============================================================================
 # recibo-claro — imagen de la API (y de los dos mocks, que reusan esta misma).
 #
-# Multi-stage en dos etapas:
+# Multi-stage: build web, dependencias Python y runtime final.
 #
 #   constructor  instala las dependencias en un entorno virtual aislado.
 #                Aquí sí hay pip, ruedas descargadas y cachés.
@@ -18,6 +18,19 @@
 # --------------------------------------------------------------------------- #
 # Etapa 1 — constructor
 # --------------------------------------------------------------------------- #
+FROM node:22-alpine AS web-builder
+
+WORKDIR /workspace
+
+# Manifiestos primero para que cambios de UI reutilicen la cache de npm.
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/package.json
+RUN npm ci
+
+COPY apps/web/ ./apps/web/
+RUN npm run build:web
+
+# Constructor de dependencias Python.
 FROM python:3.12-slim AS constructor
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -69,6 +82,8 @@ COPY --from=constructor /opt/venv /opt/venv
 # Código fuente. Se copia explícitamente lo que el servicio necesita en
 # ejecución; `tests/`, `.git/` y demás quedan fuera (ver .dockerignore).
 COPY --chown=recibo:recibo apps/     ./apps/
+# Build reproducible de React. Node y node_modules no entran en el runtime.
+COPY --from=web-builder --chown=recibo:recibo /workspace/apps/web/dist ./apps/web/dist
 COPY --chown=recibo:recibo packages/ ./packages/
 COPY --chown=recibo:recibo db/       ./db/
 COPY --chown=recibo:recibo eval/     ./eval/

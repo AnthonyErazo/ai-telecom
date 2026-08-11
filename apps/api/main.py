@@ -185,7 +185,10 @@ def _montar_interfaz(aplicacion: FastAPI) -> None:
     monta nada y la API arranca igual: la interfaz es andamiaje de demostración, no una
     dependencia del servicio.
     """
-    directorio = raiz_proyecto() / "apps" / "web" / "estatico"
+    raiz_web = raiz_proyecto() / "apps" / "web"
+    compilado = raiz_web / "dist"
+    legado = raiz_web / "estatico"
+    directorio = compilado if (compilado / "index.html").is_file() else legado
     if not directorio.is_dir():
         _LOG.info("no se monta /ui: no existe el directorio %s", directorio)
         return

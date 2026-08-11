@@ -73,6 +73,8 @@ r.xml
 # --- Node (por si se añade tooling auxiliar) ---------------------------------
 node_modules/
 npm-debug.log*
+apps/web/dist/
+apps/web/*.tsbuildinfo
 
 # --- Editores / sistema operativo --------------------------------------------
 .vscode/

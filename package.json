@@ -1,0 +1,17 @@
+{
+  "name": "recibo-claro-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @recibo-claro/web",
+    "build:web": "npm run build --workspace @recibo-claro/web",
+    "test:web": "npm run test --workspace @recibo-claro/web",
+    "typecheck:web": "npm run typecheck --workspace @recibo-claro/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

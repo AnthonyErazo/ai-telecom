@@ -171,6 +171,18 @@ audit:  ## Verifica la cadena de hashes y muestra el último turno auditado
 test:  ## Ejecuta la batería completa de pruebas
 	$(PY) -m pytest $(ARGS)
 
+web-install:  ## Instala dependencias del workspace React
+	npm install
+
+web-dev:  ## Levanta Vite en :5173 (API en :8000)
+	npm run dev:web
+
+web-build:  ## Comprueba tipos y genera apps/web/dist
+	npm run build:web
+
+web-test:  ## Ejecuta pruebas unitarias del frontend
+	npm run test:web
+
 lint:  ## Comprueba estilo y formato sin modificar nada
 	$(PY) -m ruff check .
 	$(PY) -m ruff format --check .
