@@ -1,4 +1,4 @@
-import type { DemoAccounts, Explanation, FactSet } from "./types";
+import type { DemoAccounts, Explanation, FactSet, LiveToken } from "./types";
 
 const configuredBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
 const API_BASE = configuredBase ?? "";
@@ -31,8 +31,9 @@ export const api = {
     body: JSON.stringify({ cuenta_id: accountId, nivel: "LOA2", canal: "APP" })
   }),
   facts: (token: string) => request<FactSet>("/v1/hechos", authorized(token)),
-  explain: (token: string, input: { conversation_id?: string; cuenta_id: string; verbosidad: string; utterance: string }) =>
+  explain: (token: string, input: { conversation_id?: string; cuenta_id: string; periodo?: string; verbosidad: string; utterance: string }) =>
     request<Explanation>("/v1/explicar", authorized(token, { method: "POST", body: JSON.stringify({ ...input, canal: "APP" }) })),
+  liveToken: (token: string) => request<LiveToken>("/v1/live/token", authorized(token, { method: "POST" })),
   audit: (token: string, traceId: string) => request<Record<string, unknown>>(`/v1/auditoria?trace_id=${encodeURIComponent(traceId)}&incluir_eventos=true`, authorized(token)),
   hallucinate: (token: string, accountId: string) => request<Record<string, unknown>>("/dev/alucinar", authorized(token, {
     method: "POST", body: JSON.stringify({ activar: true, delta_cent: 731, turnos: 1, cuenta_id: accountId })

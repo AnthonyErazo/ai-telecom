@@ -42,3 +42,11 @@ export interface DemoAccounts {
   demo: string[];
   guion: Record<string, string>;
 }
+
+export interface LiveToken {
+  token: string;
+  model: string;
+  voice: string;
+  expire_time: string;
+  new_session_expire_time: string;
+}
