@@ -541,7 +541,7 @@ se siembra e indexa **antes** de levantarla):
 | Paso | Objetivo | Qué hace |
 |---|---|---|
 | 1/5 | `build` | Construye `recibo-claro:local` desde `Dockerfile.api` (multi-stage: `constructor` instala en un venv, `runtime` solo lo copia) |
-| 2/5 | `migrate` | Levanta `db` y aplica `db/migraciones/001_core.sql`, `002_rag.sql`, `003_auditoria.sql` |
+| 2/5 | `migrate` | Levanta `db` y aplica `db/esquema.sql`, el único fichero de esquema |
 | 3/5 | `seed` | Genera el dataset determinístico (semilla `20260804`, 300 clientes) |
 | 4/5 | `indexar` | Vectoriza catálogo, FAQs y casuísticas en pgvector |
 | 5/5 | `up` + `smoke` | Levanta `db`, `api`, `mock-brainybill`, `mock-amdocs` y ejecuta la prueba de humo |

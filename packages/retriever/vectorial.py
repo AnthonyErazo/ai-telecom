@@ -70,7 +70,7 @@ _LOG = logging.getLogger(__name__)
 DIMENSION_POR_DEFECTO: Final = 768
 
 #: Tabla de pgvector. La DDL se crea de forma idempotente desde este módulo, de modo
-#: que el retriever funciona con o sin la migración ``db/migraciones/002_rag.sql``.
+#: que el retriever funciona con o sin las columnas ``vector`` de ``db/esquema.sql``.
 TABLA_POR_DEFECTO: Final = "rag_documento"
 
 #: Timeout de la llamada de embeddings, en segundos.

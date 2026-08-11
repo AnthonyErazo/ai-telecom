@@ -117,7 +117,7 @@ shell:  ## Abre una shell dentro del contenedor de la API
 # --------------------------------------------------------------------------- #
 # Datos y esquema
 # --------------------------------------------------------------------------- #
-migrate:  ## Aplica las migraciones SQL (idempotente)
+migrate:  ## Aplica db/esquema.sql (idempotente)
 	$(COMPOSE) up -d --wait db
 	$(COMPOSE) run --rm --no-deps $(SERVICIO) python -m db.migrar
 
@@ -138,7 +138,7 @@ indexar:  ## Indexa catálogo, FAQs y casuísticas en pgvector (idempotente)
 demo:  ## Todo en un comando: build → migrate → seed → indexar → up → smoke
 	@echo "==> 1/5 construyendo la imagen"
 	$(MAKE) build
-	@echo "==> 2/5 aplicando migraciones"
+	@echo "==> 2/5 aplicando el esquema"
 	$(MAKE) migrate
 	@echo "==> 3/5 generando el dataset sintético (semilla $(SEED))"
 	$(MAKE) seed

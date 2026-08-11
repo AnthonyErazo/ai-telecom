@@ -665,6 +665,119 @@ def _buscar_fichero(directorio: Path, nombres: Sequence[str]) -> Path | None:
     return None
 
 
+def _conectar_supabase():
+    """Conexión a Supabase, o ``None`` si no está configurada o no responde.
+
+    Centralizada para que las tres cargas del corpus degraden igual: sin base de datos el
+    sistema arranca con lo local y solo pierde riqueza de contexto, nunca corrección —las
+    cifras salen del ``FactSet``, no del corpus.
+    """
+    import os
+
+    cadena = (os.getenv("SUPABASE_DB_URL") or "").strip()
+    if not cadena:
+        return None
+    try:
+        import psycopg
+
+        return psycopg.connect(cadena, connect_timeout=15)
+    except Exception as exc:
+        _LOG.info("corpus: Supabase no disponible (%s); se usa el local", type(exc).__name__)
+        return None
+
+
+def _faqs_de_supabase() -> list[Faq]:
+    """Las preguntas frecuentes reales, desde ``faq_externa``.
+
+    Solo se traen las **traducidas al español**: una FAQ en inglés dentro del índice
+    ensucia BM25 —comparte pocas palabras con la pregunta de un cliente peruano— y, si se
+    recuperase, metería inglés en el contexto del modelo. Las que aún no se han traducido
+    se ignoran hasta que ``scripts/traducir_faqs.py`` las procese.
+    """
+    conexion = _conectar_supabase()
+    if conexion is None:
+        return []
+    try:
+        with conexion:
+            filas = conexion.execute(
+                """
+                SELECT faq_id, pregunta, respuesta,
+                       coalesce(etiquetas[1], ''), coalesce(origen, 'faq')
+                FROM faq
+                WHERE activo
+                ORDER BY faq_id
+                """
+            ).fetchall()
+    except Exception as exc:
+        _LOG.info("FAQ: no se pudo leer de Supabase (%s)", type(exc).__name__)
+        return []
+
+    faqs = [
+        Faq(
+            faq_id=faq_id,
+            pregunta=pregunta,
+            respuesta=respuesta,
+            etiquetas=[intencion] if intencion else [],
+            fuente=fuente or "faq_externa",
+        )
+        for faq_id, pregunta, respuesta, intencion, fuente in filas
+    ]
+    if faqs:
+        _LOG.info("FAQ: %d documentos reales desde Supabase", len(faqs))
+    return faqs
+
+
+def _conceptos_de_supabase() -> list[ConceptoCatalogo]:
+    """Conceptos reales del operador, desde ``v_concepto_real``.
+
+    Devuelve lista vacía —nunca falla— si no hay conexión configurada o si la vista no
+    existe. El corpus es **color narrativo**: las cifras salen del ``FactSet``, así que
+    quedarse sin catálogo empobrece la explicación pero no la vuelve incorrecta, y hacer
+    que el sistema no arranque por eso sería desproporcionado.
+
+    ``definicion_cliente`` se deja vacía a propósito: el dataset trae el nombre comercial
+    y la clasificación del facturador, no una explicación redactada. Inventarla aquí sería
+    volver a poner texto nuestro donde debe haber dato del operador.
+    """
+    import os
+
+    cadena = (os.getenv("SUPABASE_DB_URL") or "").strip()
+    if not cadena:
+        return []
+    try:
+        import psycopg
+    except ImportError:  # pragma: no cover - psycopg es opcional en esta ruta
+        return []
+    consulta = """
+        SELECT concepto_id, nombre_comercial, grupo
+        FROM v_concepto_real
+        WHERE considerado AND apariciones >= 5
+        ORDER BY apariciones DESC
+    """
+    try:
+        with psycopg.connect(cadena, connect_timeout=15) as conexion:
+            filas = conexion.execute(consulta).fetchall()
+    except Exception as exc:
+        _LOG.info("catálogo: Supabase no disponible (%s); se usa solo el local", type(exc).__name__)
+        return []
+
+    salida: list[ConceptoCatalogo] = []
+    for concepto_id, nombre, grupo in filas:
+        familia = "AJUSTE" if "DESCUENTO" in (grupo or "").upper() else "RECURRENTE"
+        salida.append(
+            ConceptoCatalogo(
+                concepto_id=concepto_id,
+                nombre_comercial=nombre or concepto_id,
+                familia=familia,
+                definicion_cliente="",
+                visible_cliente=True,
+            )
+        )
+    if salida:
+        _LOG.info("catálogo: %d conceptos reales desde Supabase", len(salida))
+    return salida
+
+
 def cargar_catalogo(
     ruta: str | Path | None = None, reglas: ConfiguracionReglas | None = None
 ) -> list[ConceptoCatalogo]:
@@ -686,6 +799,17 @@ def cargar_catalogo(
     configuracion = reglas if reglas is not None else cargar_reglas()
     conceptos: list[ConceptoCatalogo] = list(configuracion.catalogo)
     conocidos = {concepto.concepto_id for concepto in conceptos}
+
+    # Supabase antes que el disco: los conceptos reales del operador salen de
+    # `v_concepto_real`, que se recalcula sola al recargar el dataset. Los de
+    # `rules.yaml` siguen mandando —fijan `causas_permitidas`, que el motor necesita—,
+    # pero dejan de ser los únicos: de 31 escritos por el equipo se pasa a los que
+    # realmente aparecen en los recibos de Movistar.
+    for concepto in _conceptos_de_supabase():
+        if concepto.concepto_id in conocidos:
+            continue
+        conceptos.append(concepto)
+        conocidos.add(concepto.concepto_id)
 
     directorio = Path(ruta) if ruta is not None else ruta_corpus_por_defecto()
     fichero = _buscar_fichero(directorio, ("catalogo", "catalogo_conceptos", "conceptos"))
@@ -720,6 +844,14 @@ def cargar_faqs(
     minuto, sin corpus previo y sin inventar contenido, porque el texto sale de las
     definiciones ya validadas en ``rules.yaml``.
     """
+    # Supabase manda. Las 480 FAQs de `faq_externa` son preguntas reales de clientes de
+    # telecomunicaciones; el fichero local son 36 que escribimos nosotros, y usarlas
+    # convertía la métrica de *Retrieval Accuracy* en una tautología: recuperábamos bien
+    # porque preguntábamos con las mismas palabras con que habíamos escrito el corpus.
+    desde_bd = _faqs_de_supabase()
+    if desde_bd:
+        return desde_bd
+
     directorio = Path(ruta) if ruta is not None else ruta_corpus_por_defecto()
     fichero = _buscar_fichero(directorio, ("faqs", "faq", "faqs_seed", "preguntas_frecuentes"))
     if fichero is not None:
@@ -742,14 +874,93 @@ def cargar_faqs(
     return faqs
 
 
+def _casuisticas_de_supabase() -> list[Casuistica]:
+    """Las casuísticas desde la tabla ``casuistica``.
+
+    Se reconstruye el **registro del corpus** —los nombres que usa el fichero JSON— y se
+    pasa por :meth:`Casuistica.desde_registro`, el mismo constructor que la ruta de disco.
+    Traducir aquí los campos a mano habría creado un segundo mapeo que se desincroniza en
+    cuanto alguien añada un campo: el alias vive en un solo sitio, ``_ALIAS_CASUISTICA``.
+
+    ``signo_delta`` viaja como ``smallint`` porque el motor compara signos como enteros;
+    el corpus lo escribe como ``"+"``/``"-"``. La traducción es de ida y vuelta y está
+    aquí, no en la tabla, para que la columna siga siendo comparable en SQL.
+    """
+    conexion = _conectar_supabase()
+    if conexion is None:
+        return []
+    try:
+        with conexion:
+            filas = conexion.execute(
+                """
+                SELECT casuistica_id, titulo, situacion, modalidad_renta::text, signo_delta,
+                       causas::text[], conceptos, estructura, narrativa, error_frecuente,
+                       accion_sugerida, senales_cliente, prioridad
+                FROM casuistica
+                WHERE activo
+                ORDER BY prioridad, casuistica_id
+                """
+            ).fetchall()
+    except Exception as exc:
+        _LOG.info("casuísticas: no se pudo leer de Supabase (%s)", type(exc).__name__)
+        return []
+
+    signo_texto = {1: "+", -1: "-", 0: "0"}
+    casuisticas: list[Casuistica] = []
+    for fila in filas:
+        registro = {
+            "casuistica_id": fila[0],
+            "titulo": fila[1],
+            "situacion": fila[2] or "",
+            "modalidad": fila[3],
+            "signo_delta": signo_texto.get(fila[4], "0"),
+            "causas": list(fila[5] or []),
+            "conceptos": list(fila[6] or []),
+            "estructura": list(fila[7] or []),
+            "guia_narrativa": fila[8] or "",
+            "error_frecuente": fila[9] or "",
+            "accion_sugerida": fila[10] or "",
+            "senales_cliente": list(fila[11] or []),
+            "prioridad": fila[12],
+        }
+        try:
+            casuisticas.append(Casuistica.desde_registro(registro))
+        except Exception as exc:
+            # Una casuística mal formada no puede tumbar el corpus entero: se descarta y
+            # se dice cuál, que es lo que permite arreglarla.
+            _LOG.warning("casuística %s descartada: %s", fila[0], exc)
+    if casuisticas:
+        _LOG.info("casuísticas: %d desde Supabase", len(casuisticas))
+    return casuisticas
+
+
 def cargar_casuisticas(ruta: str | Path | None = None) -> list[Casuistica]:
     """Carga las casuísticas del corpus, o la semilla incluida en el paquete.
 
-    El corpus del disco es **autoritativo**: si existe, la semilla incluida en el
-    paquete (:data:`CASUISTICAS_SEMILLA`) solo cubre las firmas causales que el fichero
-    no traiga. Así el equipo puede reescribir los guiones narrativos sin que una
-    casuística vieja del código siga ganando por firma.
+    **Supabase manda.** Si la tabla ``casuistica`` responde, es la que vale: es donde el
+    equipo edita los guiones sin tocar el repositorio, y donde los ve cualquiera del
+    grupo. El fichero de disco pasa a ser la semilla que la pobló, y la semilla del
+    paquete (:data:`CASUISTICAS_SEMILLA`) solo cubre las firmas causales que nadie traiga.
+
+    Sin conexión se cae al fichero y luego a la semilla, en ese orden. Quedarse sin
+    casuísticas no da respuestas falsas —las cifras salen del ``FactSet``— pero sí
+    explicaciones más secas, así que degradar es mejor que no arrancar.
     """
+    de_supabase = _casuisticas_de_supabase()
+    if de_supabase:
+        ids_bd = {casuistica.casuistica_id for casuistica in de_supabase}
+        firmas_bd = {firma for casuistica in de_supabase for firma in casuistica.firmas()}
+        return sorted(
+            de_supabase
+            + [
+                casuistica
+                for casuistica in CASUISTICAS_SEMILLA
+                if casuistica.casuistica_id not in ids_bd
+                and not firmas_bd.issuperset(casuistica.firmas())
+            ],
+            key=lambda c: (c.prioridad, c.casuistica_id),
+        )
+
     directorio = Path(ruta) if ruta is not None else ruta_corpus_por_defecto()
     fichero = _buscar_fichero(directorio, ("casuisticas", "casuistica", "casuisticas_seed"))
     if fichero is None:

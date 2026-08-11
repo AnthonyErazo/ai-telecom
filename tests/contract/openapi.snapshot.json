@@ -1542,7 +1542,8 @@
           "INTENCION_REGULATORIA",
           "UMBRAL_INCOMPRENSION",
           "VERIFICACION_FALLIDA",
-          "NIVEL_INSUFICIENTE"
+          "NIVEL_INSUFICIENTE",
+          "FUERA_DE_ALCANCE"
         ],
         "title": "MotivoDerivacion",
         "type": "string"

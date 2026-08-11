@@ -49,5 +49,5 @@ La propia ficha respalda la separación: los datos llegan «listos para su vecto
 
 - `packages/retriever/corpus.py`, `hibrido.py`, `saneador.py`
 - `packages/facts_engine/diff.py`, `invariante.py`
-- `db/migraciones/002_rag.sql` — solo tres tablas de corpus llevan columna `vector`
+- `db/esquema.sql` — solo las tablas de corpus (`faq`, `casuistica`) llevan columna `vector`
 - `docs/arquitectura.md` §7

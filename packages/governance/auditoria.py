@@ -68,6 +68,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from packages.governance.espejo_supabase import espejo_por_defecto
 from packages.core_domain.dinero import formatear_soles
 from packages.core_domain.enums import EtapaAuditoria, NivelAseguramiento
 from packages.core_domain.esquemas.auditoria import HASH_GENESIS, EventoAuditoria
@@ -453,6 +454,9 @@ class RegistroAuditoria:
                 evidencia; desactívelo solo en pruebas masivas.
         """
         self.ruta = Path(ruta) if ruta is not None else ruta_auditoria_por_defecto()
+        # La cadena se identifica por el nombre del fichero: así dos entornos que
+        # comparten base de datos no mezclan sus índices ni sus hashes.
+        self.espejo = espejo_por_defecto(self.ruta.stem)
         self.actor = actor
         self.sincronizar = sincronizar
         self._cerrojo = threading.RLock()
@@ -581,6 +585,8 @@ class RegistroAuditoria:
             if self.sincronizar:
                 os.fsync(fichero.fileno())
         self._tamano_visto = self.ruta.stat().st_size
+        # Después del fsync, nunca antes: el espejo copia lo que YA es evidencia.
+        self.espejo.encolar(evento)
 
     def cerrar_turno(
         self,
@@ -602,7 +608,7 @@ class RegistroAuditoria:
         """
         eventos = self.leer(trace_id)
         valida, indice_roto = verificar_cadena(self.ruta) if verificar else (True, None)
-        return self.emitir(
+        cierre = self.emitir(
             EtapaAuditoria.CHAIN,
             trace_id,
             {
@@ -613,6 +619,11 @@ class RegistroAuditoria:
             },
             cuenta_ref=cuenta_ref,
         )
+        # El turno está cerrado y verificado en disco: ahora, y solo ahora, se copia a
+        # Supabase. Un viaje de red por conversación, y ninguno en el camino crítico de
+        # la respuesta al cliente.
+        self.espejo.volcar()
+        return cierre
 
     # ------------------------------------------------------------------ #
     # Lectura

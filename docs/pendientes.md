@@ -201,7 +201,7 @@ lo están**; conviene no arrastrar el error a la presentación:
 | **Prueba de carga** | El dimensionamiento del pico 3× es **aritmética sobre supuestos declarados**, con latencias medidas pero sin ensayo de carga. Ninguna cifra de escala debe presentarse como medición | `arquitectura.md` §10 |
 | **Integración con el sistema facturador** | No hay adaptador. No es un problema para el prototipo: el recibo llega por BrainyBill | `arquitectura.md` §2 |
 | **Gemini en el camino real** | La demo corre en `LLM_MODE=mock` por determinismo, y `google-genai` **no está instalada** en el entorno de referencia (los tests marcados `gemini` se omiten). El proveedor está implementado con import diferido y salida estructurada; falta ejercitarlo contra el servicio con una clave real | `packages/llm_layer/providers/gemini.py` |
-| **Persistencia de FactSets y explicaciones en PostgreSQL** | Las tablas y sus `CHECK` existen (`db/migraciones/001_core.sql`), pero la API sirve desde memoria y disco. Migrar la escritura es directo; no se hizo por no añadir un fallo posible a la demo | `db/migraciones/001_core.sql` |
+| **Persistencia de FactSets y explicaciones en PostgreSQL** | Se diseñaron las tablas y sus `CHECK`, pero nada las escribía ni las leía: el motor construye el `FactSet` en memoria desde `cargo_facturado` y el verificador lo comprueba ahí. Se retiraron de la base por eso. El razonamiento de cada restricción se conserva en `docs/BACKEND_Y_DATOS.md` §7 por si se decide persistir | `docs/BACKEND_Y_DATOS.md` |
 
 ### 3.5 Abierto por la decisión del ADR 005 — capa de orquestación
 

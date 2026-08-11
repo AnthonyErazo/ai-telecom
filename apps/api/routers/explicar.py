@@ -1063,6 +1063,24 @@ _COPY_INTENCION: dict[Intencion, tuple[str, str]] = {
         "Por supuesto. Lo paso con un asesor y le dejo cargado el contexto de su "
         "consulta para que no tenga que empezar de cero.",
     ),
+    Intencion.DISPUTA_CARGO: (
+        "advertencia",
+        "Entiendo, y eso no lo resuelvo yo desde aquí. Si un cargo no le corresponde, "
+        "lo tiene que revisar una persona. Lo paso con un asesor con todo lo que me ha "
+        "contado, para que no tenga que repetirlo.",
+    ),
+    Intencion.PAGAR: (
+        "info",
+        "Puede pagar su recibo desde la App Mi Movistar o en los canales autorizados, "
+        "con el código de pago que aparece en su recibo. Si además quiere, le explico "
+        "por qué le llegó ese monto.",
+    ),
+    Intencion.CONSUMO: (
+        "advertencia",
+        "El consumo de sus datos y minutos no lo veo desde aquí: eso lo encuentra en la "
+        "App Mi Movistar. Lo mío es su recibo, qué le cobraron y por qué. Si quiere, lo "
+        "paso con un asesor que sí pueda revisar su consumo.",
+    ),
 }
 
 #: Motivo legible que se guarda en la derivación, por intención.
@@ -1071,6 +1089,12 @@ _MOTIVO_INTENCION: dict[Intencion, str] = {
         "el cliente manifestó una intención con efecto regulatorio o contractual"
     ),
     Intencion.PEDIR_HUMANO: "el cliente pidió expresamente hablar con una persona",
+    Intencion.DISPUTA_CARGO: (
+        "el cliente impugna un cargo: sostiene que no le corresponde, no que no lo entienda"
+    ),
+    Intencion.CONSUMO: (
+        "el cliente pregunta por consumo (datos, minutos, saldo), que no está en el FactSet"
+    ),
 }
 
 

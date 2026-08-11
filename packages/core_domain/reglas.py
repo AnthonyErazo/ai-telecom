@@ -42,9 +42,9 @@ from packages.core_domain.esquemas.recibo import ConceptoCatalogo
 
 __all__ = [
     "RUTA_RELATIVA_REGLAS",
+    "ConfianzaAtribucion",
     "ConfiguracionCrossSelling",
     "ConfiguracionReglas",
-    "ConfianzaAtribucion",
     "EfectoEfervescente",
     "PesosIncomprension",
     "PoliticaCalculo",
@@ -85,6 +85,22 @@ class PoliticaCalculo(BaseModel):
     igv_bp: int = Field(default=1800, ge=0, description="IGV en puntos básicos (1800 = 18 %)")
     metodo_redondeo: str = "mayor_resto"
     cargo_reconexion_cent: Centimos = 2500
+    descuento_alta_solo_cargo_fijo: bool = Field(
+        default=True,
+        description=(
+            "[CONFIRMADO-OFICIAL] El descuento por alta nueva o portabilidad aplica solo "
+            "sobre el cargo fijo del plan, nunca sobre SVAs, paquetes ni financiamiento "
+            "de equipos (vídeo oficial «Alta y porta», 04:06)"
+        ),
+    )
+    ventana_descuento_alta_dias: int = Field(
+        default=90,
+        ge=0,
+        description=(
+            "[CONFIRMADO-OFICIAL] La promoción se agota en DÍAS, no en meses naturales, "
+            "por lo que el recibo que la agota es mixto (vídeo «Alta y porta», 02:25)"
+        ),
+    )
     prorratear_financiamiento: bool = Field(
         default=False, description="Las cuotas de equipo NUNCA se prorratean"
     )
@@ -191,6 +207,39 @@ class EfectoEfervescente(BaseModel):
 # --------------------------------------------------------------------------- #
 # Configuración completa
 # --------------------------------------------------------------------------- #
+class ConfiguracionCiclos(BaseModel):
+    """Calendario de facturación: cuándo cierra un ciclo y cuándo vence su recibo.
+
+    El ciclo **nombra el día de cierre** y la facturación reanuda al día siguiente:
+    el ciclo 5 cierra el 5 y arranca el 6 (vídeo oficial «Planta», 01:33).
+
+    ``vencimiento_por_ciclo`` no se dedujo de esa regla, porque no hay ninguna
+    fórmula que la genere: se extrajo observando el dataset del desafío, donde cada
+    ciclo presenta un único día de vencimiento. El ciclo 5 → día 21 coincide con el
+    vídeo, y esa coincidencia es lo que da crédito a las otras ocho filas.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    vencimiento_por_ciclo: dict[int, int] = Field(
+        default_factory=dict,
+        description="día de cierre del ciclo -> día del mes en que vence el recibo",
+    )
+    dias_aviso_antes_de_vencer: int = Field(
+        default=10,
+        ge=0,
+        description="El recibo se envía unos 10 días antes de vencer («Planta», 01:39)",
+    )
+
+    def vence_el_dia(self, ciclo: int) -> int | None:
+        """Día del mes en que vence el recibo de ``ciclo``, o ``None`` si no se conoce.
+
+        Devuelve ``None`` en vez de inventar un valor: un ciclo no observado es un
+        dato que falta, y adivinarlo pondría una fecha falsa delante del cliente.
+        """
+        return self.vencimiento_por_ciclo.get(ciclo)
+
+
 class ConfiguracionReglas(BaseModel):
     """Contenido validado de ``rules.yaml``.
 
@@ -203,6 +252,7 @@ class ConfiguracionReglas(BaseModel):
     rules_version: str
     descripcion: str = ""
     politica: PoliticaCalculo = Field(default_factory=PoliticaCalculo)
+    ciclos: ConfiguracionCiclos = Field(default_factory=ConfiguracionCiclos)
     confianza: ConfianzaAtribucion = Field(default_factory=ConfianzaAtribucion)
     umbrales_incomprension: UmbralesIncomprension = Field(default_factory=UmbralesIncomprension)
     cross_selling: ConfiguracionCrossSelling = Field(default_factory=ConfiguracionCrossSelling)

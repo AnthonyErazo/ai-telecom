@@ -70,7 +70,7 @@ detectar en un recibo.
 
 Fuera del recuento de Python: `apps/web/estatico/` con **3 309 líneas** en 9 ficheros HTML, CSS y
 JavaScript —la interfaz de demostración servida en `/ui`, que no participa en ninguna decisión—; las
-tres migraciones SQL con **1 147 líneas**; `db/reglas/rules.yaml` con **558**; y los siete ficheros de
+un esquema SQL único, `db/esquema.sql`, con **536 líneas**; `db/reglas/rules.yaml` con **558**; y los siete ficheros de
 casos golden con **817**.
 
 ### 1.2 La regla de dependencias
@@ -890,8 +890,10 @@ retroactivo, que es lo que de verdad explica.
 
 ## 3. Modelo de datos: las 17 tablas
 
-Las migraciones son tres ficheros SQL idempotentes, 1 147 líneas en total, aplicables con
+El esquema es **un solo fichero SQL idempotente**, `db/esquema.sql`, 536 líneas, aplicable con
 `make migrate` (que ejecuta `db/migrar.py`). Están escritas a mano y no generadas por un ORM.
+
+**Por qué un solo fichero y no una cadena de migraciones.** Un histórico de migraciones sirve para no perder datos al evolucionar un esquema en producción; aquí la base se reconstruye entera desde el dataset cuando hace falta, así que ese histórico solo añadía cuatro ficheros que había que leer en orden para saber qué existe. Un fichero idempotente se pega en el editor SQL de Supabase y se acabó.
 
 **Por qué SQL a mano y no migraciones de un ORM.** El proyecto usa SQLAlchemy Core, sin ORM pesado, y
 las migraciones son el espejo explícito de los esquemas Pydantic de `core_domain`. La razón es que
@@ -973,6 +975,27 @@ BASES §9 —vigente **durante 10 años** `[CONFIRMADO-OFICIAL]`— sobre un rep
 puede ser público.
 
 ### 3.2 Recibo y línea de recibo
+
+> **Qué de este capítulo está desplegado y qué no.** Lo que sigue es el modelo relacional
+> tal como se diseñó: `recibo`, `recibo_linea`, `movimiento`, `pago`, `cuenta`, `cliente`,
+> `factset`, `deuda_snapshot`, `explicacion`, `gt_causa_delta` y compañía. **Esas tablas no
+> existen en la base**, y el razonamiento de cada restricción se conserva aquí porque sigue
+> siendo el que gobierna el motor —solo que lo hace en memoria y en las pruebas, no en
+> PostgreSQL.
+>
+> El motivo es que el dataset del desafío **ya es** la tabla de líneas: `cargo_facturado`
+> trae 297 002 filas, una por línea de cargo, con el recibo repetido en cada una.
+> Normalizarlo a diez tablas habría duplicado la verdad en dos sitios sin ganar nada: el
+> adaptador reconstruye el modelo canónico al vuelo desde esas filas
+> (`apps/api/transporte_supabase.py`) y el verificador comprueba la conciliación sobre el
+> `FactSet`, que es donde importa. Las tablas quedaron creadas y vacías durante semanas;
+> se retiraron.
+>
+> Lo que **sí** está desplegado: `cargo_facturado`, `cliente_planta`, `faq`, `casuistica`,
+> `vocabulario_peruano`, `auditoria_evento`, `telemetria_turno` y las vistas
+> `v_concepto_real`, `v_rag_salud`, `v_gobernanza`, `v_auditoria_turno`. El fichero
+> `db/esquema.sql` es la única fuente: si algo no está ahí, no está en la base.
+
 
 ```sql
 CREATE TABLE recibo (
@@ -3802,7 +3825,7 @@ restart api`.**
 | Cifra | Comando |
 |---|---|
 | 39 281 líneas de Python en 105 ficheros | Recuento sobre `**/*.py` excluyendo `.venv` y `__pycache__` |
-| 17 tablas SQL | `grep -c "CREATE TABLE IF NOT EXISTS" db/migraciones/*.sql` |
+| 7 tablas SQL | `grep -c "CREATE TABLE IF NOT EXISTS" db/esquema.sql` |
 | 1 427 pruebas superadas, 299 omitidas | `python -m pytest -p no:warnings -v` |
 | `TA_respuesta` 0,00 %, 100 % strict answer accuracy, 261 casos | `python -m eval.run_eval` |
 | 4 625 aserciones auditadas, 391/391 conceptos atribuidos | Misma ejecución |

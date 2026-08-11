@@ -34,6 +34,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -617,8 +618,16 @@ def crear_repositorio(
     con el mock o con el sistema real. Es el único sitio donde se decide, y se decide con
     una variable de entorno.
     """
-    if brainybill_base_url:
-        transporte_bb: Transporte = TransporteHTTP(
+    # Supabase manda sobre el disco cuando `ORIGEN_RECIBOS=supabase`. Se exige el valor
+    # explícito y no basta con que exista `SUPABASE_DB_URL`: la conexión también la usan
+    # el vocabulario y las FAQs, y tenerla configurada no debe cambiar en silencio de
+    # dónde salen los recibos que se le explican a un cliente.
+    if os.environ.get("ORIGEN_RECIBOS", "").strip().lower() == "supabase":
+        from apps.api.transporte_supabase import TransporteSupabase
+
+        transporte_bb: Transporte = TransporteSupabase()
+    elif brainybill_base_url:
+        transporte_bb = TransporteHTTP(
             brainybill_base_url, nombre="BrainyBill", timeout_s=timeout_s
         )
     else:
@@ -628,7 +637,11 @@ def crear_repositorio(
         transporte_am: Transporte = TransporteHTTP(
             amdocs_base_url, nombre="Amdocs", timeout_s=timeout_s
         )
-    elif brainybill_base_url:
+    elif brainybill_base_url or isinstance(transporte_bb, TransporteArchivo) is False:
+        # Amdocs nunca hereda el transporte de recibos salvo que ambos sean el mismo
+        # disco. Con Supabase sirviendo los recibos, el de órdenes debe seguir siendo el
+        # archivo: el dataset del desafío **no trae órdenes de CRM**, y pedirle `/orders`
+        # a un transporte que solo sabe de `/bills` rompía la carga entera.
         transporte_am = TransporteArchivo(raiz_datos, nombre="Amdocs")
     else:
         transporte_am = transporte_bb

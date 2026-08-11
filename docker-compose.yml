@@ -23,7 +23,7 @@ services:
   # ---------------------------------------------------------------------------
   # Base de datos: PostgreSQL 16 con pgvector.
   # La imagen oficial de pgvector trae la extensión compilada; las migraciones
-  # (`db/migraciones/002_rag.sql`) hacen el CREATE EXTENSION.
+  # (`db/esquema.sql`) hacen el CREATE EXTENSION.
   # ---------------------------------------------------------------------------
   db:
     image: pgvector/pgvector:pg16
