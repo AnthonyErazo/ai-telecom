@@ -1,9 +1,19 @@
 """La suite golden bajo las DOS convenciones de prorrateo.
 
-``convencion_prorrateo`` es uno de los dos parámetros marcados **[POR VALIDAR]** en
-``rules.yaml``: ``actual`` reparte sobre los días reales del ciclo (28/29/30/31) y
-``30_360`` fuerza meses de 30 días. Movistar no ha confirmado cuál usa, así que el
-sistema tiene que comportarse bien con las dos y hay que poder demostrarlo.
+``convencion_prorrateo`` reparte sobre los días reales del ciclo (``actual``: 28/29/30/31)
+o fuerza meses de 30 días (``30_360``).
+
+**Ya no es [POR VALIDAR].** El material de formación oficial del Desafío 1 lo fija en
+``30_360``: «tu plan es de 60 soles al mes… serán 3 días a 6 soles» (vídeo «Alta y porta»,
+01:39), es decir S/60 ÷ 30 = S/2 al día con independencia de los días naturales del mes.
+``rules.yaml`` se actualizó en consecuencia.
+
+Estos tests siguen valiendo, y por una razón que sobrevive a la confirmación: la
+convención es un parámetro de **verificación**, no de facturación, y el sistema debe
+comportarse bien bajo las dos —si mañana un operador factura de otro modo, se cambia el
+parámetro y nada más—. Además cubren el caso en que el dato de origen se generó con una
+convención y el motor verifica con otra, que es exactamente lo que ocurre al ingerir un
+export ajeno.
 
 No es un campo del caso golden a propósito: es **política global**, no un atributo del
 recibo, y meterla en el YAML habría dado a entender que un mismo operador factura con dos
@@ -150,11 +160,32 @@ def test_la_convencion_ajena_nunca_sube_la_confianza(reglas_30_360) -> None:
     cambiar la cifra. Un sistema que mantuviera la confianza intacta estaría prometiendo
     una certeza que no tiene.
     """
+    # La convención de contraste se fija POR SU NOMBRE, no leyendo el valor por
+    # defecto del fichero. Cuando `rules.yaml` pasó de `actual` a `30_360` —al
+    # confirmarlo el material oficial del desafío— esta prueba se quedó comparando
+    # `30_360` consigo misma: seguía en verde sin medir nada, hasta que la
+    # aserción final la delató. Anclar la convención elimina esa clase de fallo.
+    import os
+
     from eval.datos import cargar_cuenta, factset_de_cuenta
     from packages.core_domain.reglas import cargar_reglas, limpiar_cache_reglas
 
     limpiar_cache_reglas()
-    reglas_actual = cargar_reglas(aplicar_entorno=False)
+    anterior = os.environ.get("CONVENCION_PRORRATEO")
+    os.environ["CONVENCION_PRORRATEO"] = "actual"
+    try:
+        limpiar_cache_reglas()
+        reglas_actual = cargar_reglas()
+    finally:
+        if anterior is None:
+            os.environ.pop("CONVENCION_PRORRATEO", None)
+        else:
+            os.environ["CONVENCION_PRORRATEO"] = anterior
+
+    from packages.core_domain.enums import ConvencionProrrateo
+
+    assert reglas_actual.politica.convencion_prorrateo is ConvencionProrrateo.ACTUAL
+    assert reglas_30_360.politica.convencion_prorrateo is ConvencionProrrateo.TREINTA_360
 
     bajaron = 0
     for caso in CASOS:

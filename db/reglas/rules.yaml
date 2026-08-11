@@ -21,9 +21,22 @@ politica:
   # [POR VALIDAR] Si es false, los días en suspensión no se cobran y generan un
   # ajuste negativo. Si es true, la renta corre igual durante la suspensión.
   cobro_en_suspension: false
-  # [POR VALIDAR] "actual" usa los días reales del ciclo (28/29/30/31);
+  # [CONFIRMADO-OFICIAL] "actual" usa los días reales del ciclo (28/29/30/31);
   # "30_360" fuerza meses de 30 días.
-  convencion_prorrateo: actual
+  #
+  # Resuelto con el material de formación oficial del Desafío 1 (vídeo «Alta y
+  # porta», 01:39): «Tu plan es de 60 soles al mes. Al activar el beneficio antes
+  # del cierre del ciclo se cobrará solo la porción de los días consumidos:
+  # PRORRATEO, que serán 3 días a 6 soles.»
+  #
+  #   S/60 ÷ 30 días = S/2/día  →  3 días = S/6
+  #
+  # Con la convención "actual" y un ciclo de 31 días, esos mismos 3 días darían
+  # S/5,81 y el recibo no cuadraría con el del operador. Movistar prorratea sobre
+  # base 30 con independencia de los días naturales del mes.
+  # Entre comillas a propósito: sin ellas, YAML lee `30_360` como el ENTERO 30360
+  # (el guion bajo es separador de millares) y la convención se pierde en silencio.
+  convencion_prorrateo: "30_360"
   dias_base_30_360: 30
   # Invariante de conciliación: por encima de esto NO se explica, se deriva.
   tolerancia_residual_cent: 1
@@ -37,6 +50,51 @@ politica:
   prorratear_financiamiento: false
   # Días de gracia antes de suspender por deuda. [SUPUESTO]
   dias_gracia_suspension: 15
+
+  # [CONFIRMADO-OFICIAL] El descuento por alta nueva o portabilidad se aplica
+  # SOLO sobre el cargo fijo del plan. Vídeo oficial «Alta y porta», 04:06:
+  # «Ten en cuenta, este descuento para ambos casos sólo aplica sobre el cargo
+  # fijo del plan del cliente, que es de 60 soles, y NO sobre los servicios
+  # adicionales como SVAs, paquetes, financiamiento de equipos entre otros.»
+  #
+  # Un motor que reparta el descuento sobre todas las líneas produce cifras que
+  # no coinciden con el recibo real. No es una preferencia de diseño: es la regla.
+  descuento_alta_solo_cargo_fijo: true
+
+  # [CONFIRMADO-OFICIAL] La promoción de alta/portabilidad se mide en DÍAS, no en
+  # meses naturales. Vídeo «Alta y porta», 02:02 y 02:25: «el descuento es por 90
+  # días aproximadamente al 50 %… si le restamos los días del beneficio del recibo
+  # 1 (3 días), 2 (30 días) y 3 (30 días), son 63 días, por lo que quedan solo 27
+  # días de descuento».
+  #
+  # De ahí que el recibo 4 sea MIXTO: parte con descuento y parte sin él. Un motor
+  # que cuente meses da un cuarto recibo entero sin descuento, y se equivoca.
+  ventana_descuento_alta_dias: 90
+
+# -----------------------------------------------------------------------------
+# Ciclos de facturación
+# -----------------------------------------------------------------------------
+# [CONFIRMADO-OFICIAL] El ciclo nombra el día de CIERRE; la facturación reanuda al
+# día siguiente. Vídeo «Planta», 01:33: «en el ciclo 5, su inicio de facturación es
+# el 6 de cada mes y su fin es el 5… su fecha de vencimiento será el 21 de cada mes».
+#
+# La tabla ciclo → día de vencimiento NO se dedujo del vídeo: se extrajo de los
+# 297 002 cargos del dataset del desafío, donde cada ciclo tiene un único día de
+# vencimiento observado. El ciclo 5 → día 21 coincide exactamente con el vídeo, lo
+# que valida las otras ocho filas.
+ciclos:
+  vencimiento_por_ciclo:
+    5: 21
+    9: 25
+    12: 24
+    15: 1
+    17: 5
+    20: 3
+    23: 9
+    27: 13
+    31: 17
+  # El recibo se envía unos 10 días antes del vencimiento («Planta», 01:39).
+  dias_aviso_antes_de_vencer: 10
 
 # -----------------------------------------------------------------------------
 # Confianza de la atribución de causa (sección 4.7)

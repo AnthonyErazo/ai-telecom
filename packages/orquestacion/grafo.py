@@ -109,9 +109,17 @@ _DURABILIDADES = ("sync", "async", "exit")
 PRIORIDAD_DE_RUTA: tuple[tuple[Intencion, str], ...] = (
     (Intencion.SOSPECHOSA, "responder_intencion"),
     (Intencion.REGULATORIA, "responder_intencion"),
+    # PEDIR_HUMANO por delante de DISPUTA_CARGO: las dos derivan, así que el cliente
+    # acaba con una persona en ambos casos y lo único que cambia es el motivo que queda
+    # registrado. Cuando alguien **pide** expresamente un asesor, ese es el motivo
+    # honesto; inferir «disputa» sobre una petición explícita sería contarle al asesor
+    # algo que el cliente no dijo.
     (Intencion.PEDIR_HUMANO, "responder_intencion"),
+    (Intencion.DISPUTA_CARGO, "responder_intencion"),
     (Intencion.VACIO, "responder_intencion"),
     (Intencion.SALUDO, "responder_intencion"),
+    (Intencion.PAGAR, "responder_intencion"),
+    (Intencion.CONSUMO, "responder_intencion"),
     (Intencion.CONSULTA_CONCEPTO, "responder_intencion"),
     (Intencion.FUERA_DE_DOMINIO, "responder_intencion"),
     (Intencion.EXPLICAR_RECIBO, "construir_hechos"),

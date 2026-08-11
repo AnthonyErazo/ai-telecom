@@ -16,6 +16,7 @@ from packages.core_domain.dinero import Centimos
 from packages.core_domain.enums import EstadoServicio, TipoMovimiento
 
 __all__ = [
+    "MODELOS_DETALLE",
     "CuotaFinanciamiento",
     "DetalleAltaEquipoFinanciado",
     "DetalleAltaPaquete",
@@ -26,7 +27,6 @@ __all__ = [
     "DetalleSuspension",
     "MovementEvent",
     "PlanFinanciamiento",
-    "MODELOS_DETALLE",
 ]
 
 

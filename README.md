@@ -156,7 +156,7 @@ make demo
 | Paso | Qué hace | Por qué en ese orden |
 |---|---|---|
 | `build` | Construye la imagen multi-stage (`Dockerfile.api`) | La misma imagen sirve API y mocks |
-| `migrate` | Aplica `db/migraciones/00{1,2,3}.sql` sobre PostgreSQL 16 + pgvector | Idempotente; con *advisory lock* y checksum por migración |
+| `migrate` | Aplica `db/esquema.sql` sobre PostgreSQL 16 + pgvector (o Supabase) | Un solo fichero, idempotente: se puede aplicar dos veces seguidas sin efecto |
 | `seed` | Genera el dataset sintético (300 clientes, 1 800 recibos) | Determinístico: misma semilla ⇒ mismos bytes |
 | `indexar` | Vectoriza catálogo, FAQs y casuísticas | Antes de levantar la API, que cachea el corpus al arrancar |
 | `up` | Levanta `db`, `api`, `mock-brainybill`, `mock-amdocs` | La API espera a que la BD esté *healthy* |
@@ -408,9 +408,9 @@ Estado: ✅ implementado y verificado · 🟡 parcial (se dice hasta dónde) · 
 | 23 | *«respuestas limitadas estrictamente a la base de datos de facturación provista, para garantizar 0 % de alucinaciones financieras, apoyándose en reglas / base de conocimiento»* | ✅ | El conjunto permitido del verificador se construye **solo** desde el `FactSet` (`verificador.py::construir_permitidos`); `packages/retriever/saneador.py` garantiza que el texto recuperado **no contiene un solo dígito** |
 | 24 | *«experiencia omnicanal App + Bot (+ WhatsApp)»* | ✅ | `RespuestaCanalAgnostica` con bloques que cada canal degrada; `Canal` = `APP·BOT·WHATSAPP·ASESOR`; WhatsApp resuelto por nivel de aseguramiento (§6.4) |
 | 25 | *«motor de recomendación de siguientes acciones: pago, consulta, derivación con contexto o propuesta comercial personalizada cuando aplique»* | ✅ | `packages/llm_layer/generador.py::accion_sugerida` + reglas de `explicar.py` |
-| 26 | *«usando datos simulados o anonimizados y reglas de negocio simplificadas»* | ✅ | `packages/datagen/` (300 clientes, 1 800 recibos, ground truth escrito en el mismo acto) + `db/reglas/rules.yaml`. **Sin PII: ni DNI ni teléfono** (hay un `CHECK` en `db/migraciones/001_core.sql` que los rechaza) |
+| 26 | *«usando datos simulados o anonimizados y reglas de negocio simplificadas»* | ✅ | `packages/datagen/` (300 clientes, 1 800 recibos, ground truth escrito en el mismo acto) + `db/reglas/rules.yaml`. **Sin PII: ni DNI ni teléfono** (hay un `CHECK` en `db/esquema.sql` que los rechaza) |
 | 27 | *«categorizando los motivos de consulta en lenguaje cliente alineado al de la atención humana Movistar (ej. prorrateos, reconexiones)»* | ✅ | `ETIQUETAS_CAUSA_OFICIAL` en `packages/core_domain/enums.py` — las 9 etiquetas son las de la ficha, literales |
-| 28 | *«no mostrar información sensible sin autenticación; contemplar protección de datos, TRAZABILIDAD y uso responsable de IA»* | ✅ | `security.py` + bitácora encadenada por hash (`packages/governance/auditoria.py`, `db/migraciones/003_auditoria.sql`, con `UPDATE`/`DELETE` bloqueados por *trigger*) |
+| 28 | *«no mostrar información sensible sin autenticación; contemplar protección de datos, TRAZABILIDAD y uso responsable de IA»* | ✅ | `security.py` + bitácora encadenada por hash (`packages/governance/auditoria.py`, `db/esquema.sql`, con `UPDATE`/`DELETE` bloqueados por *trigger*) |
 | 29 | **Demo:** *«demostración funcional EN VIVO abordando al menos DOS de: (a) prorrateos, (b) cuota de equipo financiado, (c) reconexión tras suspensión morosa, (d) fin de descuentos, (e) cambios de plan, todo en ambas modalidades de RENTA ADELANTADA y VENCIDA»* | ✅ | **Los cinco**, en ambas modalidades: `eval/golden/02_escenarios_adelantada.yaml` y `03_escenarios_vencida.yaml`; guion de 5 minutos en `ejemplos/curl.md` §16; clientes de guion `C-DEMO-01` (ADELANTADA), `C-DEMO-02` y `C-DEMO-03` (VENCIDA) |
 | 30 | *«modelo escalable a todo el ecosistema digital de Movistar, con retroalimentación para mejora continua»* | 🟡 | La telemetría de silencio y la bitácora de auditoría son el insumo del bucle de mejora. **El bucle en sí (reentrenamiento, curación de FAQs a partir de derivaciones) no está implementado.** Ver §7 |
 | 31 | *«sistemas y canales involucrados: App Mi Movistar · Bot Lucía · WhatsApp Movistar · Amdocs (CRM) · el sistema facturador · BrainyBill»* | 🟡 | BrainyBill y Amdocs integrados vía ACL con mocks HTTP funcionales (`apps/api/acl.py`, `apps/mocks/`). App, Bot y WhatsApp son consumidores de la API. **El sistema facturador no se integra**: no hay contrato publicado y el recibo ya llega por BrainyBill. Ver §7 |
@@ -467,6 +467,7 @@ Se lista aquí y no en letra pequeña. El detalle completo, con riesgos y respon
 | [`docs/declaracion_herramientas.md`](docs/declaracion_herramientas.md) | La tabla que exige BASES §10: herramienta, tipo, versión, licencia, rol exacto, si procesa datos de Movistar y dónde se ejecuta |
 | [`docs/ADR/`](docs/ADR/) | Cuatro decisiones de arquitectura: por qué el recibo no se vectoriza · por qué céntimos enteros · por qué el LLM no calcula · por qué tramos y no fórmulas por escenario |
 | [`docs/ELECCION_DEL_MODELO.md`](docs/ELECCION_DEL_MODELO.md) | Qué modelo generativo conviene y **por qué la elección pesa menos de lo que parece**: precios verificados, coste por explicación, la decisión según se priorice humanización, velocidad, coste o control, y qué invalidaría la recomendación |
+| [`docs/ACCESO_SUPABASE.md`](docs/ACCESO_SUPABASE.md) | Cómo dar acceso al equipo: ver las tablas, ejecutar la app contra la base y el rol de solo lectura |
 | [`docs/pendientes.md`](docs/pendientes.md) | Lo que falta, lo `[POR VALIDAR]` con Movistar y los riesgos abiertos |
 | [`ejemplos/curl.md`](ejemplos/curl.md) | Recorrido completo de la demo, 16 secciones, con los tres clientes de guion |
 | [`data/README.md`](data/README.md) | Por qué `data/` está vacío en el repositorio |

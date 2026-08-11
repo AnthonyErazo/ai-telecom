@@ -108,6 +108,71 @@ GUION: dict[Intencion, _Guion] = {
             "Hola. Si quiere le reviso su recibo y le digo por qué le llegó ese monto.",
         ),
     ),
+    Intencion.DISPUTA_CARGO: _Guion(
+        objetivo=(
+            "El cliente NO está preguntando qué es un cargo: está diciendo que ese cargo "
+            "no le corresponde. Reconoce lo que plantea, dile que lo va a ver una persona "
+            "y que no tiene que volver a explicarlo."
+        ),
+        debe=(
+            "Tomarle en serio: no es una duda, es un desacuerdo.",
+            "Decirle que pasa a un asesor con el caso ya cargado.",
+            "Dejar claro que no pierde lo que ya contó.",
+        ),
+        no_debe=(
+            "Explicarle la descomposición del recibo: no la ha pedido y suena a excusa.",
+            "Defender el cobro ni dar a entender que se equivoca.",
+            "Prometer una devolución, que no depende de usted.",
+        ),
+        respaldos=(
+            "Entiendo, y eso no lo resuelvo yo: lo paso con un asesor con todo lo que "
+            "me ha contado, para que no tenga que repetirlo.",
+            "Si cree que ese cobro no le corresponde, lo ve una persona. Le derivo el "
+            "caso ahora mismo con el detalle que ya tenemos.",
+        ),
+    ),
+    Intencion.PAGAR: _Guion(
+        objetivo=(
+            "El cliente quiere pagar o saber hasta cuándo puede hacerlo. Dile por dónde "
+            "hacerlo, sin darle cifras."
+        ),
+        debe=(
+            "Ir al grano: quiere pagar, no entender.",
+            "Mencionar la App Mi Movistar como vía directa.",
+            "Ofrecerle ver el detalle si además le cuadra poco el monto.",
+        ),
+        no_debe=(
+            "Decir importes ni fechas concretas: no las tiene delante.",
+            "Explicarle la variación del recibo sin que la haya pedido.",
+        ),
+        respaldos=(
+            "Puede pagarlo desde la App Mi Movistar, con el código de pago que aparece "
+            "en su recibo. ¿Quiere que además le explique el monto?",
+            "El pago se hace desde la App o en los canales autorizados. Si quiere, "
+            "de paso le reviso por qué le llegó ese importe.",
+        ),
+    ),
+    Intencion.CONSUMO: _Guion(
+        objetivo=(
+            "El cliente pregunta por sus gigas, minutos o saldo. Eso no lo sabe usted: "
+            "dígalo con claridad y pásele con quien sí puede verlo."
+        ),
+        debe=(
+            "Decir sin rodeos que el consumo no lo ve.",
+            "Explicar en una frase qué sí ve: lo que le cobraron y por qué.",
+            "Ofrecer la App o un asesor para el consumo.",
+        ),
+        no_debe=(
+            "Inventar una cifra de consumo, ni aproximarla.",
+            "Confundir el cargo por exceso de datos con el consumo en sí.",
+        ),
+        respaldos=(
+            "El consumo de datos no lo veo desde aquí; eso lo tiene en la App Mi "
+            "Movistar. Lo mío es su recibo: qué le cobraron y por qué.",
+            "No tengo a la vista sus gigas. Si quiere le paso con un asesor que sí los "
+            "ve, o le explico los cargos de su recibo.",
+        ),
+    ),
     Intencion.VACIO: _Guion(
         objetivo="El cliente envió un mensaje vacío. Pídele con amabilidad que te diga qué necesita.",
         debe=("Ser muy breve.", "No sonar a reproche."),
@@ -318,7 +383,7 @@ def generar_respuesta_conversacional(
             bloqueado_por_cifras=False,
             detalle=f"proveedor: {error}",
         )
-    except Exception as error:  # noqa: BLE001 - ningún fallo del modelo tumba el turno
+    except Exception as error:
         _LOG.warning("turno conversacional: error inesperado (%r); se usa respaldo", error)
         return ResultadoConversacional(
             _respaldo(intencion, semilla),

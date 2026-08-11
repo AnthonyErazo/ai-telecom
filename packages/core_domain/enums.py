@@ -335,6 +335,12 @@ class MotivoDerivacion(StrEnum):
     UMBRAL_INCOMPRENSION = "UMBRAL_INCOMPRENSION"
     VERIFICACION_FALLIDA = "VERIFICACION_FALLIDA"
     NIVEL_INSUFICIENTE = "NIVEL_INSUFICIENTE"
+    #: La pregunta es legítima y del ámbito de la operadora, pero **el ``FactSet`` no
+    #: tiene los datos**: consumo de gigas, minutos restantes, saldo. Se distingue de
+    #: ``CONCEPTO_FUERA_CATALOGO`` —donde el dato existe pero no se sabe nombrar— y de
+    #: ``INTENCION_REGULATORIA``, que es un trámite. Aquí no hay defecto que corregir:
+    #: hay una frontera del sistema, y decirlo es más honesto que improvisar una cifra.
+    FUERA_DE_ALCANCE = "FUERA_DE_ALCANCE"
 
 
 class ConvencionProrrateo(StrEnum):

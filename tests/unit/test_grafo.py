@@ -84,6 +84,9 @@ FRASES_POR_INTENCION: dict[Intencion, str] = {
     Intencion.SALUDO: "hola",
     Intencion.CONSULTA_CONCEPTO: "que es un prorrateo",
     Intencion.FUERA_DE_DOMINIO: "cual es la capital de francia",
+    Intencion.DISPUTA_CARGO: "este cobro esta mal, no lo reconozco",
+    Intencion.PAGAR: "donde pago mi recibo",
+    Intencion.CONSUMO: "cuantos gigas me quedan",
     Intencion.EXPLICAR_RECIBO: "por que subio mi recibo este mes",
 }
 
@@ -355,7 +358,8 @@ def test_la_prioridad_de_intencion_manda_sospechosa_primero() -> None:
     destinos = dict(PRIORIDAD_DE_RUTA)
     assert destinos.pop(Intencion.EXPLICAR_RECIBO) == "construir_hechos"
     assert set(destinos.values()) == {"responder_intencion"}
-    # La tabla cubre las ocho intenciones declaradas: ninguna se enruta por descuido.
+    # La tabla cubre TODAS las intenciones declaradas: ninguna se enruta por descuido.
+    # Si mañana se añade un valor al enum y no se enruta aquí, esta linea lo delata.
     assert set(orden) == set(Intencion)
 
 

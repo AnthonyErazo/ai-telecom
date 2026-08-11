@@ -1377,7 +1377,7 @@ tabla dice de cuál, para que cualquiera pueda repetirla y contradecirme.
 |---|---|
 | 105 ficheros Python, 39 281 líneas | `find . -name "*.py" -not -path "./.venv/*" \| wc -l` |
 | 3 309 líneas de interfaz web | `wc -l apps/web/estatico/*` |
-| 17 tablas SQL | `grep -c "CREATE TABLE" db/migraciones/*.sql` |
+| 7 tablas SQL | `grep -c "CREATE TABLE IF NOT EXISTS" db/esquema.sql` |
 | 1.511 pruebas pasadas, 62 omitidas | `python -m pytest -q` · los motivos con `-rs` |
 | `TA_respuesta = 0` sobre 4.625 afirmaciones | `python -m eval.run_eval --detalle` |
 | 19 de 19 pasos de extremo a extremo | `python scripts/probar_e2e.py` (con la bitácora limpia) |

@@ -1315,7 +1315,7 @@ Todas las cifras se obtuvieron el 8 de agosto de 2026 sobre el árbol de trabajo
 | Cifra | Comando |
 |---|---|
 | 39.281 líneas en 105 archivos Python | `find . -name "*.py" -not -path "*/__pycache__/*" \| xargs wc -l` |
-| 17 tablas SQL (13 + 3 + 1) | `grep -c "CREATE TABLE" db/migraciones/*.sql` |
+| 7 tablas SQL | `grep -c "CREATE TABLE IF NOT EXISTS" db/esquema.sql` |
 | 3.309 líneas de consola web | `wc -l apps/web/estatico/*` |
 | 1 427 pruebas superadas, 299 omitidas, 1 726 recogidas | `python -m pytest -q` (código de salida 0) |
 | `TA_respuesta 0,00 %` · 4 625 aserciones · 261/261 exactas · 8 escenarios al 100 % · residual medio 0,00 · latencia 13/29 ms | `python -m eval.run_eval` |

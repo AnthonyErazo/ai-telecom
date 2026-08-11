@@ -61,6 +61,7 @@ from enum import StrEnum
 from typing import NamedTuple
 
 from packages.core_domain.enums import MotivoDerivacion
+from packages.facts_engine.jerga import expandir
 
 __all__ = [
     "PATRONES",
@@ -136,11 +137,14 @@ class Intencion(StrEnum):
 
     SOSPECHOSA = "SOSPECHOSA"
     REGULATORIA = "REGULATORIA"
+    DISPUTA_CARGO = "DISPUTA_CARGO"
     PEDIR_HUMANO = "PEDIR_HUMANO"
     VACIO = "VACIO"
     SALUDO = "SALUDO"
     EXPLICAR_RECIBO = "EXPLICAR_RECIBO"
     CONSULTA_CONCEPTO = "CONSULTA_CONCEPTO"
+    PAGAR = "PAGAR"
+    CONSUMO = "CONSUMO"
     FUERA_DE_DOMINIO = "FUERA_DE_DOMINIO"
 
 
@@ -171,6 +175,34 @@ PATRONES: dict[Intencion, tuple[str, ...]] = {
         "demanda",
         "abogado",
     ),
+    # Disputar un cargo NO es preguntar por él. «¿por qué me cobran esto?» es una duda
+    # y se explica; «este cobro está mal, no lo reconozco» es una **impugnación**, y
+    # explicarle la aritmética a quien afirma que el cobro no le corresponde es no
+    # escucharle. La taxonomía del corpus telco real la separa (`dispute_invoice`,
+    # 1 000 casos) y nosotros la teníamos cayendo en EXPLICAR_RECIBO.
+    #
+    # Va por debajo de REGULATORIA: si además menciona OSIPTEL o el libro de
+    # reclamaciones, manda el trámite formal.
+    Intencion.DISPUTA_CARGO: (
+        "no reconozco",
+        "no reconosco",
+        "cobro indebido",
+        "cobro mal",
+        "me cobraron mal",
+        "me estan cobrando de mas",
+        "cobro de mas",
+        "no me corresponde",
+        "yo no pedi",
+        "yo no contrate",
+        "nunca contrate",
+        "nunca pedi",
+        "esta mal el cobro",
+        "cargo que no",
+        "devolucion",
+        "me devuelvan",
+        "reembolso",
+        "compensacion",
+    ),
     Intencion.PEDIR_HUMANO: (
         "asesor",
         "humano",
@@ -181,6 +213,38 @@ PATRONES: dict[Intencion, tuple[str, ...]] = {
         "atencion al cliente",
         "call center",
         "llamar",
+    ),
+    # Querer pagar es una intención propia, no una duda de facturación: la respuesta
+    # útil es *dónde y hasta cuándo*, no la descomposición causal del recibo.
+    Intencion.PAGAR: (
+        "donde pago",
+        "como pago",
+        "quiero pagar",
+        "pagar mi recibo",
+        "medios de pago",
+        "formas de pago",
+        "metodo de pago",
+        "hasta cuando puedo pagar",
+        "fecha de pago",
+        "fecha de vencimiento",
+        "cuando vence",
+        "codigo de pago",
+    ),
+    # Consumo es el otro gran bloque del corpus real (`check_usage`,
+    # `check_excess_data_charges`). Hoy no lo resolvemos: el FactSet explica el recibo,
+    # no los gigas gastados. Se clasifica para poder **derivar con contexto** en vez de
+    # responder una explicación de recibo que nadie pidió.
+    Intencion.CONSUMO: (
+        "cuantos gigas",
+        "cuanto me queda",
+        "consumo de datos",
+        "gasto de datos",
+        "megas",
+        "gigas",
+        "minutos que me quedan",
+        "saldo",
+        "exceso de datos",
+        "consumo adicional",
     ),
     Intencion.SALUDO: (
         "hola",
@@ -390,16 +454,35 @@ def detectar_manipulacion(utterance: str) -> list[str]:
 #: mencione el recibo.
 _PRIORIDAD: tuple[Intencion, ...] = (
     Intencion.REGULATORIA,
+    # Antes que DISPUTA_CARGO: las dos derivan, así que el cliente acaba con una persona
+    # en ambos casos y lo único que cambia es el motivo registrado. Si lo pidió
+    # expresamente, ese es el motivo honesto.
     Intencion.PEDIR_HUMANO,
+    # Por encima de todo lo demás: quien impugna un cargo no está pidiendo una
+    # explicación, y dársela sería contestar a otra pregunta.
+    Intencion.DISPUTA_CARGO,
     Intencion.SALUDO,
+    # PAGAR y CONSUMO van antes que las de recibo porque comparten vocabulario con
+    # ellas —«recibo», «cobro», «monto»— y sin este orden caerían en EXPLICAR_RECIBO,
+    # que es justo el defecto que se está corrigiendo.
+    Intencion.PAGAR,
+    Intencion.CONSUMO,
     Intencion.CONSULTA_CONCEPTO,
     Intencion.EXPLICAR_RECIBO,
 )
 
 #: Intenciones que obligan a derivar sin construir el FactSet.
+#:
+#: ``DISPUTA_CARGO`` y ``CONSUMO`` se suman por motivos distintos: la primera porque
+#: impugnar un cobro es un trámite que decide una persona —el motor puede demostrar que
+#: la aritmética cuadra, y aun así el cliente puede tener razón sobre si ese servicio le
+#: correspondía—; la segunda porque el ``FactSet`` explica el recibo y **no** tiene los
+#: datos de consumo, así que responder sería inventar.
 _DERIVAN: dict[Intencion, MotivoDerivacion] = {
     Intencion.REGULATORIA: MotivoDerivacion.INTENCION_REGULATORIA,
+    Intencion.DISPUTA_CARGO: MotivoDerivacion.INTENCION_REGULATORIA,
     Intencion.PEDIR_HUMANO: MotivoDerivacion.PETICION_HUMANO,
+    Intencion.CONSUMO: MotivoDerivacion.FUERA_DE_ALCANCE,
 }
 
 #: Interjecciones y muletillas que en un chat peruano equivalen a un saludo o a un
@@ -464,6 +547,22 @@ def clasificar_intencion(utterance: str | None) -> ResultadoIntencion:
                     motivo_derivacion=_DERIVAN.get(intencion),
                     explica_recibo=intencion is Intencion.EXPLICAR_RECIBO,
                 )
+
+    # Ninguna señal en la frase literal. Segundo intento traduciendo la jerga peruana:
+    # «ya cancelé» lleva el significado «pagar», y con él el patrón de pago sí casa.
+    # Va DESPUÉS y no antes para que una frase que ya se entiende no cambie de
+    # clasificación por una expansión: la jerga solo puede rescatar, nunca reinterpretar.
+    expandido = expandir(texto)
+    if expandido != texto:
+        for intencion in _PRIORIDAD:
+            for patron in PATRONES[intencion]:
+                if coincide_patron(patron, expandido):
+                    return ResultadoIntencion(
+                        intencion=intencion,
+                        patron=patron,
+                        motivo_derivacion=_DERIVAN.get(intencion),
+                        explica_recibo=intencion is Intencion.EXPLICAR_RECIBO,
+                    )
 
     # Sin señal reconocible. Solo se trata como cortesía si TODO lo que escribió
     # es una interjección: «xd» sí, «ya pero qué tienes» no. Contar tokens era
