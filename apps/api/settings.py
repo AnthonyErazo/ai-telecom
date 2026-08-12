@@ -165,6 +165,11 @@ class Ajustes(BaseSettings):
     llm_mode: str = Field(default="mock", alias="LLM_MODE")
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="", alias="GEMINI_MODEL")
+    gemini_live_model: str = Field(
+        default="gemini-3.1-flash-live-preview", alias="GEMINI_LIVE_MODEL"
+    )
+    gemini_live_voice: str = Field(default="Kore", alias="GEMINI_LIVE_VOICE")
+    gemini_live_session_min: int = Field(default=30, alias="GEMINI_LIVE_SESSION_MIN", ge=5, le=30)
     llm_timeout_s: float = Field(default=4.0, alias="LLM_TIMEOUT_S", ge=0.1, le=60.0)
     verificador_estricto: bool = Field(default=True, alias="VERIFICADOR_ESTRICTO")
 

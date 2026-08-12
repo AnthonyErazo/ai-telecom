@@ -1,0 +1,190 @@
+.live-control {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  align-self: end;
+  gap: 10px;
+}
+
+.controls input {
+  display: block;
+  width: 180px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #ccd5df;
+  border-radius: 8px;
+  color: #172033;
+  background: #fff;
+}
+
+.account-load {
+  align-self: end;
+  padding: 9px 12px;
+  border: 1px solid #b9c7d4;
+  border-radius: 9px;
+  color: #29445e;
+  background: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.live-control button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.live-control button:disabled { opacity: .5; }
+.live-start { background: #087bb8; }
+.live-stop { background: #b43b4b; }
+.live-control small { color: #68768a; min-width: 92px; }
+
+.live-transcript {
+  margin: 0 22px 10px;
+  padding: 12px 15px;
+  border: 1px solid #cceaf5;
+  border-radius: 12px;
+  background: #eef8fc;
+  font-size: 13px;
+}
+
+.live-transcript p { margin: 4px 0; line-height: 1.45; }
+
+@media (max-width: 720px) {
+  .live-control { width: 100%; margin-left: 0; }
+}
+
+.app-tabs {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-tabs button {
+  height: 100%;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: #8fa2ba;
+  background: transparent;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.app-tabs button.active {
+  border-bottom-color: #00a9e0;
+  color: #fff;
+}
+
+.app-tabs button:disabled { opacity: .35; cursor: not-allowed; }
+
+.topbar-status { display: flex; align-items: center; gap: 18px; }
+.signed-account {
+  padding: 6px 10px;
+  border: 1px solid #2b3b50;
+  border-radius: 999px;
+  color: #cbd6e3;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.login-main {
+  min-height: calc(100vh - 172px);
+  display: grid;
+  place-items: center;
+  padding: 56px 24px;
+  background:
+    radial-gradient(circle at 20% 10%, #0d91c824, transparent 34%),
+    #07111f;
+}
+
+.login-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, .8fr);
+  gap: 56px;
+  align-items: center;
+  width: min(980px, 100%);
+  padding: clamp(28px, 5vw, 58px);
+  border: 1px solid #24354a;
+  border-radius: 24px;
+  color: #fff;
+  background: #0d1928;
+  box-shadow: 0 28px 70px #0007;
+}
+
+.login-copy h1 { margin: 0; font-size: clamp(34px, 5vw, 54px); letter-spacing: -.04em; }
+.login-copy > p:last-child { max-width: 520px; color: #a9b7c9; line-height: 1.6; }
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 26px;
+  border: 1px solid #29405a;
+  border-radius: 18px;
+  background: #101f31;
+}
+
+.login-form label { color: #cdd7e4; font-size: 12px; font-weight: 800; }
+.login-form input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #40546c;
+  border-radius: 10px;
+  outline: none;
+  color: #172033;
+  background: #fff;
+}
+.login-form input:focus { border-color: #00a9e0; box-shadow: 0 0 0 3px #00a9e033; }
+.login-form button, .session-actions .primary {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: #087bb8;
+  font-weight: 800;
+  cursor: pointer;
+}
+.login-form button:disabled { opacity: .55; cursor: wait; }
+.login-form small { color: #8fa2ba; line-height: 1.5; }
+.login-form code { color: #65d6ff; }
+
+.session-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 26px;
+  border: 1px solid #28624f;
+  border-radius: 18px;
+  background: #102a26;
+}
+.session-check { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: #07111f; background: #48e0a7; font-weight: 900; }
+.session-card small, .session-card strong { display: block; }
+.session-card small { color: #90b9ad; }
+.session-card strong { margin-top: 3px; font-size: 20px; }
+.session-card p { color: #b8d0c9; line-height: 1.45; }
+.session-actions { grid-column: 1 / -1; display: flex; gap: 9px; }
+.session-actions button { flex: 1; min-height: 42px; border: 1px solid #477265; border-radius: 10px; color: #d7e8e3; background: transparent; font-weight: 800; cursor: pointer; }
+.session-actions button.primary { border-color: transparent; }
+
+.account-identity {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 170px;
+}
+.account-identity small { color: #68768a; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.account-identity strong { margin-top: 5px; color: #172033; }
+
+@media (max-width: 760px) {
+  .topbar { height: auto; min-height: 76px; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
+  .app-tabs { order: 3; width: 100%; height: 42px; justify-content: center; }
+  .app-tabs button { height: 42px; }
+  .signed-account { display: none; }
+  .login-main { min-height: calc(100vh - 202px); padding: 24px 14px; }
+  .login-panel { grid-template-columns: 1fr; gap: 24px; padding: 28px 20px; }
+}

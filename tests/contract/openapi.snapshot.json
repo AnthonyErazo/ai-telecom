@@ -2126,6 +2126,43 @@
         "title": "RespuestaToken",
         "type": "object"
       },
+      "RespuestaTokenLive": {
+        "additionalProperties": false,
+        "description": "Credencial breve y metadatos públicos para abrir una sesión Live.",
+        "properties": {
+          "expire_time": {
+            "format": "date-time",
+            "title": "Expire Time",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "new_session_expire_time": {
+            "format": "date-time",
+            "title": "New Session Expire Time",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "voice": {
+            "title": "Voice",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "model",
+          "voice",
+          "expire_time",
+          "new_session_expire_time"
+        ],
+        "title": "RespuestaTokenLive",
+        "type": "object"
+      },
       "ResumenConcepto": {
         "additionalProperties": false,
         "description": "Entrada del listado del catálogo.",
@@ -3244,6 +3281,33 @@
         "summary": "FactSet conciliado del periodo (409 si el recibo no cuadra)",
         "tags": [
           "hechos"
+        ]
+      }
+    },
+    "/v1/live/token": {
+      "post": {
+        "description": "Entrega una credencial de un uso; la API key nunca sale del backend.",
+        "operationId": "token_live_v1_live_token_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespuestaTokenLive"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Token efímero para Gemini Live",
+        "tags": [
+          "gemini-live"
         ]
       }
     }

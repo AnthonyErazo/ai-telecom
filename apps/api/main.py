@@ -39,6 +39,7 @@ from apps.api.routers import (
     evidencia,
     explicar,
     hechos,
+    live,
     salud,
 )
 from apps.api.settings import obtener_ajustes, raiz_proyecto
@@ -154,6 +155,7 @@ def crear_aplicacion() -> FastAPI:
     aplicacion.include_router(derivacion.router)
     aplicacion.include_router(asesor.router)
     aplicacion.include_router(auditoria.router)
+    aplicacion.include_router(live.router)
     if ajustes.es_desarrollo:
         aplicacion.include_router(dev.router)
         _LOG.warning("router /dev montado: emite tokens de prueba. ENTORNO=%s", ajustes.entorno)
