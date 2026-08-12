@@ -39,6 +39,7 @@ from apps.api.routers import (
     evidencia,
     explicar,
     hechos,
+    live,
     salud,
 )
 from apps.api.settings import obtener_ajustes, raiz_proyecto
@@ -154,6 +155,7 @@ def crear_aplicacion() -> FastAPI:
     aplicacion.include_router(derivacion.router)
     aplicacion.include_router(asesor.router)
     aplicacion.include_router(auditoria.router)
+    aplicacion.include_router(live.router)
     if ajustes.es_desarrollo:
         aplicacion.include_router(dev.router)
         _LOG.warning("router /dev montado: emite tokens de prueba. ENTORNO=%s", ajustes.entorno)
@@ -185,7 +187,10 @@ def _montar_interfaz(aplicacion: FastAPI) -> None:
     monta nada y la API arranca igual: la interfaz es andamiaje de demostración, no una
     dependencia del servicio.
     """
-    directorio = raiz_proyecto() / "apps" / "web" / "estatico"
+    raiz_web = raiz_proyecto() / "apps" / "web"
+    compilado = raiz_web / "dist"
+    legado = raiz_web / "estatico"
+    directorio = compilado if (compilado / "index.html").is_file() else legado
     if not directorio.is_dir():
         _LOG.info("no se monta /ui: no existe el directorio %s", directorio)
         return
