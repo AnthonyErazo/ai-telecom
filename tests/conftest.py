@@ -44,11 +44,31 @@ def pytest_configure(config: pytest.Config) -> None:
     # ejecución arranca limpia y no acumula el estado de la anterior en el almacén con
     # el que se hace la demostración.
     os.environ.setdefault("CHECKPOINT_PATH", str(_checkpoints_de_la_sesion()))
+    # Y la bitácora, por la misma razón y una más. La razón compartida: la suite no debe
+    # escribir en `data/auditoria/eventos.jsonl`, que es la evidencia con la que se hace
+    # la demostración. La razón propia: esa cadena de hashes es de **un solo escritor**,
+    # y dos ejecuciones simultáneas —la suite y un servidor levantado al lado— se pisan
+    # los índices y la rompen. Un test que compruebe `cadena_valida` fallaría entonces
+    # por lo que hace otro proceso, no por lo que prueba.
+    os.environ.setdefault("AUDIT_LOG_PATH", str(_bitacora_de_la_sesion()))
 
 
 def _checkpoints_de_la_sesion() -> Path:
     """Fichero de *checkpoints* de esta ejecución de la suite, recién vaciado."""
     destino = Path(tempfile.gettempdir()) / "recibo-claro-tests" / "checkpoints.sqlite"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.unlink(missing_ok=True)
+    return destino
+
+
+def _bitacora_de_la_sesion() -> Path:
+    """Fichero de auditoría de esta ejecución de la suite, recién vaciado.
+
+    El nombre lleva el PID porque dos ejecuciones de la suite a la vez —algo habitual
+    cuando varias personas trabajan sobre el mismo repositorio— compartirían el fichero
+    y romperían la cadena de hashes de las dos.
+    """
+    destino = Path(tempfile.gettempdir()) / "recibo-claro-tests" / f"auditoria-{os.getpid()}.jsonl"
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.unlink(missing_ok=True)
     return destino

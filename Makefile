@@ -58,7 +58,8 @@ SMOKE_API ?= http://127.0.0.1:8000
 
 .DEFAULT_GOAL := help
 .PHONY: help instalar dev probar build up down migrate seed indexar demo smoke eval golden audit \
-        test lint fmt logs ps shell limpiar limpiar-datos
+        test lint fmt logs ps shell limpiar limpiar-datos \
+        cargar-supabase vectorizar publicar-docs
 
 # --------------------------------------------------------------------------- #
 # Ayuda
@@ -190,6 +191,33 @@ lint:  ## Comprueba estilo y formato sin modificar nada
 fmt:  ## Formatea y aplica las correcciones automáticas
 	$(PY) -m ruff format .
 	$(PY) -m ruff check --fix .
+
+# --------------------------------------------------------------------------- #
+# Operación manual  (intérprete local, contra servicios de fuera)
+#
+# Los tres se lanzan a mano y ninguno cuelga de `demo` ni de `dev`, a propósito:
+# dos tocan servicios externos —Supabase y la cuota de embeddings de Gemini— y el
+# tercero produce un entregable que se revisa antes de mandarlo a nadie. Están aquí
+# para que se encuentren, no para que se ejecuten solos.
+#
+# `cargar-supabase` y `vectorizar` exigen las credenciales de `.env`, que no está en
+# el repositorio, y el dataset del desafío, que vive fuera por confidencialidad. Los
+# dos son idempotentes: repetirlos no duplica filas ni regasta cuota, así que ante la
+# duda se relanzan. Para saber cómo está la base sin tocarla, `ARGS="--verificar"`.
+# --------------------------------------------------------------------------- #
+cargar-supabase:  ## Sube el dataset y los corpus a Supabase (ARGS="--verificar" solo comprueba)
+	$(PY) scripts/cargar_supabase.py $(ARGS)
+
+# No es lo mismo que `indexar`: aquel escribe en la tabla `rag_documento` que se crea
+# a sí misma, y este escribe el vector en la columna `embedding` de la propia fila
+# (faq, casuistica, vocabulario_peruano), que es donde lo espera `db/esquema.sql` y de
+# donde cuelgan los índices HNSW. `indexar` es para la demo con Docker; este, para
+# el Supabase real.
+vectorizar:  ## Calcula los embeddings del corpus en Supabase (ARGS="--verificar" no gasta cuota)
+	$(PY) scripts/vectorizar_corpus.py $(ARGS)
+
+publicar-docs:  ## Genera docs/sitio/documentacion.html: toda la documentación en un solo fichero
+	$(PY) scripts/publicar_docs.py
 
 # --------------------------------------------------------------------------- #
 # Limpieza

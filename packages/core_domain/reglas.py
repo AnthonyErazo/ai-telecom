@@ -155,6 +155,14 @@ class UmbralesIncomprension(BaseModel):
     similitud_repregunta: float = Field(default=0.80, ge=0.0, le=1.0)
     max_turnos_sin_progreso: int = Field(default=2, ge=1)
     histeresis: bool = Field(default=True, description="Una vez derivado, no se vuelve atrás")
+    histeresis_requiere_asesor: bool = Field(
+        default=True,
+        description=(
+            "La histéresis solo se aplica si un asesor está realmente en la sala. Sin "
+            "esto, un pico transitorio del score fijaba la derivación para todos los "
+            "turnos siguientes aunque nadie hubiera recogido el expediente."
+        ),
+    )
     reglas_duras: list[MotivoDerivacion] = Field(default_factory=list)
     intenciones_regulatorias: list[str] = Field(default_factory=list)
 

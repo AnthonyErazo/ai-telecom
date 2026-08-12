@@ -475,8 +475,36 @@ equivocarse; este solo sabe borrar.
 
 **Paso 10 — Umbral de incomprensión.**
 Antes de generar, se calcula si este turno debería ir a un humano. El score combina cobertura del
-delta explicado, unicidad de la causa, repregunta y turnos sin progreso:
+delta **desglosado**, unicidad de la causa, repregunta y turnos sin progreso:
 `U = 1 − (0,40·s1 + 0,25·s2 + 0,20·(1−s3) + 0,15·(1−s6))`, con los cuatro pesos en `rules.yaml`.
+
+Conviene detenerse en qué mide `s1`, porque la distinción decide cuándo se deriva. `s1` es
+**desglose**: qué parte del delta está repartida en líneas con nombre comercial, importe anterior,
+importe actual y evidencia citable. Responde a *«¿sé cuánto varió y en qué líneas?»*, que es lo
+que hace falta para poder explicar un recibo. **No** mide si esa variación tiene detrás una orden
+del CRM que la justifique: eso es la **cobertura causal**, se calcula aparte y **queda fuera de
+`U`**.
+
+La diferencia no es teórica. El dataset del desafío no trae órdenes de CRM, así que la cobertura
+causal vale 0 en las cuentas reales. Mientras esa laguna entraba en `s1`, imponía un suelo
+permanente de 0,40 al score y las cuatro cuentas probadas de extremo a extremo derivaban en el
+primer turno con `U = 0,675` —recibos conciliados al céntimo, con cada línea nombrada, que el
+sistema se declaraba incapaz de explicar—. El hand-off dejaba de ser el último recurso para ser
+el único camino, y la métrica de Precisión del Hand-off medía una avería del dato en vez de la
+salud de la conversación. Son dos preguntas distintas:
+
+| Situación | Qué sabe el sistema | Qué hace |
+|---|---|---|
+| El recibo no cuadra | No sabe cuánto varió cada cosa | **Deriva**, por la regla dura `INVARIANTE_ROTO` |
+| Cuadra, sin orden del CRM | Sabe cuánto y en qué líneas; no sabe por qué | **Explica**, nombra la laguna y **ofrece** un asesor |
+| El cliente pide una persona | Da igual lo que sepa | **Deriva**, sin regatear |
+
+En el segundo caso la explicación dice con todas las letras lo que no puede confirmar —*«lo que
+no le puedo confirmar es el motivo: en nuestros sistemas no consta la orden que originó ese
+cambio»*— y añade `DERIVAR_ASESOR` como acción **sugerida**. Derivar pasa a ser una decisión del
+cliente, no una rendición del sistema. La bitácora registra las dos magnitudes por separado
+(`desglose` y `cobertura_causal` en el evento `ROUTE`) para que la auditoría pueda reconstruir
+cuál de las dos gobernó la decisión.
 En este turno el valor **registrado en la bitácora** —evento `ROUTE`,
 `{"modo": "SCORE", "score_incomprension": 0.4292, "derivar": false}`— es `0,4292`, por debajo del
 umbral `tau_alto = 0,65`: se explica. No hay que fiarse de la palabra del documento: el score va
@@ -817,11 +845,18 @@ U          : 0.2465   (tau_alto = 0.65)
 ```
 
 Ese `U = 0,2465` es la parte importante y hay que detenerse en ella. El score de incomprensión
-dice que este turno va **estupendamente**: la cobertura del delta es 1,0, no hay repregunta, no
+dice que este turno va **estupendamente**: el desglose del delta es 1,0, no hay repregunta, no
 hay turnos sin progreso. Un sistema que solo mirase el score habría explicado con toda confianza
 un recibo que no cuadra. Lo que deriva no es el score: es la **regla dura**, que se dispara antes
 de mirarlo. Por eso las reglas duras existen y por eso son cuatro y no un umbral más bajo: hay
 fallos que no se manifiestan como duda.
+
+Este ejemplo es también la respuesta a una objeción razonable al paso 10: *si `s1` ya no penaliza
+la falta de causa confirmada, ¿qué protege al cliente de una explicación mal fundada?* Esto: el
+recibo que de verdad no se puede explicar —el que no cuadra— tiene su propia vía, es una regla
+dura y deriva antes de que el score llegue a opinar. Bajar `tau_alto` o hacer que `s1` cargue con
+la laguna del CRM no habría cazado ni un caso más de los que caza `INVARIANTE_ROTO`; solo habría
+derivado, además, los recibos correctos.
 
 El sistema **no lanza una excepción**: devuelve el FactSet entero, con todos sus datos y con
 `invariante.ok = False`, para que el asesor no se quede sin información. Lo que hace es cambiar

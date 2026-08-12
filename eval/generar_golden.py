@@ -1173,9 +1173,14 @@ def _validar_frases(casos: Sequence[dict[str, Any]]) -> list[str]:
       dura (pedir una persona, intención regulatoria): sería un falso positivo del
       hand-off provocado por el propio autor de la suite;
     * un caso con ``debe_derivar: true`` tiene que llevar exactamente una de esas frases.
+
+    La petición de humano se comprueba con :func:`pide_humano`, que es **la misma
+    función** que usa el motor, y no con una relectura de las subcadenas. Antes se
+    reimplementaba aquí la regla, y esa copia podía discrepar del original justo en el
+    sitio donde más caro sale: la suite que mide la Precisión del Hand-off.
     """
     from packages.core_domain.reglas import cargar_reglas
-    from packages.facts_engine.confianza import PATRONES_PETICION_HUMANO, normalizar_texto
+    from packages.facts_engine.confianza import normalizar_texto, pide_humano
 
     reglas = cargar_reglas()
     regulatorias = [
@@ -1184,7 +1189,8 @@ def _validar_frases(casos: Sequence[dict[str, Any]]) -> list[str]:
     problemas: list[str] = []
     for caso in casos:
         normal = normalizar_texto(caso["utterance"])
-        disparadores = [p for p in PATRONES_PETICION_HUMANO if p in normal]
+        peticion = pide_humano(caso["utterance"])
+        disparadores = [peticion] if peticion else []
         disparadores += [r for r in regulatorias if r in normal]
         if caso["debe_derivar"] and not disparadores:
             problemas.append(

@@ -358,6 +358,9 @@ def responder_intencion(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dic
             "model_version": conversacional.model_version,
             "bloqueado_por_cifras": conversacional.bloqueado_por_cifras,
             "detalle_generacion": conversacional.detalle,
+            # Misma clave que en la vía directa: sin ella el expediente solo existe en la
+            # memoria del proceso y el paquete del asesor responde 404.
+            "context_ref": context_ref,
         },
         **contexto_auditoria,
     )
@@ -470,6 +473,9 @@ def recuperar_contexto(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict
         utterance,
         reglas=servicios.reglas,
         derivado_previamente=servicios.memoria.fue_derivada(estado["conversation_id"]),
+        # Misma precondición que en la vía directa: la histéresis la activa una persona
+        # dentro de la sala, no el recuerdo de un score que subió una vez.
+        asesor_en_sala=servicios.memoria.asesor_presente(estado["conversation_id"]) is not None,
         conceptos_fuera_catalogo=fuera_catalogo,
     )
     servicios.auditoria.emitir(
@@ -482,6 +488,11 @@ def recuperar_contexto(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict
             "modo": "SCORE",
             "reglas_disparadas": list(incomprension.reglas_disparadas),
             "senal_disparadora": incomprension.senal_disparadora,
+            # Mismo payload que la vía directa: las dos magnitudes por separado, para
+            # que la bitácora del grafo y la del router sean comparables evento a evento.
+            "desglose": incomprension.s1_cobertura,
+            "cobertura_causal": incomprension.cobertura_causal,
+            "ofrece_asesor": incomprension.ofrecer_asesor,
         },
         **contexto_auditoria,
     )
@@ -684,12 +695,16 @@ def verificar_y_armar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[
 
     # --- Acciones y respuesta --------------------------------------------------- #
     acciones = list(resultado.acciones)
-    if incomprension.derivar and all(
+    # Igual que en la vía directa: derivar (el sistema pasa la conversación) y ofrecer
+    # (el cliente decide si quiere el motivo documentado) son cosas distintas, y la
+    # segunda es la que evita que la laguna del CRM se cobre en hand-offs.
+    if (incomprension.derivar or incomprension.ofrecer_asesor) and all(
         accion.id is not AccionSiguiente.DERIVAR_ASESOR for accion in acciones
     ):
         etiqueta, riesgo = ETIQUETAS_ACCION[AccionSiguiente.DERIVAR_ASESOR]
         acciones.insert(
-            0, Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo)
+            0 if incomprension.derivar else len(acciones),
+            Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo),
         )  # type: ignore[arg-type]
     oferta = explicar.evaluar_cross_selling(
         factset,
@@ -734,6 +749,10 @@ def verificar_y_armar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[
             "degradado": estado.get("degradado", False),
             "contexto_degradado": bool(contexto.degradado) if contexto else True,
             "score_incomprension": round(incomprension.U, 4),
+            # Misma telemetría que la vía directa: un turno resuelto con salvedad causal
+            # y uno resuelto con la causa documentada no pueden verse iguales.
+            "cobertura_causal": incomprension.cobertura_causal,
+            "asesor_ofrecido": incomprension.ofrecer_asesor,
             "cross_selling": oferta.payload.get("regla") if oferta else None,
             "firma_causal": factset.firma_causal(),
         }
@@ -789,6 +808,9 @@ def verificar_y_armar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[
             "explicacion_id": trace_id,
             "context_ref": context_ref,
             "degradado": estado.get("degradado", False),
+            # Igual que en la vía lineal: la bitácora conserva lo que se le dijo al
+            # cliente, para que el asesor no se lo repita.
+            "texto_entregado": respuesta.texto[: explicar.MAX_TEXTO_BITACORA],
         },
         **contexto_auditoria,
     )
@@ -979,6 +1001,7 @@ def derivar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[str, Any]:
             "latencia_ms": 0,
             "silence_probe_id": str(sonda.silence_probe_id),
             "context_ref": context_ref,
+            "texto_entregado": respuesta.texto[: explicar.MAX_TEXTO_BITACORA],
         },
         **contexto_auditoria,
     )

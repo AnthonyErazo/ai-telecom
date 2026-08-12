@@ -337,20 +337,20 @@ def atribuir(
 
 
 def esta_atribuida(linea: LineaDelta, confianza_minima: float = 0.0) -> bool:
-    """Si la variación de la línea cuenta como **explicada**.
+    """Si la variación de la línea tiene una causa **confirmada**.
 
     Lo está cuando tiene una causa del CRM, una causa oficial del catálogo o es una
     línea derivada del propio recibo, y además alcanza la confianza mínima exigida
     (``confianza.minima_para_explicar`` de ``rules.yaml``).
 
-    Es el predicado que alimenta ``s1`` (cobertura del delta explicado) del umbral de
-    incomprensión, de modo que la decisión de derivar use la misma definición de
-    "explicado" que la narración.
+    Es el predicado de la **cobertura causal**, que responde a *"¿sé por qué se movió
+    esta línea?"*. Ojo con el matiz, porque la confusión con la otra pregunta salía
+    cara: **no** es el predicado de *"¿sé cuánto varió y de qué línea?"*, que es lo que
+    hace falta para poder explicar un recibo y lo que mide ``s1`` del umbral de
+    incomprensión. Sin órdenes del CRM esto vale ``False`` para todas las líneas de una
+    cuenta real, y cuando alimentaba ``s1`` imponía un suelo de 0.40 al score que
+    derivaba a un asesor recibos conciliados al céntimo.
     """
     if linea.confianza < confianza_minima:
         return False
-    return (
-        linea.causa is not None
-        or linea.causa_oficial is not None
-        or EVIDENCIA_DERIVADO in linea.evidencia
-    )
+    return linea.causa_confirmada or EVIDENCIA_DERIVADO in linea.evidencia

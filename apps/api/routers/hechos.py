@@ -128,8 +128,16 @@ def construir_hechos(
     return factset, datos
 
 
-def payload_facts_built(factset: FactSet, datos: DatosCuenta) -> dict[str, object]:
-    """Payload del evento ``FACTS_BUILT`` (incluye ``residual_cent``, obligatorio)."""
+def payload_facts_built(factset: FactSet, datos: DatosCuenta | None = None) -> dict[str, object]:
+    """Payload del evento ``FACTS_BUILT`` (incluye ``residual_cent``, obligatorio).
+
+    ``datos`` es opcional porque hay un caso en el que no existen: cuando
+    ``POST /v1/derivacion`` **reutiliza** el FactSet del turno anterior en vez de
+    volver a construirlo. Ese turno también tiene que dejar sus hechos en la bitácora
+    —si no, el expediente que recoge el asesor no tendría desglose—, y lo único que no
+    se puede decir de él es cuántos recibos había disponibles, que es un dato de la
+    carga y no del recibo.
+    """
     payload = dict(resumen_de_conciliacion(factset))
     payload.update(
         {
@@ -140,7 +148,14 @@ def payload_facts_built(factset: FactSet, datos: DatosCuenta) -> dict[str, objec
             "periodo_previo": factset.periodo_previo,
             "lineas": len(factset.lineas),
             "movimientos_ciclo": len(factset.movimientos_ciclo),
-            "recibos_disponibles": len(datos.previos) + 1,
+            "recibos_disponibles": (len(datos.previos) + 1) if datos is not None else None,
+            # Cabecera del recibo: lo que el asesor necesita nombrar en la primera
+            # frase ("su recibo de julio vence el 12"). Va a la bitácora para que el
+            # paquete del asesor no tenga que volver a abrir el recibo.
+            "deuda_anterior_cent": factset.deuda_anterior_cent,
+            "total_a_pagar_cent": factset.total_a_pagar_cent,
+            "dias_ciclo": factset.dias_ciclo,
+            "fecha_vencimiento": factset.fecha_vencimiento,
         }
     )
     return payload

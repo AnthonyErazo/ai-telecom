@@ -114,18 +114,37 @@ confianza:
 # -----------------------------------------------------------------------------
 # Umbrales del score de incomprensión (sección 4.8)
 # U = 1 - (w1*s1 + w2*s2 + w3*(1-s3) + w6*(1-s6));  DERIVAR si U > tau_alto
+#
+# QUÉ MIDE w1, Y QUÉ NO
+# ---------------------
+# `s1` mide el DESGLOSE: qué parte del delta total está repartida en líneas con nombre
+# comercial, importe anterior, importe actual y evidencia citable. Responde a «¿sé
+# cuánto varió y en qué líneas?», que es lo que hace falta para poder explicar.
+#
+# NO mide la CONFIRMACIÓN CAUSAL —qué parte tiene detrás una orden del CRM—, que se
+# calcula aparte como `cobertura_causal` y queda FUERA de U. El dataset del desafío no
+# trae órdenes de CRM: mezclarlas imponía un suelo permanente de 0.40 al score y
+# convertía el hand-off en el caso normal en recibos que se explican al céntimo. La
+# laguna causal se dice en voz alta en la narrativa y ofrece un asesor; no lo impone.
+#
+# El caso de verdad inexplicable —el recibo que no cuadra— tiene su propia vía y es una
+# regla dura: INVARIANTE_ROTO. No necesita que s1 lo cubra.
 # -----------------------------------------------------------------------------
 umbrales_incomprension:
   tau_alto: 0.65
   tau_bajo: 0.35
   pesos:
-    w1: 0.40 # cobertura del delta explicado
+    w1: 0.40 # cobertura del delta DESGLOSADO por línea (no "atribuido a una causa")
     w2: 0.25 # unicidad de causa
     w3: 0.20 # repregunta
     w6: 0.15 # turnos sin progreso
   similitud_repregunta: 0.80
   max_turnos_sin_progreso: 2
   histeresis: true # una vez derivado, no se vuelve atrás
+  # ...pero solo mientras haya una persona atendiendo. Una derivación que nadie recogió
+  # no es una conversación humana que proteger, y fijarla condenaba el diálogo entero
+  # por un único turno de fricción.
+  histeresis_requiere_asesor: true
   reglas_duras:
     - PETICION_HUMANO
     - INVARIANTE_ROTO

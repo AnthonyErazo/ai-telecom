@@ -130,6 +130,13 @@ class DatosPlantilla:
     causa_que_sube: dict[str, Any] | None = None
     causa_que_ahorra: dict[str, Any] | None = None
     signos_mixtos: bool = False
+    # --- honestidad sobre lo que NO se puede confirmar ---------------------- #
+    #: Hay al menos una línea con variación cuyo motivo no consta en ningún sistema.
+    #: El desglose sigue completo —cuánto y en qué línea salen del propio recibo—, pero
+    #: el porqué necesitaría una orden del CRM que no existe. Cuando esto es cierto la
+    #: explicación lo dice con todas las letras en vez de insinuar una causa plausible:
+    #: la alternativa honesta a inventar no es callarse, es nombrar el límite.
+    causa_sin_confirmar: bool = False
 
     def cifras_usadas_cent(self) -> list[int]:
         """Enteros en céntimos que las plantillas pueden citar. Todos anclados."""
@@ -257,6 +264,7 @@ def construir_datos(
                 "dias_prorrateo": cruda.get("dias_prorrateo"),
                 "cuota": cruda.get("cuota"),
                 "tramos": tramos,
+                "causa_confirmada": bool(cruda.get("causa_confirmada", False)),
             }
         )
 
@@ -325,6 +333,9 @@ def construir_datos(
         causa_que_sube=_mayor_impacto(causas_suben),
         causa_que_ahorra=_mayor_impacto(causas_bajan),
         signos_mixtos=bool(causas_suben and causas_bajan),
+        # `lineas` ya viene filtrada a las que varían (`lineas_explicables`), así que
+        # esto es exactamente "queda variación cuyo motivo no consta en ningún sistema".
+        causa_sin_confirmar=any(not linea["causa_confirmada"] for linea in lineas),
         linea_principal=linea_principal,
         tramos=(con_tramos or {}).get("tramos", []),
         cuota=(

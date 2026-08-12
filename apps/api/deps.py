@@ -514,11 +514,21 @@ def historial_para_score(
 ) -> Sequence[Turno]:
     """Historial de la conversación tal como lo espera ``evaluar_incomprension``.
 
-    Incluye el turno actual del cliente al final, que es el que ``s3`` compara con el
-    anterior para detectar la repregunta.
+    Son los turnos **anteriores**, y solo ellos. El mensaje de este turno viaja aparte,
+    en el argumento ``utterance``, y así es como lo espera ``_repregunta``.
+
+    Antes se añadía el turno actual al final de la lista "para que ``s3`` lo compare con
+    el anterior". El efecto real era el contrario: ``_repregunta`` recorre los últimos
+    turnos del cliente y el último era el propio mensaje, de modo que se comparaba
+    consigo mismo. ``Jaccard(x, x) = 1.0``, por encima del umbral de 0.80, y la primera
+    pregunta de cualquier cliente nuevo entraba en el score como si estuviera
+    repreguntando: 0.20 gratis sobre ``U`` desde el primer turno.
+
+    El parámetro ``utterance`` se conserva —el llamador ya lo tiene a mano y la firma es
+    estable— aunque hoy no se use aquí: quien lo necesita es ``evaluar_incomprension``.
     """
-    turnos = memoria.turnos(conversation_id)
-    return [*turnos, Turno(utterance=utterance, rol="cliente")]
+    del utterance  # el mensaje del turno actual NO forma parte del historial previo
+    return memoria.turnos(conversation_id)
 
 
 # --------------------------------------------------------------------------- #

@@ -33,6 +33,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -288,8 +289,15 @@ def construir_permitidos(
     )
 
 
-def _anclar_enteros_de_textos(factset: FactSet, anclados: dict[str, list[str]]) -> None:
-    """Ancla como ``num:`` los dígitos contenidos en los textos del FactSet."""
+def textos_nominales(factset: FactSet) -> list[tuple[str, str]]:
+    """Nombres propios que el FactSet aporta, con su ``fact_id``.
+
+    Son los nombres comerciales de las líneas, las etiquetas de causa, los equipos
+    financiados, los beneficios y el plan vigente: texto del propio recibo, no redacción
+    nuestra. Se publica como función porque tiene dos consumidores que deben ver
+    exactamente la misma lista —el anclaje de enteros y la protección de nombres propios
+    de :func:`verificar`—, y dos listas paralelas acabarían discrepando.
+    """
     textos: list[tuple[str, str]] = []
     for linea in factset.lineas:
         textos.append((f"texto:linea:{linea.concepto_id}.nombre_comercial", linea.nombre_comercial))
@@ -303,8 +311,12 @@ def _anclar_enteros_de_textos(factset: FactSet, anclados: dict[str, list[str]]) 
         textos.append((f"texto:beneficio:{indice}", beneficio))
     if factset.plan_vigente:
         textos.append(("texto:factset:plan_vigente", factset.plan_vigente))
+    return textos
 
-    for fact_id, texto in textos:
+
+def _anclar_enteros_de_textos(factset: FactSet, anclados: dict[str, list[str]]) -> None:
+    """Ancla como ``num:`` los dígitos contenidos en los textos del FactSet."""
+    for fact_id, texto in textos_nominales(factset):
         for bruto in _NUMEROS_EN_TEXTO.findall(texto or ""):
             token = token_entero(int(bruto))
             fuentes = anclados.setdefault(token, [])
@@ -559,6 +571,51 @@ def extraer_aserciones(texto: str) -> list[Asercion]:
     return aserciones
 
 
+#: Un nombre propio solo protege si es lo bastante específico para no ser un comodín.
+#: Un supuesto "nombre" corto o sin una sola letra no ampara nada: la protección tiene
+#: que ser imposible de provocar desde el texto generado.
+_LONGITUD_MINIMA_NOMBRE = 6
+
+
+def tramos_de_nombres_propios(texto: str, factset: FactSet) -> list[tuple[int, int, str]]:
+    """Tramos del texto ocupados por un nombre propio del FactSet citado literalmente.
+
+    Por qué hace falta
+    ------------------
+    El dataset real trae nombres comerciales con cifras dentro: la cuenta 100032914
+    factura un concepto llamado literalmente ``"RV Plan Mi Movistar S/55.9 VII"``. Al
+    citarlo —que es lo correcto: es el nombre que el cliente ve impreso en su recibo— el
+    extractor leía ``S/55.9`` como un importe afirmado sobre el recibo, no lo encontraba
+    en ``ALLOWED`` y bloqueaba una explicación por lo demás impecable. El sistema acababa
+    derivando a un asesor por haber llamado a las cosas por su nombre.
+
+    Por qué es seguro
+    -----------------
+    Esto **no amplía** ``ALLOWED``: no se añade ni un token al conjunto permitido, de
+    modo que ``S/55.9`` sigue sin poder aparecer en ninguna otra parte del texto. Lo que
+    se reconoce es una propiedad **posicional**: los caracteres que caen dentro de una
+    cita literal y completa de un nombre propio del FactSet forman parte de ese nombre y
+    no son una afirmación sobre importes. Escribir *"su plan cuesta S/55.9"* sigue siendo
+    FAIL; escribir el nombre entero del producto, no.
+
+    Returns:
+        Tríos ``(inicio, fin, fact_id)`` para que cada cifra amparada quede citada con
+        el hecho exacto que la ampara, igual que cualquier otra cifra anclada.
+    """
+    tramos: list[tuple[int, int, str]] = []
+    if not texto:
+        return tramos
+    for fact_id, nombre in textos_nominales(factset):
+        limpio = (nombre or "").strip()
+        if len(limpio) < _LONGITUD_MINIMA_NOMBRE or not any(c.isalpha() for c in limpio):
+            continue
+        # Se admite cualquier separación de espacios porque las plantillas normalizan el
+        # texto, pero el resto del nombre tiene que aparecer al pie de la letra.
+        patron = re.compile(r"\s+".join(re.escape(parte) for parte in limpio.split()), re.IGNORECASE)
+        tramos.extend((hallado.start(), hallado.end(), fact_id) for hallado in patron.finditer(texto))
+    return tramos
+
+
 def extraer_numeros(texto: str) -> set[str]:
     """Conjunto de tokens numéricos presentes en el texto.
 
@@ -715,6 +772,23 @@ class ResultadoVerificacion(BaseModel):
         return lineas[:6]
 
 
+def _nombre_que_ampara(
+    asercion: Asercion, tramos: Sequence[tuple[int, int, str]]
+) -> str | None:
+    """``fact_id`` del nombre propio que contiene la aserción, si alguno la contiene.
+
+    Se exige que la cifra caiga **entera** dentro del tramo: una aserción que solo
+    solapa parcialmente con el nombre no está amparada, porque entonces la cifra no es
+    la del nombre sino otra pegada a él.
+    """
+    if asercion.inicio is None or asercion.fin is None:
+        return None
+    for inicio, fin, fact_id in tramos:
+        if inicio <= asercion.inicio and asercion.fin <= fin:
+            return fact_id
+    return None
+
+
 def verificar(
     texto: str,
     factset: FactSet,
@@ -744,6 +818,10 @@ def verificar(
     conjunto = permitidos or construir_permitidos(factset)
 
     aserciones = extraer_aserciones(texto)
+    # Cifras que viven DENTRO del nombre propio de un concepto ("RV Plan Mi Movistar
+    # S/55.9 VII"). No son afirmaciones sobre el recibo: son parte del nombre que el
+    # operador imprime, y el FactSet las trae textualmente.
+    tramos_nominales = tramos_de_nombres_propios(texto, factset)
     citas: list[Cita] = []
     derivaciones: list[DerivacionNumerica] = []
     infractores: list[str] = []
@@ -752,10 +830,19 @@ def verificar(
 
     for asercion in aserciones:
         estado = conjunto.estado(asercion.token)
+        # El amparo solo se plantea cuando el token no estaba ya permitido: nunca
+        # sustituye a una fuente real, solo cubre lo que si no quedaría sin anclar.
+        amparo = (
+            _nombre_que_ampara(asercion, tramos_nominales)
+            if estado is EstadoAsercion.NO_ANCLADA
+            else None
+        )
+        if amparo is not None:
+            estado = EstadoAsercion.ANCLADA
         asercion.estado = estado
         if estado is EstadoAsercion.ANCLADA:
             ancladas += 1
-            asercion.fuente = conjunto.fuente(asercion.token)
+            asercion.fuente = amparo or conjunto.fuente(asercion.token)
         elif estado is EstadoAsercion.DERIVADA:
             derivadas += 1
             derivacion = conjunto.derivacion(asercion.token)

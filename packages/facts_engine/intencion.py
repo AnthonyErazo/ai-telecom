@@ -62,6 +62,7 @@ from typing import NamedTuple
 
 from packages.core_domain.enums import MotivoDerivacion
 from packages.facts_engine.jerga import expandir
+from packages.facts_engine.peticion_humano import pide_humano
 
 __all__ = [
     "PATRONES",
@@ -203,16 +204,22 @@ PATRONES: dict[Intencion, tuple[str, ...]] = {
         "reembolso",
         "compensacion",
     ),
+    # Documentación, no regla: quien decide si esto es una petición de humano es
+    # `pide_humano`, en `facts_engine.peticion_humano`. Esta tupla era la regla y por eso
+    # bastaba con que la palabra «asesor» o «llamar» apareciera en cualquier sitio:
+    # «el asesor de la tienda me dijo…» y «llamé al call center» se clasificaban como
+    # peticiones de humano y derivaban, mientras el umbral de incomprensión —que ya usaba
+    # la regla gramatical— decía lo contrario sobre la misma frase.
     Intencion.PEDIR_HUMANO: (
         "asesor",
         "humano",
         "persona real",
+        "una persona",
         "hablar con alguien",
         "operador humano",
         "agente",
         "atencion al cliente",
         "call center",
-        "llamar",
     ),
     # Querer pagar es una intención propia, no una duda de facturación: la respuesta
     # útil es *dónde y hasta cuándo*, no la descomposición causal del recibo.
@@ -514,6 +521,39 @@ class ResultadoIntencion(NamedTuple):
         return self.motivo_derivacion is not None
 
 
+def _clasificar_por_patrones(texto: str) -> ResultadoIntencion | None:
+    """Recorre las intenciones por prioridad y devuelve la primera que case.
+
+    ``PEDIR_HUMANO`` no se decide aquí por tokens sino con :func:`pide_humano`, la misma
+    función que usa el umbral de incomprensión. Antes eran dos reglas distintas para la
+    misma pregunta y se contradecían dentro del mismo turno: la intención derivaba
+    *«el asesor de la tienda me dijo…»* por contener la palabra «asesor», mientras el
+    score de incomprensión, que ya distinguía pedir de mencionar, decía que ahí no había
+    ninguna petición. Ganaba la intención, porque va antes, y el cliente se quedaba sin
+    su respuesta.
+    """
+    for intencion in _PRIORIDAD:
+        if intencion is Intencion.PEDIR_HUMANO:
+            peticion = pide_humano(texto)
+            if peticion:
+                return ResultadoIntencion(
+                    intencion=intencion,
+                    patron=peticion,
+                    motivo_derivacion=_DERIVAN.get(intencion),
+                    explica_recibo=False,
+                )
+            continue
+        for patron in PATRONES[intencion]:
+            if coincide_patron(patron, texto):
+                return ResultadoIntencion(
+                    intencion=intencion,
+                    patron=patron,
+                    motivo_derivacion=_DERIVAN.get(intencion),
+                    explica_recibo=intencion is Intencion.EXPLICAR_RECIBO,
+                )
+    return None
+
+
 def clasificar_intencion(utterance: str | None) -> ResultadoIntencion:
     """Clasifica la frase del cliente sin mirar el recibo ni llamar a un modelo.
 
@@ -538,15 +578,9 @@ def clasificar_intencion(utterance: str | None) -> ResultadoIntencion:
             senales=tuple(senales),
         )
 
-    for intencion in _PRIORIDAD:
-        for patron in PATRONES[intencion]:
-            if coincide_patron(patron, texto):
-                return ResultadoIntencion(
-                    intencion=intencion,
-                    patron=patron,
-                    motivo_derivacion=_DERIVAN.get(intencion),
-                    explica_recibo=intencion is Intencion.EXPLICAR_RECIBO,
-                )
+    resuelta = _clasificar_por_patrones(texto)
+    if resuelta is not None:
+        return resuelta
 
     # Ninguna señal en la frase literal. Segundo intento traduciendo la jerga peruana:
     # «ya cancelé» lleva el significado «pagar», y con él el patrón de pago sí casa.
@@ -554,15 +588,9 @@ def clasificar_intencion(utterance: str | None) -> ResultadoIntencion:
     # clasificación por una expansión: la jerga solo puede rescatar, nunca reinterpretar.
     expandido = expandir(texto)
     if expandido != texto:
-        for intencion in _PRIORIDAD:
-            for patron in PATRONES[intencion]:
-                if coincide_patron(patron, expandido):
-                    return ResultadoIntencion(
-                        intencion=intencion,
-                        patron=patron,
-                        motivo_derivacion=_DERIVAN.get(intencion),
-                        explica_recibo=intencion is Intencion.EXPLICAR_RECIBO,
-                    )
+        resuelta = _clasificar_por_patrones(expandido)
+        if resuelta is not None:
+            return resuelta
 
     # Sin señal reconocible. Solo se trata como cortesía si TODO lo que escribió
     # es una interjección: «xd» sí, «ya pero qué tienes» no. Contar tokens era

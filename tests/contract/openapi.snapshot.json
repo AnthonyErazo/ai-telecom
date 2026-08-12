@@ -403,7 +403,8 @@
           "APP",
           "BOT",
           "WHATSAPP",
-          "ASESOR"
+          "ASESOR",
+          "VOZ"
         ],
         "title": "Canal",
         "type": "string"
@@ -497,6 +498,97 @@
         ],
         "title": "CausaOficial",
         "type": "string"
+      },
+      "CausaPaquete": {
+        "additionalProperties": false,
+        "description": "Una causa agregada: el *porqué* en el vocabulario del cliente, con su peso.",
+        "properties": {
+          "causa": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Causa"
+          },
+          "confianza": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confianza",
+            "type": "number"
+          },
+          "etiqueta_cliente": {
+            "title": "Etiqueta Cliente",
+            "type": "string"
+          },
+          "monto_cent": {
+            "title": "Monto Cent",
+            "type": "integer"
+          },
+          "movimientos": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Movimientos",
+            "type": "array"
+          },
+          "participacion_bp": {
+            "default": 0,
+            "description": "Peso sobre |delta total|, en bp",
+            "title": "Participacion Bp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "etiqueta_cliente",
+          "monto_cent"
+        ],
+        "title": "CausaPaquete",
+        "type": "object"
+      },
+      "CifraEntregada": {
+        "additionalProperties": false,
+        "description": "Una cifra que **ya se le dijo al cliente**, con el estado que le dio el verificador.\n\nEs la lista literal del evento ``VERIFY``. Para el asesor vale más que la prosa: le\ndice qué números tiene el cliente en la cabeza y cuáles de ellos están respaldados.",
+        "properties": {
+          "estado": {
+            "description": "ANCLADA · DERIVADA · NO_ANCLADA",
+            "title": "Estado",
+            "type": "string"
+          },
+          "fuente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "fact_id que la respalda",
+            "title": "Fuente"
+          },
+          "texto": {
+            "description": "Tal y como apareció en la respuesta al cliente",
+            "title": "Texto",
+            "type": "string"
+          },
+          "token": {
+            "description": "Token normalizado: cent:12490, num:12, pct:18.00…",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "texto",
+          "token",
+          "estado"
+        ],
+        "title": "CifraEntregada",
+        "type": "object"
       },
       "Cita": {
         "additionalProperties": false,
@@ -851,6 +943,88 @@
         ],
         "title": "EstadoServicio",
         "type": "string"
+      },
+      "EvidenciaAuditable": {
+        "additionalProperties": false,
+        "description": "De dónde salió el paquete y cómo comprobarlo.\n\nSin esto el paquete sería una afirmación más. Con esto, el asesor (o una auditoría\nposterior) puede pedir la traza, recorrer la cadena de hashes y ver que ningún\nevento se tocó después de escribirse.",
+        "properties": {
+          "cadena_valida": {
+            "default": true,
+            "title": "Cadena Valida",
+            "type": "boolean"
+          },
+          "consulta_auditoria": {
+            "default": "",
+            "description": "Ruta exacta para releer la evidencia, p. ej. /v1/auditoria?trace_id=…",
+            "title": "Consulta Auditoria",
+            "type": "string"
+          },
+          "etapas": {
+            "description": "Etapas del turno ancla",
+            "items": {
+              "type": "string"
+            },
+            "title": "Etapas",
+            "type": "array"
+          },
+          "eventos": {
+            "default": 0,
+            "description": "Eventos auditados del caso completo",
+            "title": "Eventos",
+            "type": "integer"
+          },
+          "factset_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factset Sha256"
+          },
+          "hash_ultimo_evento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash Ultimo Evento"
+          },
+          "indice_roto": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indice Roto"
+          },
+          "trace_id": {
+            "description": "Turno ancla: el que se pide auditar",
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "trazas": {
+            "description": "Todos los turnos del caso, en orden; el ancla es el último",
+            "items": {
+              "type": "string"
+            },
+            "title": "Trazas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "trace_id"
+        ],
+        "title": "EvidenciaAuditable",
+        "type": "object"
       },
       "FactSet": {
         "additionalProperties": false,
@@ -1243,6 +1417,48 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "Incertidumbre": {
+        "additionalProperties": false,
+        "description": "Algo que el sistema **no pudo confirmar**, con su porqué y su impacto.\n\nExiste porque el fallo más caro de un traspaso no es la falta de datos: es que el\nasesor dé por confirmado lo que era una hipótesis del motor. Aquí se nombra.",
+        "properties": {
+          "codigo": {
+            "description": "Uno de MotivoIncertidumbre",
+            "title": "Codigo",
+            "type": "string"
+          },
+          "detalle": {
+            "description": "Explicado en una frase, para leerlo en voz alta",
+            "title": "Detalle",
+            "type": "string"
+          },
+          "evidencia": {
+            "description": "Etapas o fact_id donde consta",
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencia",
+            "type": "array"
+          },
+          "impacto_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Importe afectado, si se puede acotar",
+            "title": "Impacto Cent"
+          }
+        },
+        "required": [
+          "codigo",
+          "detalle"
+        ],
+        "title": "Incertidumbre",
+        "type": "object"
+      },
       "Invariante": {
         "additionalProperties": false,
         "description": "Conciliación entre el delta total y la suma de deltas por línea.\n\nSi ``|residual_cent| > 1`` el sistema **no explica**: responde 409\n``INVARIANTE_FALLIDO`` y deriva a un asesor. Nunca hay \"explicación aproximada\".",
@@ -1497,6 +1713,71 @@
         "title": "LineaDelta",
         "type": "object"
       },
+      "LineaPaquete": {
+        "additionalProperties": false,
+        "description": "Una línea del recibo que aporta variación, tal y como quedó en la bitácora.",
+        "properties": {
+          "atribuida": {
+            "default": false,
+            "description": "Falso cuando el motor vio la variación pero no supo a qué se debe",
+            "title": "Atribuida",
+            "type": "boolean"
+          },
+          "causa": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Causa"
+          },
+          "clase": {
+            "description": "SUBIO · BAJO · NUEVO · DESAPARECIDO",
+            "title": "Clase",
+            "type": "string"
+          },
+          "concepto_id": {
+            "title": "Concepto Id",
+            "type": "string"
+          },
+          "confianza": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confianza",
+            "type": "number"
+          },
+          "delta_cent": {
+            "title": "Delta Cent",
+            "type": "integer"
+          },
+          "monto_actual_cent": {
+            "title": "Monto Actual Cent",
+            "type": "integer"
+          },
+          "monto_previo_cent": {
+            "title": "Monto Previo Cent",
+            "type": "integer"
+          },
+          "nombre_comercial": {
+            "title": "Nombre Comercial",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concepto_id",
+          "nombre_comercial",
+          "clase",
+          "monto_previo_cent",
+          "monto_actual_cent",
+          "delta_cent"
+        ],
+        "title": "LineaPaquete",
+        "type": "object"
+      },
       "MensajeAsesor": {
         "additionalProperties": false,
         "description": "Lo que el asesor escribe al cliente dentro de la conversación.",
@@ -1558,6 +1839,278 @@
         ],
         "title": "NivelAseguramiento",
         "type": "string"
+      },
+      "PaqueteAsesor": {
+        "additionalProperties": false,
+        "description": "Contrato único de traspaso a un asesor humano, común a los tres canales.\n\nSe construye con\n:func:`packages.governance.paquete_asesor.construir_paquete_asesor` a partir de los\neventos de la bitácora de un turno.",
+        "properties": {
+          "accion_pendiente": {
+            "default": "",
+            "description": "La tarea del asesor",
+            "title": "Accion Pendiente",
+            "type": "string"
+          },
+          "brief": {
+            "default": "",
+            "description": "Ficha etiquetada, verificada",
+            "title": "Brief",
+            "type": "string"
+          },
+          "canal": {
+            "default": "APP",
+            "description": "APP · WHATSAPP · VOZ · BOT · ASESOR",
+            "title": "Canal",
+            "type": "string"
+          },
+          "causas": {
+            "items": {
+              "$ref": "#/components/schemas/CausaPaquete"
+            },
+            "title": "Causas",
+            "type": "array"
+          },
+          "confianza_global": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confianza Global"
+          },
+          "consulta_cliente": {
+            "default": "",
+            "description": "Lo que escribió o dijo el cliente",
+            "title": "Consulta Cliente",
+            "type": "string"
+          },
+          "context_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Ref"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "cuenta_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuenta Id"
+          },
+          "delta_total_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Total Cent"
+          },
+          "deuda_anterior_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deuda Anterior Cent"
+          },
+          "evidencia": {
+            "$ref": "#/components/schemas/EvidenciaAuditable"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "generado_en": {
+            "format": "date-time",
+            "title": "Generado En",
+            "type": "string"
+          },
+          "incertidumbres": {
+            "items": {
+              "$ref": "#/components/schemas/Incertidumbre"
+            },
+            "title": "Incertidumbres",
+            "type": "array"
+          },
+          "invariante_ok": {
+            "default": true,
+            "title": "Invariante Ok",
+            "type": "boolean"
+          },
+          "lineas": {
+            "items": {
+              "$ref": "#/components/schemas/LineaPaquete"
+            },
+            "title": "Lineas",
+            "type": "array"
+          },
+          "modalidad_renta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidad Renta"
+          },
+          "motivo_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Codigo"
+          },
+          "motivo_detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Señal concreta que disparó la derivación",
+            "title": "Motivo Detalle"
+          },
+          "nivel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nivel con el que se atendió",
+            "title": "Nivel"
+          },
+          "periodo_actual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo Actual"
+          },
+          "periodo_previo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo Previo"
+          },
+          "residual_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Cent"
+          },
+          "total_a_pagar_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total A Pagar Cent"
+          },
+          "total_actual_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Actual Cent"
+          },
+          "total_previo_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Previo Cent"
+          },
+          "verificacion_brief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerificacionBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ya_explicado": {
+            "$ref": "#/components/schemas/YaExplicado"
+          }
+        },
+        "required": [
+          "generado_en",
+          "evidencia"
+        ],
+        "title": "PaqueteAsesor",
+        "type": "object"
       },
       "PeticionAlucinar": {
         "additionalProperties": false,
@@ -2394,6 +2947,135 @@
         ],
         "title": "Verbosidad",
         "type": "string"
+      },
+      "VeredictoVerificacion": {
+        "description": "Resultado del verificador numérico sobre el texto final.",
+        "enum": [
+          "PASS",
+          "FAIL",
+          "NO_APLICA"
+        ],
+        "title": "VeredictoVerificacion",
+        "type": "string"
+      },
+      "VerificacionBrief": {
+        "additionalProperties": false,
+        "description": "Veredicto del verificador numérico sobre el brief que lee el asesor.\n\nEl brief es texto generado por el sistema, así que se le aplica la misma regla que a\nla respuesta al cliente: cada cifra, contra los tokens del paquete. La única\nexcepción son las cifras **citadas del cliente** —lo que él escribió va entre\ncomillas—, que no son afirmaciones del sistema y se listan aparte en vez de\nbloquearse: censurar la pregunta del cliente sería absurdo, y darla por respaldada,\ndeshonesto.",
+        "properties": {
+          "ancladas": {
+            "default": 0,
+            "title": "Ancladas",
+            "type": "integer"
+          },
+          "aserciones_totales": {
+            "default": 0,
+            "title": "Aserciones Totales",
+            "type": "integer"
+          },
+          "citadas_del_cliente": {
+            "description": "Cifras que escribió el cliente, no el sistema",
+            "items": {
+              "type": "string"
+            },
+            "title": "Citadas Del Cliente",
+            "type": "array"
+          },
+          "no_ancladas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "No Ancladas",
+            "type": "array"
+          },
+          "tokens_permitidos": {
+            "default": 0,
+            "title": "Tokens Permitidos",
+            "type": "integer"
+          },
+          "veredicto": {
+            "$ref": "#/components/schemas/VeredictoVerificacion"
+          }
+        },
+        "required": [
+          "veredicto"
+        ],
+        "title": "VerificacionBrief",
+        "type": "object"
+      },
+      "YaExplicado": {
+        "additionalProperties": false,
+        "description": "Qué recibió el cliente antes de la derivación. Evita que el asesor se repita.",
+        "properties": {
+          "cifras": {
+            "items": {
+              "$ref": "#/components/schemas/CifraEntregada"
+            },
+            "title": "Cifras",
+            "type": "array"
+          },
+          "citas": {
+            "description": "fact_id citados",
+            "items": {
+              "type": "string"
+            },
+            "title": "Citas",
+            "type": "array"
+          },
+          "hubo_explicacion": {
+            "default": false,
+            "title": "Hubo Explicacion",
+            "type": "boolean"
+          },
+          "modo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "LLM · PLANTILLA · NO_APLICA",
+            "title": "Modo"
+          },
+          "score_incomprension": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Incomprension"
+          },
+          "texto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Literal entregado, recortado",
+            "title": "Texto"
+          },
+          "veredicto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Veredicto del verificador",
+            "title": "Veredicto"
+          }
+        },
+        "title": "YaExplicado",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -2719,6 +3401,117 @@
           }
         ],
         "summary": "El asesor entra a la conversación y la IA pasa a copiloto",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/asesor/paquete/{context_ref}": {
+      "get": {
+        "description": "Todo lo que el asesor necesita para retomar el caso **sin que el cliente repita**.\n\nEs el mismo contenido para los tres canales; lo que cambia es el transporte. Trae el\ndelta y las líneas que lo componen, lo que ya se le dijo al cliente cifra a cifra,\n**qué no se pudo confirmar y por qué**, el motivo de la derivación y la referencia\ncon la que auditar todo lo anterior.\n\nEl ``brief`` viene ya verificado: ``verificacion_brief.veredicto`` es ``PASS`` solo\nsi cada cifra del texto está respaldada por el paquete. Un consumidor que vaya a\nmostrar el brief como texto debe mirar ``apto_para_entregar`` antes.",
+        "operationId": "paquete_v1_asesor_paquete__context_ref__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_ref",
+            "required": true,
+            "schema": {
+              "title": "Context Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaqueteAsesor"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "CUENTA_NO_AUTORIZADA"
+          },
+          "404": {
+            "description": "CONTEXTO_NO_ENCONTRADO"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Paquete de contexto del asesor, reconstruido desde la bitácora",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/asesor/paquete/{context_ref}/texto": {
+      "get": {
+        "description": "El paquete como texto, que es lo único que viaja por WhatsApp o por un SMS.\n\nExiste para demostrar que el paquete es **canal-agnóstico**: el mismo contenido, sin\nvolver a calcular nada, servido en el formato que el transporte admite.\n\nSe niega a devolver texto si el brief no pasó el verificador. Un JSON con\n``veredicto: FAIL`` es un dato que el consumidor puede interpretar; un texto plano\ncon una cifra sin respaldo es una cifra que un asesor va a leer en voz alta.\n\nRaises:\n    ErrorApi: ``409`` si el brief no está verificado o la cadena no valida.",
+        "operationId": "paquete_en_texto_v1_asesor_paquete__context_ref__texto_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_ref",
+            "required": true,
+            "schema": {
+              "title": "Context Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "CUENTA_NO_AUTORIZADA"
+          },
+          "404": {
+            "description": "CONTEXTO_NO_ENCONTRADO"
+          },
+          "409": {
+            "description": "BRIEF_NO_VERIFICADO: el brief no pasó el verificador"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "El mismo paquete en texto plano, para canales que solo admiten texto",
         "tags": [
           "asesor"
         ]

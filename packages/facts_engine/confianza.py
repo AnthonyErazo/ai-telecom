@@ -13,15 +13,36 @@ Dos mecanismos, en este orden:
    se deriva.
 2. **Score continuo** ``U``::
 
-       s1 = cobertura del Δ explicado = Σ|Δ_atribuidos| / |Δ_total|
-       s2 = unicidad de causa         = 1 − H(p_causas)/log(k)
-       s3 = repregunta                (similitud entre turnos consecutivos > 0.80)
-       s6 = turnos sin progreso       (normalizado por max_turnos_sin_progreso)
+       s1 = cobertura del Δ DESGLOSADO = Σ|Δ_desglosados| / |Δ_total|
+       s2 = unicidad de causa          = 1 − H(p_causas)/log(k)
+       s3 = repregunta                 (similitud con los turnos PREVIOS > 0.80)
+       s6 = turnos sin progreso        (normalizado por max_turnos_sin_progreso)
 
        U = 1 − (w1·s1 + w2·s2 + w3·(1−s3) + w6·(1−s6)),   Σw = 1
        DERIVAR si U > τ_alto (0.65)
 
-   Con **histéresis**: una vez derivada, la conversación no vuelve al asistente.
+   Con **histéresis**, y solo mientras un asesor esté realmente en la sala.
+
+Desglosar no es confirmar
+-------------------------
+El score mide **si el sistema puede explicar**, y explicar un recibo es responder *cuánto
+varió y en qué líneas*. Eso es lo que mide ``s1``: la parte del delta total que está
+desglosada línea a línea, con su nombre comercial, su importe anterior, su importe actual
+y evidencia citable. Es una magnitud **aritmética**, y en el dataset real vale 1.0.
+
+Aparte, y **fuera de** ``U``, se calcula la :func:`cobertura causal
+<_cobertura_causal>`: qué parte del delta tiene además una causa confirmada (una orden
+del CRM o una causa oficial del catálogo). En el dataset del desafío no hay órdenes de
+CRM, así que vale 0.0 casi siempre. Meter esa laguna dentro de ``U`` era el defecto que
+convertía el hand-off en el caso normal: el sistema sabía perfectamente *cuánto* y *de
+qué línea*, y aun así se declaraba incapaz de explicar. Son dos preguntas distintas:
+
+* *"no sé cuánto varió ni en qué línea"* → el recibo no se puede explicar → **derivar**.
+  Esa vía existe y es la regla dura ``INVARIANTE_ROTO``, no ``s1``.
+* *"sé exactamente cuánto y en qué líneas, pero no puedo confirmar el porqué"* → el
+  recibo **sí** se explica, con la laguna dicha en voz alta → **no derivar**. La
+  cobertura causal gobierna la narrativa, la telemetría y la *oferta* de asesor, que es
+  una acción que el cliente elige, no una puerta que se le cierra.
 
 Los pesos y umbrales viven en ``rules.yaml``. Aquí no hay aritmética monetaria: los
 importes solo se leen del FactSet, ya en céntimos enteros.
@@ -31,7 +52,6 @@ from __future__ import annotations
 
 import math
 import re
-import unicodedata
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
@@ -39,10 +59,20 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from packages.core_domain.enums import MotivoDerivacion
-from packages.core_domain.esquemas.factset import FactSet
+from packages.core_domain.esquemas.factset import FactSet, LineaDelta
 from packages.core_domain.esquemas.respuesta import Derivacion
 from packages.core_domain.reglas import ConfiguracionReglas, cargar_reglas
 from packages.facts_engine.atribucion import esta_atribuida
+
+# La regla dura «el cliente pide una persona» vive en su propio módulo porque la
+# consultan tres sitios —este umbral, el clasificador de intención y el generador de la
+# suite golden— y cuando cada uno tenía su copia, los tres discrepaban. Se reexporta
+# desde aquí para no romper a quien ya la importaba de `confianza`.
+from packages.facts_engine.peticion_humano import (
+    PATRONES_PETICION_HUMANO,
+    normalizar_texto,
+    pide_humano,
+)
 
 __all__ = [
     "PATRONES_PETICION_HUMANO",
@@ -51,26 +81,9 @@ __all__ = [
     "entropia_normalizada",
     "evaluar_incomprension",
     "normalizar_texto",
+    "pide_humano",
     "similitud_textos",
 ]
-
-#: Formas en que un cliente peruano pide un humano. Es una regla dura: se deriva sin más.
-PATRONES_PETICION_HUMANO: tuple[str, ...] = (
-    "asesor",
-    "humano",
-    "persona real",
-    "una persona",
-    "operador",
-    "ejecutivo",
-    "representante",
-    "agente",
-    "hablar con alguien",
-    "quiero hablar con",
-    "comunicarme con",
-    "atencion al cliente",
-    "call center",
-    "telefono de atencion",
-)
 
 _TOKENIZADOR = re.compile(r"[a-z0-9]+")
 
@@ -83,12 +96,6 @@ _VACIAS: frozenset[str] = frozenset(
         "su", "sus", "un", "una", "y", "ya", "yo",
     }
 )
-
-
-def normalizar_texto(texto: str) -> str:
-    """Minúsculas sin tildes ni signos: la forma canónica para comparar frases."""
-    descompuesto = unicodedata.normalize("NFD", texto.lower())
-    return "".join(caracter for caracter in descompuesto if unicodedata.category(caracter) != "Mn")
 
 
 def _tokens(texto: str) -> set[str]:
@@ -163,10 +170,24 @@ class ResultadoIncomprension(BaseModel):
         default=None, description="Qué disparó la decisión, en lenguaje humano"
     )
     reglas_disparadas: list[str] = Field(default_factory=list)
-    s1_cobertura: float = Field(default=1.0, ge=0.0, le=1.0)
+    s1_cobertura: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Parte del delta DESGLOSADA por línea. Entra en U con peso w1.",
+    )
     s2_unicidad: float = Field(default=1.0, ge=0.0, le=1.0)
     s3_repregunta: float = Field(default=0.0, ge=0.0, le=1.0)
     s6_sin_progreso: float = Field(default=0.0, ge=0.0, le=1.0)
+    cobertura_causal: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Parte del delta con causa CONFIRMADA (orden del CRM o causa oficial). "
+            "NO entra en U: gobierna la narrativa, la oferta de asesor y la gobernanza."
+        ),
+    )
     tau_alto: float = 0.65
     tau_bajo: float = 0.35
     turnos_sin_progreso: int = 0
@@ -176,6 +197,28 @@ class ResultadoIncomprension(BaseModel):
     def score(self) -> float:
         """Alias legible de ``U``."""
         return self.U
+
+    @property
+    def causa_confirmada(self) -> bool:
+        """Si toda la variación tiene una causa documentada detrás.
+
+        Cuando es ``False`` el recibo se explica igual —el desglose está completo— pero
+        la explicación tiene que decir qué parte no se puede confirmar y por qué. Es la
+        diferencia entre *"no puedo explicarlo"* y *"puedo explicarlo, pero no puedo
+        confirmar el motivo"*, y el cliente merece que se le diga cuál de las dos es.
+        """
+        return self.cobertura_causal >= 1.0
+
+    @property
+    def ofrecer_asesor(self) -> bool:
+        """Si conviene **ofrecer** un asesor sin derivar todavía.
+
+        Es el término medio que faltaba: la explicación sale, con su desglose completo y
+        su laguna declarada, y además se le ofrece al cliente la puerta a una persona por
+        si quiere el porqué documentado. Derivar es entonces una decisión suya, no una
+        rendición del sistema, y el hand-off vuelve a ser el último recurso.
+        """
+        return not self.derivar and not self.causa_confirmada
 
     def a_derivacion(
         self, *, context_ref: str | None = None, resumen_asesor: str | None = None
@@ -207,14 +250,6 @@ def _regla_activa(reglas: ConfiguracionReglas, motivo: MotivoDerivacion) -> bool
     return motivo in activas if activas else True
 
 
-def _pide_humano(utterance_normalizado: str) -> str | None:
-    """Devuelve el patrón que delata la petición explícita de un asesor."""
-    for patron in PATRONES_PETICION_HUMANO:
-        if patron in utterance_normalizado:
-            return patron
-    return None
-
-
 def _intencion_regulatoria(utterance_normalizado: str, reglas: ConfiguracionReglas) -> str | None:
     """Detecta reclamo formal, baja, portabilidad y demás intenciones regulatorias."""
     for intencion in reglas.umbrales_incomprension.intenciones_regulatorias:
@@ -223,16 +258,62 @@ def _intencion_regulatoria(utterance_normalizado: str, reglas: ConfiguracionRegl
     return None
 
 
-def _cobertura(factset: FactSet, confianza_minima: float) -> float:
-    """``s1``: parte del delta total que queda efectivamente explicada."""
+def _esta_desglosada(linea: LineaDelta) -> bool:
+    """Si de esta línea se puede decir **cuánto varió y de qué es**.
+
+    Hacen falta tres cosas y ninguna de ellas es el CRM:
+
+    1. un nombre en lenguaje de cliente (*"Movistar TV Estándar"*), que en el dataset
+       real sale de ``v_concepto_real`` y es el nombre comercial del propio operador;
+    2. los dos importes, el de antes y el de ahora —``delta_cent`` los valida el propio
+       ``LineaDelta``, así que basta con que la línea exista—;
+    3. evidencia citable, porque una cifra que no se puede citar no se puede entregar:
+       el verificador la rechazaría de todas formas.
+    """
+    return bool(linea.nombre_comercial.strip()) and bool(linea.evidencia)
+
+
+def _desglose(factset: FactSet) -> float:
+    """``s1``: parte del delta total que el sistema sabe **desglosar** por línea.
+
+    Es la magnitud que entra en ``U`` porque es la que responde a *"¿puedo explicar este
+    recibo?"*. Un 1.0 significa que cada céntimo de la variación tiene una línea con
+    nombre, importe anterior, importe actual y referencia citable. Lo que **no** afirma
+    es por qué se movió esa línea: eso es :func:`_cobertura_causal`, y va aparte.
+    """
     if factset.delta_total_cent == 0:
         return 1.0
-    explicado = sum(
+    desglosado = sum(
+        abs(linea.delta_cent)
+        for linea in factset.lineas
+        if linea.se_explica and _esta_desglosada(linea)
+    )
+    return min(desglosado / abs(factset.delta_total_cent), 1.0)
+
+
+def _cobertura_causal(factset: FactSet, confianza_minima: float) -> float:
+    """Parte del delta con una causa **confirmada** (orden del CRM o causa oficial).
+
+    **No entra en el score**, y es deliberado. Sin órdenes del CRM esta magnitud vale 0
+    para todas las cuentas del dataset del desafío, y meterla en ``U`` imponía un suelo
+    de ``w1 = 0.40`` a conversaciones perfectamente sanas. Lo que gobierna es otra cosa:
+
+    * la **narrativa** — con cobertura causal baja hay que decir con todas las letras qué
+      no se puede confirmar y por qué, en vez de insinuar una causa;
+    * la **oferta** de asesor como acción sugerida, que el cliente acepta o no;
+    * la **telemetría y la gobernanza**, donde queda registrada la laguna del dato.
+
+    Que el sistema no pueda confirmar el porqué es una limitación del dato disponible, no
+    una incomprensión de la conversación. Confundirlas falseaba la métrica de hand-off.
+    """
+    if factset.delta_total_cent == 0:
+        return 1.0
+    confirmado = sum(
         abs(linea.delta_cent)
         for linea in factset.lineas
         if linea.se_explica and esta_atribuida(linea, confianza_minima)
     )
-    return min(explicado / abs(factset.delta_total_cent), 1.0)
+    return min(confirmado / abs(factset.delta_total_cent), 1.0)
 
 
 def _unicidad(factset: FactSet) -> float:
@@ -250,6 +331,11 @@ def _repregunta(
 
     Por debajo del umbral no penaliza (dos preguntas sobre el recibo se parecen siempre
     un poco); a partir de él, el valor entra tal cual en el score.
+
+    ``historial`` tiene que traer **solo turnos anteriores**: el mensaje de este turno
+    llega por ``utterance`` y aparte. Cuando el llamador incluía también el turno actual,
+    la frase se comparaba consigo misma, ``Jaccard(x, x) = 1.0`` y toda primera pregunta
+    de todo cliente nuevo entraba en el score como si fuera una repregunta.
     """
     previos = [turno for turno in historial if turno.rol == "cliente" and turno.utterance]
     mejor, frase = 0.0, None
@@ -263,14 +349,21 @@ def _repregunta(
 
 
 def _sin_progreso(historial: Sequence[Turno], maximo: int) -> tuple[float, int]:
-    """``s6``: turnos consecutivos del cliente sin que la conversación avance."""
+    """``s6``: turnos del cliente desde la última vez que la conversación avanzó.
+
+    Se cuentan turnos **de cliente**, pero el corte lo marca ``progreso`` en **cualquier
+    rol**, y ahí estaba el fallo: quien sabe si el turno resolvió algo es el asistente
+    —es él quien lo escribe al responder—, y el bucle saltaba los turnos que no eran del
+    cliente *antes* de mirar la bandera. Los turnos de cliente nacen siempre con
+    ``progreso=False``, así que la bandera no se leía nunca y ``s6`` acababa siendo un
+    simple contador de mensajes: subía por hablar, por bien que se hubiera explicado.
+    """
     cuenta = 0
     for turno in reversed(historial):
-        if turno.rol != "cliente":
-            continue
         if turno.progreso:
             break
-        cuenta += 1
+        if turno.rol == "cliente":
+            cuenta += 1
     return (min(cuenta / maximo, 1.0) if maximo > 0 else 0.0), cuenta
 
 
@@ -281,6 +374,7 @@ def evaluar_incomprension(
     *,
     reglas: ConfiguracionReglas | None = None,
     derivado_previamente: bool = False,
+    asesor_en_sala: bool = False,
     conceptos_fuera_catalogo: Sequence[str] | None = None,
 ) -> ResultadoIncomprension:
     """Decide si la conversación debe pasar a un asesor humano (sección 4.8).
@@ -291,24 +385,30 @@ def evaluar_incomprension(
         U = 1 − (w1·s1 + w2·s2 + w3·(1−s3) + w6·(1−s6))
         DERIVAR si U > τ_alto
 
-    Un ``U`` alto significa "el sistema no está entendiendo o no está explicando": poca
-    cobertura del delta, causas dispersas, el cliente repreguntando lo mismo y varios
-    turnos sin avanzar.
+    Un ``U`` alto significa "el sistema no está entendiendo o no está explicando": el
+    delta sin desglosar, causas dispersas, el cliente repreguntando lo mismo y varios
+    turnos sin avanzar. Fíjese en que **ninguna** de las cuatro señales es "el CRM no me
+    dice por qué": esa laguna se mide aparte, en ``cobertura_causal``, y no deriva.
 
     Args:
-        factset: hechos del recibo ya conciliados (aporta ``s1`` y ``s2``).
-        historial_turnos: turnos previos de la conversación (``Turno`` o texto suelto).
+        factset: hechos del recibo ya conciliados (aporta ``s1``, ``s2`` y la cobertura
+            causal).
+        historial_turnos: turnos **previos** de la conversación (``Turno`` o texto
+            suelto). El mensaje de este turno **no** va aquí: va en ``utterance``.
         utterance: mensaje actual del cliente. Entra como **dato**, nunca como
             instrucción, y solo se usa para detección de patrones.
         reglas: configuración; por defecto ``cargar_reglas()``.
-        derivado_previamente: si la conversación ya fue derivada. Con histéresis
-            activada, no se vuelve atrás.
+        derivado_previamente: si la conversación ya fue derivada alguna vez.
+        asesor_en_sala: si una persona real está atendiendo ahora mismo. Es lo que activa
+            la histéresis, no el hecho de haber derivado: mientras nadie haya recogido el
+            expediente no hay conversación humana que proteger, y fijar la derivación por
+            un pico transitorio del score condenaba el resto del diálogo.
         conceptos_fuera_catalogo: conceptos del recibo que el catálogo no conoce
             (los calcula ``diff.comparar_detallado``).
 
     Returns:
-        El veredicto completo, con los cuatro componentes del score, para que la
-        auditoría pueda reconstruir la decisión.
+        El veredicto completo, con los cuatro componentes del score y la cobertura
+        causal, para que la auditoría pueda reconstruir la decisión.
     """
     configuracion = reglas if reglas is not None else cargar_reglas()
     umbrales = configuracion.umbrales_incomprension
@@ -320,7 +420,7 @@ def evaluar_incomprension(
     motivo: MotivoDerivacion | None = None
     senal: str | None = None
 
-    patron = _pide_humano(normalizado) if normalizado else None
+    patron = pide_humano(utterance) if normalizado else None
     if patron and _regla_activa(configuracion, MotivoDerivacion.PETICION_HUMANO):
         reglas_disparadas.append(MotivoDerivacion.PETICION_HUMANO.value)
         motivo = motivo or MotivoDerivacion.PETICION_HUMANO
@@ -356,10 +456,12 @@ def evaluar_incomprension(
         motivo = motivo or MotivoDerivacion.INTENCION_REGULATORIA
         senal = senal or f'intención regulatoria detectada ("{intencion}")'
 
-    s1 = _cobertura(factset, configuracion.confianza.minima_para_explicar)
+    s1 = _desglose(factset)
     s2 = _unicidad(factset)
     s3, frase_repetida = _repregunta(utterance, historial, umbrales.similitud_repregunta)
     s6, turnos_sin_progreso = _sin_progreso(historial, umbrales.max_turnos_sin_progreso)
+    # Fuera del score a propósito: mide la laguna del DATO, no la salud del diálogo.
+    causal = _cobertura_causal(factset, configuracion.confianza.minima_para_explicar)
 
     comprension = pesos.w1 * s1 + pesos.w2 * s2 + pesos.w3 * (1.0 - s3) + pesos.w6 * (1.0 - s6)
     score = min(max(1.0 - comprension, 0.0), 1.0)
@@ -370,7 +472,7 @@ def evaluar_incomprension(
         reglas_disparadas.append(MotivoDerivacion.UMBRAL_INCOMPRENSION.value)
         detalles = []
         if s1 < 1.0:
-            detalles.append(f"solo se explica el {round(s1 * 100)} % de la variación")
+            detalles.append(f"solo se desglosa el {round(s1 * 100)} % de la variación")
         if frase_repetida:
             detalles.append("el cliente repite la misma pregunta")
         if turnos_sin_progreso >= umbrales.max_turnos_sin_progreso:
@@ -379,13 +481,20 @@ def evaluar_incomprension(
         senal = f"umbral de incomprensión superado (U={round(score, 2)} > {umbrales.tau_alto}): "
         senal += motivo_texto
 
+    # La histéresis protege una conversación humana ya empezada, no un número que subió
+    # una vez. Mientras nadie haya recogido el expediente, cada turno se juzga por sus
+    # propios méritos: si la causa de la derivación sigue ahí, la regla dura o el score
+    # volverán a dispararla solos, y si no sigue, no hay nada que fijar. Con
+    # `histeresis_requiere_asesor: false` se recupera el comportamiento antiguo.
     histeresis = derivado_previamente and umbrales.histeresis
+    if histeresis and umbrales.histeresis_requiere_asesor and not asesor_en_sala:
+        histeresis = False
     if histeresis:
         derivar = True
         if "HISTERESIS" not in reglas_disparadas:
             reglas_disparadas.append("HISTERESIS")
         motivo = motivo or MotivoDerivacion.UMBRAL_INCOMPRENSION
-        senal = senal or "la conversación ya había sido derivada a un asesor"
+        senal = senal or "un asesor ya está atendiendo esta conversación"
 
     return ResultadoIncomprension(
         derivar=derivar,
@@ -397,6 +506,7 @@ def evaluar_incomprension(
         s2_unicidad=round(s2, 4),
         s3_repregunta=round(s3, 4),
         s6_sin_progreso=round(s6, 4),
+        cobertura_causal=round(causal, 4),
         tau_alto=umbrales.tau_alto,
         tau_bajo=umbrales.tau_bajo,
         turnos_sin_progreso=turnos_sin_progreso,

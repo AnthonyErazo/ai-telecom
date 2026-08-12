@@ -284,6 +284,12 @@ class Canal(StrEnum):
     BOT = "BOT"
     WHATSAPP = "WHATSAPP"
     ASESOR = "ASESOR"
+    #: Llamada de voz conducida por Gemini Live. Existe como valor propio porque el
+    #: traspaso a un asesor cambia por completo según el canal —en voz hay que resumir
+    #: y enrutar la llamada, no publicar un mensaje— y hasta ahora una consulta hablada
+    #: se auditaba como ``APP``, con lo que la bitácora no distinguía las dos cosas.
+    #: El cliente de Live tiene que declararlo al llamar a ``/v1/explicar``.
+    VOZ = "VOZ"
 
 
 class TipoEvidencia(StrEnum):

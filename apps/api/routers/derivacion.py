@@ -38,7 +38,7 @@ from apps.api.deps import (
     nuevo_trace_id,
 )
 from apps.api.errores import ErrorApi
-from apps.api.routers.hechos import construir_hechos
+from apps.api.routers.hechos import construir_hechos, payload_facts_built
 from apps.api.security import Identidad, cuenta_autorizada, requiere_nivel
 from packages.core_domain.dinero import formatear_soles
 from packages.core_domain.enums import (
@@ -47,6 +47,7 @@ from packages.core_domain.enums import (
     NivelAseguramiento,
 )
 from packages.core_domain.esquemas.factset import FactSet
+from packages.core_domain.esquemas.paquete_asesor import ACCION_PENDIENTE
 from packages.core_domain.esquemas.respuesta import Derivacion, PeticionDerivacion
 from packages.retriever.saneador import sanear
 
@@ -66,32 +67,11 @@ router = APIRouter(prefix="/v1", tags=["derivacion"])
 #: Espacio de nombres para que un mismo turno produzca siempre el mismo ``context_ref``.
 NAMESPACE_CONTEXTO = uuid.UUID("6f1f2f5c-6d5b-5a2f-9d47-2f6c1a0b7e31")
 
-#: Qué tiene que hacer el asesor, por motivo de derivación. Es la línea PENDIENTE del
-#: brief: sin ella el asesor recibe contexto pero no una tarea.
-ACCION_PENDIENTE: dict[MotivoDerivacion, str] = {
-    MotivoDerivacion.PETICION_HUMANO: (
-        "atender la duda concreta del cliente; la explicación del recibo ya se le dio"
-    ),
-    MotivoDerivacion.INVARIANTE_ROTO: (
-        "el recibo no concilia: verificar con facturación ANTES de confirmar cifras"
-    ),
-    MotivoDerivacion.CONCEPTO_FUERA_CATALOGO: (
-        "hay un concepto que el catálogo no reconoce: identificarlo y explicarlo"
-    ),
-    MotivoDerivacion.INTENCION_REGULATORIA: (
-        "tramitar por el canal formal (reclamo, baja o portabilidad), no por facturación"
-    ),
-    MotivoDerivacion.UMBRAL_INCOMPRENSION: (
-        "reexplicar con otras palabras: el cliente repreguntó sin quedar conforme"
-    ),
-    MotivoDerivacion.VERIFICACION_FALLIDA: (
-        "no se pudo sustentar una cifra: recalcular el detalle antes de responder"
-    ),
-    MotivoDerivacion.NIVEL_INSUFICIENTE: (
-        "validar la identidad del cliente para poder darle importes"
-    ),
-}
-
+# ``ACCION_PENDIENTE`` —la tarea del asesor por motivo— se mudó a
+# ``packages.core_domain.esquemas.paquete_asesor``: la usan este endpoint y el brief del
+# paquete del asesor, y dos copias de la misma tabla acabarían diciendo cosas distintas
+# del mismo motivo. Se sigue reexportando desde aquí porque es donde la buscará quien
+# venga leyendo el flujo de derivación.
 
 class RespuestaDerivacion(BaseModel):
     """Lo que devuelve ``POST /v1/derivacion``."""
@@ -299,6 +279,18 @@ def derivar(
         )
         previa = None
 
+    # Los hechos van a la bitácora **también aquí**, aunque el FactSet se reutilice del
+    # turno anterior. Sin este evento, el turno de derivación quedaba registrado con su
+    # motivo y su ``context_ref`` pero sin ni una cifra, y el paquete que el asesor
+    # reconstruye desde la bitácora se quedaba sin desglose: el expediente decía a quién
+    # atender y no qué mirar.
+    auditoria.emitir(
+        EtapaAuditoria.FACTS_BUILT,
+        trace_id,
+        {**payload_facts_built(factset), "reutilizado": previa is not None},
+        **contexto_auditoria,
+    )
+
     if factset.cuenta_id != cuenta:  # defensa en profundidad: nunca se cruzan cuentas
         raise ErrorApi(
             403,
@@ -359,6 +351,9 @@ def derivar(
             "score_incomprension": previa.score_incomprension if previa else None,
             "modo": "DERIVACION_EXPLICITA",
             "context_ref": context_ref,
+            # La misma señal que viaja en la respuesta, para que el paquete del asesor
+            # pueda decir *por qué* llegó a una persona leyendo solo la bitácora.
+            "senal_disparadora": f"peticion_explicita:{peticion.motivo_codigo}",
         },
         **contexto_auditoria,
     )

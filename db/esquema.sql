@@ -175,10 +175,38 @@ COMMENT ON FUNCTION es_referencia_tokenizada(text) IS
 -- recuerde sanear en tiempo de consulta.
 --
 -- DIMENSIÓN DEL EMBEDDING: vector(768), que es el valor por defecto de EMBED_DIM.
--- ⚠️ Cambiar de modelo de embeddings CAMBIA la dimensión y OBLIGA A REINDEXAR: hay
--- que emitir una migración nueva con ALTER TABLE ... ALTER COLUMN embedding TYPE
--- vector(N), recrear los índices HNSW y recalcular todos los vectores. Las columnas
--- `modelo_embedding` y `dim_embedding` existen para detectar vectores obsoletos, y
+-- COMPROBADO contra la API real y contra la base real: `gemini-embedding-001` devuelve
+-- vectores de 768 componentes porque `EMBED_DIM` no está en `.env` y el embedder pide
+-- `output_dimensionality=768`; el typmod de las tres columnas `embedding` es 768. NO
+-- hay desajuste de dimensión y no hay que tocar nada aquí. Se deja escrito porque la
+-- dimensión fue la primera sospechosa del «RAG vacío» y no era: la causa era que nadie
+-- escribía en estas columnas. `gemini-embedding-001` es un modelo MRL (nativo 3072) y
+-- el propio API trunca a la dimensión pedida; `normalizar_vector()` renormaliza después,
+-- que es exactamente lo que Google recomienda al truncar y lo que permite tratar el
+-- coseno como producto escalar.
+-- ⚠️ Cambiar de modelo de embeddings PUEDE cambiar la dimensión y OBLIGA A REINDEXAR.
+-- Si la dimensión cambia hay que emitir una migración nueva con ALTER TABLE ... ALTER
+-- COLUMN embedding TYPE vector(N) y recrear los índices HNSW. Si NO cambia, el DDL se
+-- queda igual pero HAY QUE RECALCULAR TODOS LOS VECTORES IGUAL, y esta es la trampa: dos
+-- modelos de la misma dimensión producen vectores que caben en la misma columna y no
+-- son comparables entre sí. La base los acepta sin rechistar y el error no se manifiesta
+-- como un fallo, sino como resultados peores que nadie sabe explicar.
+--
+-- MODELO EN USO HOY (verificado contra la base el 12/08/2026): `gemini-embedding-2`,
+-- firma `gemini:gemini-embedding-2:768`, en las 662 filas de las tres tablas. Se cambió
+-- desde `gemini-embedding-001` porque la cuota diaria del nivel gratuito es POR MODELO
+-- (1.000 textos/día) y la de `-001` se agotó a mitad de la primera indexación. La
+-- dimensión sigue siendo 768, así que este DDL no se tocó.
+--
+-- Ese cambio dejó, durante unas horas, `casuistica` con vectores de los dos modelos a la
+-- vez (`v_rag_salud.modelos_distintos = 2`). Se resolvió solo, y por diseño: el criterio
+-- de «pendiente» de `scripts/vectorizar_corpus.py` no es «embedding IS NULL» sino
+-- «embedding IS NULL **O** modelo_embedding distinto de la firma actual», de modo que
+-- cambiar de modelo marca como pendiente lo que quedó obsoleto y la siguiente pasada lo
+-- reescribe. Por eso `modelo_embedding` y `dim_embedding` no son metadatos decorativos:
+-- son el mecanismo que hace detectable —y reparable— la mezcla. Las consultas de
+-- similitud filtran además por `modelo_embedding = <firma>`, para que una mezcla en
+-- curso devuelva menos resultados en vez de resultados incomparables.
 -- `db/migrar.py --verificar-dim` compara EMBED_DIM con el typmod real.
 -- =============================================================================
 
@@ -298,10 +326,61 @@ COMMENT ON COLUMN casuistica.firma_causal    IS 'causas ordenadas + modalidad + 
 COMMENT ON COLUMN casuistica.estructura      IS 'Orden de bloques sugerido para la respuesta, p. ej. ["puente", "tabla_tramos", "aviso"].';
 COMMENT ON COLUMN casuistica.texto_saneado   IS 'Narrativa sin cifras concretas. Es la única versión que puede entrar al prompt.';
 
--- Cobertura del índice vectorial, un corpus por fila. Se declara sobre las dos tablas
--- que de verdad se vectorizan: `faq` y `casuistica`. El catálogo de conceptos salió de
--- aquí porque ya no es una tabla —se deriva del propio dataset en `v_concepto_real`— y
--- contarlo como corpus indexable daba una salud falsa.
+-- -----------------------------------------------------------------------------
+-- vocabulario_peruano
+-- -----------------------------------------------------------------------------
+-- Esta tabla EXISTÍA en Supabase con 240 filas y NO estaba declarada en este fichero:
+-- alguien la creó a mano y el esquema dejó de ser la única verdad sin que se notara.
+-- Se declara aquí, tal y como está en la base, para que volver a levantar el proyecto
+-- desde cero reproduzca lo que hay hoy. `CREATE TABLE IF NOT EXISTS` la deja intacta.
+--
+-- Qué es: la jerga con la que un cliente peruano dice las cosas. «Cancelar» en Perú es
+-- PAGAR, no dar de baja; el cliente dice «recibo» y nunca «factura». Lo consume
+-- `packages/facts_engine/jerga.py` para normalizar la pregunta ANTES de clasificar la
+-- intención. Confundir «ya cancelé» con una baja es el error más caro del dominio.
+--
+-- Por qué lleva embedding si no es un corpus del recuperador: las `variantes` son las
+-- formas reales en que se escribe cada término («ya cancele», «cancelé», «cancelado»).
+-- La coincidencia exacta falla con la ortografía real de un chat; la similitud coseno
+-- no. El vector se guarda pegado a la fila por la misma razón que en `faq`: para
+-- filtrar y ordenar en la misma consulta SQL, sin un segundo almacén que sincronizar.
+CREATE TABLE IF NOT EXISTS vocabulario_peruano (
+    termino          text PRIMARY KEY,
+    significa        text        NOT NULL DEFAULT '',
+    concepto_id      text,
+    procedencia      text,
+    nota             text,
+    variantes        text[]      NOT NULL DEFAULT '{}',
+    modelo_embedding text,
+    dim_embedding    integer,
+    embedding        vector(768),
+    actualizado_en   timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT ck_vocabulario_dim CHECK (dim_embedding IS NULL OR dim_embedding = 768)
+);
+
+-- Trigram sobre el término: el cliente escribe sin tildes y con erratas.
+CREATE INDEX IF NOT EXISTS ix_vocab_trgm ON vocabulario_peruano USING gin (termino gin_trgm_ops);
+-- HNSW: faltaba. `faq` y `casuistica` tenían su índice vectorial desde el principio y
+-- esta tabla no, así que su búsqueda por similitud era un recorrido secuencial. Con 240
+-- filas no dolía, pero el plan cambia al crecer y es justo el tipo de deuda que no
+-- avisa.
+CREATE INDEX IF NOT EXISTS ix_vocab_emb_hnsw
+    ON vocabulario_peruano USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
+
+COMMENT ON TABLE  vocabulario_peruano             IS 'Jerga peruana de facturación. Normaliza la pregunta del cliente antes de clasificar la intención.';
+COMMENT ON COLUMN vocabulario_peruano.variantes   IS 'Formas reales de escribir el término, con y sin tilde. Son la señal que recupera el vector.';
+COMMENT ON COLUMN vocabulario_peruano.procedencia IS 'De dónde sale el término: USO_PERUANO, TRANSCRIPCION (del vídeo «Planta»)…';
+
+-- Cobertura del índice vectorial, un corpus por fila. Se declara sobre las TRES tablas
+-- que de verdad se vectorizan: `faq`, `casuistica` y `vocabulario_peruano`. El catálogo
+-- de conceptos salió de aquí porque ya no es una tabla —se deriva del propio dataset en
+-- `v_concepto_real`— y contarlo como corpus indexable daba una salud falsa.
+--
+-- `vocabulario_peruano` se añade porque, mientras no estuvo, la vista decía que el RAG
+-- estaba sano sin mirar 240 de sus 662 documentos. Una métrica de salud que no cubre un
+-- tercio del corpus es peor que ninguna: da confianza falsa.
 CREATE OR REPLACE VIEW v_rag_salud AS
 SELECT 'faq'        AS corpus,
        count(*)                                   AS documentos,
@@ -311,7 +390,11 @@ FROM faq
 UNION ALL
 SELECT 'casuistica',
        count(*), count(embedding), count(DISTINCT modelo_embedding)
-FROM casuistica;
+FROM casuistica
+UNION ALL
+SELECT 'vocabulario_peruano',
+       count(*), count(embedding), count(DISTINCT modelo_embedding)
+FROM vocabulario_peruano;
 
 -- Campos que el corpus de casuísticas necesita y que la primera versión colapsaba en
 -- `narrativa`. Se llaman como en el fichero JSON —`situacion`, `error_frecuente`— para

@@ -285,6 +285,11 @@ class GeminiEmbedder(Embedder):
             raise ErrorEmbedder("GEMINI_API_KEY no está definida")
         self._timeout_ms = int((timeout_s or _TIMEOUT_POR_DEFECTO) * 1000)
         self._cliente: Any | None = None
+        #: Textos que admite una sola petición. ``None`` = todavía no se sabe; se
+        #: descubre en la primera llamada con más de un texto. No se codifica por
+        #: modelo porque el catálogo de Google cambia y una tabla de capacidades
+        #: caducada miente peor que no tener tabla.
+        self.lote_maximo: int | None = None
 
     def firma_modelo(self) -> str:
         """``gemini:<modelo>:<dimension>`` — cambia si cambia el modelo, y obliga a reindexar."""
@@ -329,10 +334,36 @@ class GeminiEmbedder(Embedder):
             vectores.append([float(componente) for componente in valores])
         return vectores
 
-    def incrustar(self, textos: Sequence[str]) -> list[list[float]]:
-        """Vectoriza el lote con la API de Gemini y normaliza los vectores."""
+    def incrustar(
+        self, textos: Sequence[str], *, tipo_tarea: str | None = None
+    ) -> list[list[float]]:
+        """Vectoriza el lote con la API de Gemini y normaliza los vectores.
+
+        Args:
+            textos: lote a vectorizar.
+            tipo_tarea: ``task_type`` de la API. Por defecto ``RETRIEVAL_DOCUMENT``,
+                que es lo correcto al **indexar**. Al buscar debe pasarse
+                ``RETRIEVAL_QUERY``: ``gemini-embedding-001`` es un modelo asimétrico y
+                proyecta pregunta y documento en subespacios distintos a propósito
+                (una pregunta no se parece a su respuesta, la *responde*). Usar el mismo
+                tipo en los dos lados no rompe nada visible —sigue devolviendo un
+                ranking— pero lo empeora en silencio, y un fallo silencioso en la
+                recuperación es exactamente lo que este proyecto quiere evitar.
+
+                Es un parámetro **solo por nombre y opcional**: la interfaz
+                :class:`Embedder` no lo declara, así que añadirlo aquí no rompe a quien
+                llame a ``incrustar(textos)`` sin saber de tipos de tarea.
+        """
         if not textos:
             return []
+        if self.lote_maximo == 1 and len(textos) > 1:
+            # Ya se descubrió que este modelo no agrupa: se va de uno en uno sin volver
+            # a intentar el lote, que solo gastaría una petición para recibir el mismo no.
+            vectores_uno_a_uno: list[list[float]] = []
+            for texto in textos:
+                vectores_uno_a_uno.extend(self.incrustar([texto], tipo_tarea=tipo_tarea))
+            return vectores_uno_a_uno
+
         cliente = self._obtener_cliente()
         try:
             respuesta = cliente.models.embed_content(
@@ -340,17 +371,34 @@ class GeminiEmbedder(Embedder):
                 contents=list(textos),
                 config={
                     "output_dimensionality": self.dimension,
-                    "task_type": "RETRIEVAL_DOCUMENT",
+                    "task_type": tipo_tarea or "RETRIEVAL_DOCUMENT",
                 },
             )
         except Exception as error:  # la causa exacta la aporta el SDK
             raise ErrorEmbedder(f"fallo al pedir embeddings a Gemini: {error}") from error
 
         vectores = self._extraer_vectores(respuesta)
+        if len(vectores) == 1 and len(textos) > 1:
+            # No es un fallo: es un modelo que no agrupa. ``gemini-embedding-2`` acepta
+            # la petición con 16 contenidos, responde 200 y devuelve UN vector —el del
+            # primer texto—. Tratarlo como error dejaría el corpus sin vectorizar; peor
+            # aún, aceptarlo en silencio habría asignado el vector del primer documento
+            # a los otros quince y la búsqueda habría devuelto basura con buena pinta.
+            # Se anota la capacidad real y se reintenta de uno en uno.
+            self.lote_maximo = 1
+            _LOG.warning(
+                "el modelo %s no admite lotes (devolvió 1 vector para %d textos); "
+                "se pasa a una petición por texto",
+                self.modelo,
+                len(textos),
+            )
+            return self.incrustar(textos, tipo_tarea=tipo_tarea)
         if len(vectores) != len(textos):
             raise ErrorEmbedder(
                 f"Gemini devolvió {len(vectores)} vectores para {len(textos)} textos"
             )
+        if self.lote_maximo is None and len(textos) > 1:
+            self.lote_maximo = len(textos)
         for vector in vectores:
             if len(vector) != self.dimension:
                 raise ErrorEmbedder(

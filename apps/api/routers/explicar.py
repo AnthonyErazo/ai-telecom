@@ -134,6 +134,13 @@ __all__ = [
     "router",
 ]
 
+#: Cuánto texto de la respuesta se copia a la bitácora. La auditoría necesita poder
+#: comprobar QUÉ se le dijo al cliente, pero guardar la respuesta íntegra en cada evento
+#: multiplicaría el tamaño de la cadena por poco valor probatorio: con el arranque basta
+#: para identificar la respuesta, y el resto es reconstruible desde el `FactSet` sellado.
+MAX_TEXTO_BITACORA = 2000
+
+
 _LOG = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["explicar"])
@@ -744,6 +751,9 @@ def _explicar_directo(
         peticion.utterance,
         reglas=reglas,
         derivado_previamente=memoria.fue_derivada(clave_conversacion),
+        # La histéresis la activa una persona dentro de la sala, no el recuerdo de un
+        # score que subió una vez.
+        asesor_en_sala=memoria.asesor_presente(clave_conversacion) is not None,
         conceptos_fuera_catalogo=fuera_catalogo,
     )
     auditoria.emitir(
@@ -756,6 +766,11 @@ def _explicar_directo(
             "modo": "SCORE",
             "reglas_disparadas": list(incomprension.reglas_disparadas),
             "senal_disparadora": incomprension.senal_disparadora,
+            # Las dos magnitudes por separado, para que la bitácora del router y la del
+            # grafo sean comparables evento a evento.
+            "desglose": incomprension.s1_cobertura,
+            "cobertura_causal": incomprension.cobertura_causal,
+            "ofrece_asesor": incomprension.ofrecer_asesor,
         },
         **contexto_auditoria,
     )
@@ -902,12 +917,16 @@ def _explicar_directo(
 
     # --- 10. Acciones y respuesta ------------------------------------------ #
     acciones = list(resultado.acciones)
-    if incomprension.derivar and all(
+    # Derivar (el sistema pasa la conversación) y ofrecer (el cliente decide si quiere el
+    # motivo documentado) son cosas distintas, y la segunda es la que evita que la laguna
+    # del CRM se cobre en hand-offs.
+    if (incomprension.derivar or incomprension.ofrecer_asesor) and all(
         accion.id is not AccionSiguiente.DERIVAR_ASESOR for accion in acciones
     ):
         etiqueta, riesgo = ETIQUETAS_ACCION[AccionSiguiente.DERIVAR_ASESOR]
         acciones.insert(
-            0, Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo)
+            0 if incomprension.derivar else len(acciones),
+            Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo),
         )  # type: ignore[arg-type]
     oferta = evaluar_cross_selling(
         factset,
@@ -952,6 +971,10 @@ def _explicar_directo(
             "degradado": degradado,
             "contexto_degradado": bool(contexto.degradado) if contexto else True,
             "score_incomprension": round(incomprension.U, 4),
+            # Un turno resuelto con salvedad causal y uno resuelto con la causa
+            # documentada no pueden verse iguales.
+            "cobertura_causal": incomprension.cobertura_causal,
+            "asesor_ofrecido": incomprension.ofrecer_asesor,
             "cross_selling": oferta.payload.get("regla") if oferta else None,
             "firma_causal": factset.firma_causal(),
         }
@@ -1013,6 +1036,9 @@ def _explicar_directo(
             "explicacion_id": trace_id,
             "context_ref": context_ref,
             "degradado": degradado,
+            # La bitácora conserva lo que se le dijo al cliente, para que el asesor no se
+            # lo repita.
+            "texto_entregado": respuesta.texto[:MAX_TEXTO_BITACORA],
         },
         **contexto_auditoria,
     )
@@ -1120,6 +1146,17 @@ def registrar_expediente_derivacion(
 
     Aquí no hay ``FactSet`` y es correcto: en esta rama no se abrió el recibo. El asesor
     recibe el motivo y lo que dijo el cliente, no cifras que nadie calculó.
+
+    .. warning::
+       Esta función deja el expediente en **memoria**, que es un almacén distinto de la
+       bitácora. Quien la llame tiene que declarar además el ``context_ref`` en el
+       payload de un evento auditado del mismo turno —sus dos llamadores lo hacen en el
+       ``RESPONSE``—, porque ``GET /v1/asesor/paquete/{ref}`` resuelve la referencia con
+       :func:`~packages.governance.paquete_asesor.traza_de_context_ref`, que solo mira
+       los eventos sellados. Sin ese evento el cliente recibe su referencia y el asesor
+       un ``404 CONTEXTO_NO_ENCONTRADO``. No se emite desde aquí a propósito: esta
+       función no recibe el registro de auditoría, y dárselo la convertiría en un segundo
+       sitio donde se escribe la bitácora del turno.
     """
     memoria.guardar_contexto(
         context_ref,
@@ -1282,6 +1319,7 @@ def _responder_por_intencion(
     bloques: list[Bloque] = [BloqueTexto(texto=conversacional.texto)]  # type: ignore[arg-type]
 
     derivacion = Derivacion()
+    context_ref: str | None = None
     if intencion.deriva:
         context_ref = nuevo_context_ref(clave_conversacion, trace_id)
         motivo = _MOTIVO_INTENCION[intencion.intencion]
@@ -1366,6 +1404,13 @@ def _responder_por_intencion(
             "model_version": conversacional.model_version,
             "bloqueado_por_cifras": conversacional.bloqueado_por_cifras,
             "detalle_generacion": conversacional.detalle,
+            # La referencia del expediente va en la bitácora, y no solo en la memoria del
+            # proceso: es lo que hace que `GET /v1/asesor/paquete/{ref}` la encuentre.
+            # `traza_de_context_ref` busca esta clave en los eventos sellados, así que un
+            # expediente que solo viva en `memoria.guardar_contexto()` es un expediente
+            # que el asesor recibe como 404. Las otras dos vías de derivación la declaran
+            # igual, en su ROUTE o en su RESPONSE.
+            "context_ref": context_ref,
         },
         **contexto_auditoria,
     )
@@ -1535,6 +1580,7 @@ def _responder_derivando(
             "latencia_ms": 0,
             "silence_probe_id": str(sonda.silence_probe_id),
             "context_ref": context_ref,
+            "texto_entregado": respuesta.texto[:MAX_TEXTO_BITACORA],
         },
         **contexto_auditoria,
     )

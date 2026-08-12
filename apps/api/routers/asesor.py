@@ -28,6 +28,16 @@ Las tres reglas que ordenan este módulo
 
 3. **Un asesor por sala.** El segundo que intente entrar recibe un conflicto. Dos
    personas escribiendo a la vez al mismo cliente es peor experiencia que una cola.
+
+El paquete de contexto
+----------------------
+La sala resuelve el traspaso **en la App**, donde el asesor entra a la conversación que
+ya está abierta. Los otros dos canales no tienen sala: en WhatsApp el asesor toma el
+número desde otra herramienta y no ve nada de nuestro estado; en voz, recibe una llamada.
+Para los tres hace falta lo mismo —el contenido— y cambia solo el transporte. Eso es
+``GET /v1/asesor/paquete/{context_ref}``: el :class:`PaqueteAsesor`, construido desde la
+bitácora encadenada y con el brief verificado por el mismo verificador numérico que
+protege al cliente. Cómo lo consume cada canal está en ``docs/PAQUETE_ASESOR.md``.
 """
 
 from __future__ import annotations
@@ -37,13 +47,16 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from apps.api.deps import AuditoriaDep, MemoriaDep, nuevo_trace_id
-from apps.api.errores import ErrorApi
+from apps.api.errores import ErrorApi, nivel_insuficiente
 from apps.api.security import Identidad, requiere_nivel
 from packages.core_domain.enums import EtapaAuditoria, NivelAseguramiento
+from packages.core_domain.esquemas.paquete_asesor import PaqueteAsesor
 from packages.facts_engine.confianza import Turno
+from packages.governance.paquete_asesor import construir_paquete_asesor, traza_de_context_ref
 
 __all__ = ["EstadoSala", "MensajeAsesor", "TurnoPublicado", "router"]
 
@@ -112,7 +125,28 @@ class ElementoCola(BaseModel):
 # --------------------------------------------------------------------------- #
 # Ayudas
 # --------------------------------------------------------------------------- #
-_AsesorDep = Annotated[Identidad, Depends(requiere_nivel(NivelAseguramiento.LOA_ASESOR))]
+def _solo_asesor(
+    identidad: Annotated[Identidad, Depends(requiere_nivel(NivelAseguramiento.LOA_ASESOR))],
+) -> Identidad:
+    """Exige que quien llama sea **exactamente** un asesor, no alguien que lo alcanza.
+
+    ``requiere_nivel`` compara por :data:`~apps.api.security.ORDEN_NIVELES`, donde
+    ``LOA_ASESOR`` y ``LOA2`` valen lo mismo —y con razón: un asesor ve lo mismo que el
+    titular, con más deberes—. El efecto colateral es que un token ``LOA2`` del propio
+    cliente *alcanza* el nivel ``LOA_ASESOR`` y entraba en este router.
+
+    Para la sala eso ya era discutible; para el paquete es inaceptable: lleva las
+    confianzas del motor, las hipótesis sin confirmar y la tarea pendiente del asesor.
+    Son notas internas, no información del cliente sobre sí mismo. Aquí se exige el
+    nivel literal, y ``acting_on_behalf_of`` —que ``LOA_ASESOR`` obliga a declarar— es lo
+    que deja registrado en la bitácora a nombre de quién se actuó.
+    """
+    if identidad.acr is not NivelAseguramiento.LOA_ASESOR:
+        raise nivel_insuficiente(identidad.acr, NivelAseguramiento.LOA_ASESOR)
+    return identidad
+
+
+_AsesorDep = Annotated[Identidad, Depends(_solo_asesor)]
 
 
 def _identificador(identidad: Identidad) -> str:
@@ -300,6 +334,144 @@ def salir(
         **identidad.contexto_auditoria(),
     )
     return _sala(memoria, conversation_id)
+
+
+def _paquete_de(
+    auditoria: Any, identidad: Identidad, context_ref: str
+) -> PaqueteAsesor:
+    """Resuelve el ``context_ref`` en la bitácora y arma el paquete del asesor.
+
+    El paso por la bitácora es el punto: la referencia se busca **en los eventos
+    sellados**, no en la memoria del proceso. Si el proceso se reinició, o si quien
+    pregunta es otro nodo del servicio, el paquete sale igual, porque la evidencia está
+    en disco y no en una variable.
+
+    Raises:
+        ErrorApi: ``404`` si ninguna traza declaró esa referencia; ``403`` si el
+            expediente pertenece a otra cuenta que la que el asesor declara atender.
+    """
+    eventos = auditoria.leer()
+    trace_id = traza_de_context_ref(eventos, context_ref)
+    if trace_id is None:
+        raise ErrorApi(
+            codigo="CONTEXTO_NO_ENCONTRADO",
+            detalle=f"ninguna traza auditada declara la referencia {context_ref}",
+            estado=404,
+            datos={"context_ref": context_ref},
+        )
+    cadena_valida, indice_roto = auditoria.verificar_cadena()
+    paquete = construir_paquete_asesor(
+        eventos,
+        trace_id=trace_id,
+        context_ref=context_ref,
+        cadena_valida=cadena_valida,
+        indice_roto=indice_roto,
+    )
+    # Defensa en profundidad, igual que en ``GET /v1/derivacion/{context_ref}``: el
+    # nivel ya limita a asesores, pero un asesor solo atiende la cuenta que declaró en
+    # ``acting_on_behalf_of``. Un intento cruzado tiene que fallar, no colarse.
+    if paquete.cuenta_id and paquete.cuenta_id != identidad.cuenta_ref:
+        raise ErrorApi(
+            codigo="CUENTA_NO_AUTORIZADA",
+            detalle="el expediente pertenece a otra cuenta",
+            estado=403,
+            datos={"context_ref": context_ref},
+        )
+    return paquete
+
+
+@router.get(
+    "/paquete/{context_ref}",
+    response_model=PaqueteAsesor,
+    summary="Paquete de contexto del asesor, reconstruido desde la bitácora",
+    responses={
+        403: {"description": "CUENTA_NO_AUTORIZADA"},
+        404: {"description": "CONTEXTO_NO_ENCONTRADO"},
+    },
+)
+def paquete(
+    context_ref: str,
+    identidad: _AsesorDep,
+    auditoria: AuditoriaDep,
+) -> PaqueteAsesor:
+    """Todo lo que el asesor necesita para retomar el caso **sin que el cliente repita**.
+
+    Es el mismo contenido para los tres canales; lo que cambia es el transporte. Trae el
+    delta y las líneas que lo componen, lo que ya se le dijo al cliente cifra a cifra,
+    **qué no se pudo confirmar y por qué**, el motivo de la derivación y la referencia
+    con la que auditar todo lo anterior.
+
+    El ``brief`` viene ya verificado: ``verificacion_brief.veredicto`` es ``PASS`` solo
+    si cada cifra del texto está respaldada por el paquete. Un consumidor que vaya a
+    mostrar el brief como texto debe mirar ``apto_para_entregar`` antes.
+    """
+    resultado = _paquete_de(auditoria, identidad, context_ref)
+    auditoria.emitir(
+        EtapaAuditoria.ROUTE,
+        nuevo_trace_id(),
+        {
+            "etapa": "asesor",
+            "evento": "PAQUETE_ENTREGADO",
+            # La clave NO es ``context_ref``: ese nombre lo usan los turnos que
+            # **acuñan** un expediente, y este evento solo lo consulta. Mezclarlos hacía
+            # que la búsqueda de la referencia acabara encontrándose a sí misma.
+            "expediente_ref": context_ref,
+            "traza_origen": resultado.evidencia.trace_id,
+            "canal": resultado.canal,
+            "incertidumbres": len(resultado.incertidumbres),
+            "verificacion_brief": str(
+                resultado.verificacion_brief.veredicto if resultado.verificacion_brief else "?"
+            ),
+        },
+        **identidad.contexto_auditoria(),
+    )
+    return resultado
+
+
+@router.get(
+    "/paquete/{context_ref}/texto",
+    response_class=PlainTextResponse,
+    summary="El mismo paquete en texto plano, para canales que solo admiten texto",
+    responses={
+        403: {"description": "CUENTA_NO_AUTORIZADA"},
+        404: {"description": "CONTEXTO_NO_ENCONTRADO"},
+        409: {"description": "BRIEF_NO_VERIFICADO: el brief no pasó el verificador"},
+    },
+)
+def paquete_en_texto(
+    context_ref: str,
+    identidad: _AsesorDep,
+    auditoria: AuditoriaDep,
+) -> str:
+    """El paquete como texto, que es lo único que viaja por WhatsApp o por un SMS.
+
+    Existe para demostrar que el paquete es **canal-agnóstico**: el mismo contenido, sin
+    volver a calcular nada, servido en el formato que el transporte admite.
+
+    Se niega a devolver texto si el brief no pasó el verificador. Un JSON con
+    ``veredicto: FAIL`` es un dato que el consumidor puede interpretar; un texto plano
+    con una cifra sin respaldo es una cifra que un asesor va a leer en voz alta.
+
+    Raises:
+        ErrorApi: ``409`` si el brief no está verificado o la cadena no valida.
+    """
+    resultado = _paquete_de(auditoria, identidad, context_ref)
+    if not resultado.apto_para_entregar:
+        verificacion = resultado.verificacion_brief
+        raise ErrorApi(
+            codigo="BRIEF_NO_VERIFICADO",
+            detalle=(
+                "el brief no puede entregarse como texto: hay cifras sin anclar o la "
+                "cadena de auditoría no valida"
+            ),
+            estado=409,
+            datos={
+                "context_ref": context_ref,
+                "no_ancladas": verificacion.no_ancladas if verificacion else [],
+                "cadena_valida": resultado.evidencia.cadena_valida,
+            },
+        )
+    return resultado.a_texto_plano()
 
 
 @router.get(

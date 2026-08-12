@@ -46,6 +46,8 @@ __all__ = [
     "agregar_causas",
     "confianza_global",
     "construir_factset",
+    "detalle_causas",
+    "detalle_lineas",
     "movimientos_del_ciclo",
     "resumen_de_conciliacion",
     "seleccionar_recibo_previo",
@@ -466,6 +468,53 @@ def construir_factset(
     return factset.sellar()
 
 
+def detalle_lineas(factset: FactSet) -> list[dict[str, object]]:
+    """Las líneas que componen el delta, en la forma que guarda la bitácora.
+
+    Hasta ahora ``FACTS_BUILT`` anotaba *cuántas* líneas había, no *cuáles*. Eso bastaba
+    para auditar la conciliación, pero no para que un asesor retomase el caso leyendo
+    solo la bitácora: le faltaba justo el desglose. Se guarda el mínimo que permite
+    reconstruir el desglose sin recalcular nada —concepto, montos, delta, causa y
+    confianza— y ni un campo más: la bitácora es evidencia, no una copia del FactSet.
+    """
+    return [
+        {
+            "concepto_id": linea.concepto_id,
+            "nombre_comercial": linea.nombre_comercial,
+            "clase": str(linea.clase),
+            "monto_actual_cent": linea.monto_actual_cent,
+            "monto_previo_cent": linea.monto_previo_cent,
+            "delta_cent": linea.delta_cent,
+            "causa": str(linea.causa) if linea.causa else None,
+            "causa_oficial": str(linea.causa_oficial) if linea.causa_oficial else None,
+            "confianza": linea.confianza,
+            "atribuida": esta_atribuida(linea),
+        }
+        for linea in factset.lineas_explicables()
+    ]
+
+
+def detalle_causas(factset: FactSet) -> list[dict[str, object]]:
+    """Las causas agregadas con su importe y su confianza, para la bitácora.
+
+    La confianza por causa es la que decide si el sistema puede afirmar el *porqué* o
+    solo el *cuánto*. Sin ella en la bitácora, el asesor no sabría distinguir una
+    atribución sólida de una hipótesis, que es precisamente lo que tiene que saber.
+    """
+    return [
+        {
+            "etiqueta_cliente": causa.etiqueta_cliente,
+            "causa": str(causa.causa) if causa.causa else None,
+            "causa_oficial": str(causa.causa_oficial) if causa.causa_oficial else None,
+            "monto_cent": causa.monto_cent,
+            "participacion_bp": causa.participacion_bp,
+            "confianza": causa.confianza,
+            "movimientos": list(causa.movimientos),
+        }
+        for causa in factset.causas_agregadas
+    ]
+
+
 def resumen_de_conciliacion(factset: FactSet) -> dict[str, object]:
     """Proyección para el evento ``FACTS_BUILT`` de la auditoría.
 
@@ -485,4 +534,8 @@ def resumen_de_conciliacion(factset: FactSet) -> dict[str, object]:
         "causas": [causa.etiqueta_cliente for causa in factset.causas_agregadas],
         "confianza_global": factset.confianza_global,
         "firma_causal": factset.firma_causal(),
+        # Desglose: sin esto el paquete del asesor tendría que salir de un estado
+        # paralelo al auditado, y ya no podríamos afirmar que ve lo mismo que se auditó.
+        "lineas_delta": detalle_lineas(factset),
+        "causas_detalle": detalle_causas(factset),
     }

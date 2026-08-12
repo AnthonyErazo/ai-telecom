@@ -467,6 +467,7 @@ Se lista aquí y no en letra pequeña. El detalle completo, con riesgos y respon
 | [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) | La tabla que exige BASES §10: herramienta, tipo, versión, licencia, rol exacto, si procesa datos de Movistar y dónde se ejecuta |
 | [`docs/ADR/`](docs/ADR/) | Cuatro decisiones de arquitectura: por qué el recibo no se vectoriza · por qué céntimos enteros · por qué el LLM no calcula · por qué tramos y no fórmulas por escenario |
 | [`docs/ELECCION_DEL_MODELO.md`](docs/ELECCION_DEL_MODELO.md) | Qué modelo generativo conviene y **por qué la elección pesa menos de lo que parece**: precios verificados, coste por explicación, la decisión según se priorice humanización, velocidad, coste o control, y qué invalidaría la recomendación |
+| [`docs/PAQUETE_ASESOR.md`](docs/PAQUETE_ASESOR.md) | El traspaso a una persona: un contenido y tres transportes (App, WhatsApp, voz). Qué recibe el asesor, por qué sale de la bitácora encadenada y no de un estado paralelo, **qué no se pudo confirmar y por qué**, y cómo se verifica el brief con el mismo verificador numérico que protege al cliente |
 | [`docs/ACCESO_SUPABASE.md`](docs/ACCESO_SUPABASE.md) | Cómo dar acceso al equipo: ver las tablas, ejecutar la app contra la base y el rol de solo lectura |
 | [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) | Lo que falta, lo `[POR VALIDAR]` con Movistar y los riesgos abiertos |
 | [`ejemplos/curl.md`](ejemplos/curl.md) | Recorrido completo de la demo, 16 secciones, con los tres clientes de guion |

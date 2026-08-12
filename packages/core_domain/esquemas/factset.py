@@ -169,6 +169,19 @@ class LineaDelta(BaseModel):
         """Las líneas sin variación no se narran."""
         return self.clase is not ClaseDelta.IGUAL
 
+    @property
+    def causa_confirmada(self) -> bool:
+        """Si se sabe **por qué** se movió esta línea, y no solo cuánto.
+
+        Son dos preguntas distintas y el sistema debe poder responder la primera aunque
+        no pueda responder la segunda. Cuánto y de qué línea sale del propio recibo y
+        está siempre; el porqué necesita una orden del CRM (``causa``) o una causa
+        oficial del catálogo (``causa_oficial``), y el dataset del desafío no trae
+        órdenes. Cuando esto vale ``False`` la explicación sigue saliendo, pero tiene
+        que decir con todas las letras qué no se puede confirmar y por qué.
+        """
+        return self.causa is not None or self.causa_oficial is not None
+
 
 class Invariante(BaseModel):
     """Conciliación entre el delta total y la suma de deltas por línea.
@@ -528,6 +541,9 @@ class FactSet(BaseModel):
                     "monto_actual_cent": linea.monto_actual_cent,
                     "monto_previo_cent": linea.monto_previo_cent,
                     "causa": str(linea.causa) if linea.causa else None,
+                    # Va al prompt a propósito: decirle al modelo que el porqué NO está
+                    # confirmado es la mejor defensa contra que se lo invente.
+                    "causa_confirmada": linea.causa_confirmada,
                     "dias_prorrateo": linea.dias_prorrateo,
                     "cuota": (
                         f"{linea.cuota_numero} de {linea.cuotas_totales}"
