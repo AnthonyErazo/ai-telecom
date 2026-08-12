@@ -1195,7 +1195,7 @@ La corrección está identificada con precisión: el generador debe emitir dos e
 y `FIN_DESCUENTO`) en lugar de uno; la atribución debe preferir `FIN_DESCUENTO` para la
 desaparición de un `DESCUENTO_PROMOCIONAL` en vez de heredar la causa del movimiento más cercano;
 y la narrativa debe separar signos. El detalle y la estimación están en
-[`pendientes.md`](pendientes.md) §1, y el riesgo figura como **R-07**.
+[`PROCEDENCIA.md`](PROCEDENCIA.md) §1, y el riesgo figura como **R-07**.
 
 Vale la pena señalar dos cosas. La primera: **la evaluación no lo detectó**, porque el ground
 truth comparte el mismo criterio y `precision_causa_raiz` sale al 100 %. Es la circularidad de la
@@ -1255,7 +1255,7 @@ equipo de facturación, y que en la demo sea el jurado quien elija el caso.
   not in sys.modules: return None`—, de modo que con `ORQUESTADOR=directo` la respuesta correcta
   sigue siendo `404`. El segundo, y es el que más pesa: **`packages/orquestacion/rehidratacion.py`
   no tiene ni una prueba automática**. Ningún fichero de `tests/` lo menciona, y así lo reconoce
-  [`pendientes.md`](pendientes.md) §3.5 —*«sigue sin batería propia `rehidratacion.py`, que hoy
+  [`PROCEDENCIA.md`](PROCEDENCIA.md) §3.5 —*«sigue sin batería propia `rehidratacion.py`, que hoy
   solo está verificado a mano matando el proceso»*—. Las dos garantías que el módulo promete en su
   documentación —que nunca lanza y que no relaja la autorización— se han comprobado a mano, aquí
   incluido, pero **nada rompe la construcción si mañana dejan de cumplirse**.
@@ -1375,7 +1375,7 @@ tabla dice de cuál, para que cualquiera pueda repetirla y contradecirme.
 
 | Afirmación de este documento | Cómo se comprueba |
 |---|---|
-| 105 ficheros Python, 39 281 líneas | `find . -name "*.py" -not -path "./.venv/*" \| wc -l` |
+| 123 ficheros Python, 47 193 líneas | `find . -name "*.py" -not -path "./.venv/*" \| wc -l` |
 | 3 309 líneas de interfaz web | `wc -l apps/web/estatico/*` |
 | 7 tablas SQL | `grep -c "CREATE TABLE IF NOT EXISTS" db/esquema.sql` |
 | 1.511 pruebas pasadas, 62 omitidas | `python -m pytest -q` · los motivos con `-rs` |
@@ -1395,8 +1395,8 @@ tabla dice de cuál, para que cualquiera pueda repetirla y contradecirme.
 ---
 
 **Documentos relacionados:** [`arquitectura.md`](arquitectura.md) para el detalle técnico y el
-posicionamiento en el ecosistema de Movistar · [`pendientes.md`](pendientes.md) para el estado
-completo de riesgos y supuestos abiertos · [`declaracion_herramientas.md`](declaracion_herramientas.md)
+posicionamiento en el ecosistema de Movistar · [`PROCEDENCIA.md`](PROCEDENCIA.md) para el estado
+completo de riesgos y supuestos abiertos · [`PROCEDENCIA.md`](PROCEDENCIA.md)
 para la declaración de herramientas que exigen las BASES · [`COMO_PROBAR.md`](COMO_PROBAR.md)
 para el recorrido de pruebas exhaustivo · [`ADR/`](ADR/) para las decisiones de diseño y sus
 alternativas descartadas.
@@ -1405,8 +1405,8 @@ alternativas descartadas.
 
 ## Procedencia
 
-**Verificado el 8 de agosto de 2026** contra el árbol de trabajo de esa fecha: **39 281 líneas
-de Python en 105 ficheros**, 17 tablas SQL, 3 309 líneas de consola web, `rules_version` **1.0.0**
+**Verificado el 11 de agosto de 2026** contra el árbol de trabajo de esa fecha: **47 193 líneas
+de Python en 123 ficheros**, 7 tablas SQL, 3 309 líneas de consola web, `rules_version` **1.0.0**
 y dataset de semilla **20260804** (300 clientes, 1 800 recibos). Estado de la verificación:
 `pytest` **1.511 superadas y 299 omitidas** sobre 1.810 recogidas, código de salida 0; `make eval`
 **APROBADA** con `TA_respuesta` 0,00 %; `probar_e2e.py` **19/19**. Toda cifra de este documento se

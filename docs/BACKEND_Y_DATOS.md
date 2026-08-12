@@ -9,7 +9,7 @@ qué** cada pieza es como es y qué alternativa se descartó para llegar a ella.
 Documentos hermanos: [`COMO_FUNCIONA.md`](COMO_FUNCIONA.md) cuenta el producto;
 [`arquitectura.md`](arquitectura.md) describe el sistema completo a vista de pájaro;
 [`FUNDAMENTACION.md`](FUNDAMENTACION.md) argumenta las decisiones de alto nivel;
-[`pendientes.md`](pendientes.md) enumera lo que falta y lo que está roto; los [`ADR/`](ADR/)
+[`PROCEDENCIA.md`](PROCEDENCIA.md) enumera lo que falta y lo que está roto; los [`ADR/`](ADR/)
 registran las decisiones una a una. Este documento entra al detalle de firmas, columnas y fórmulas.
 
 **Convención de etiquetado**, la misma que el resto de la documentación del proyecto:
@@ -27,7 +27,7 @@ Nada marcado `[PROPUESTA]` o `[SUPUESTO]` debe leerse como dato de Movistar.
 sobre el árbol de trabajo actual, con la semilla `20260804`. El §13.5 dice qué comando produce cada
 una. Ninguna cifra de aquí es una estimación disfrazada de medición.
 
-Estado verificado ese día: **39 281 líneas de Python en 105 ficheros**, **17 tablas SQL**,
+Estado verificado ese día: **47 193 líneas de Python en 123 ficheros**, **7 tablas SQL**,
 `pytest` en **1 427 pruebas superadas y 299 omitidas**, evaluación **APROBADA** con
 **`TA_respuesta` = 0,00 %** y **`strict answer accuracy` = 100 %** sobre **261 casos golden**.
 
@@ -62,7 +62,7 @@ Recuento de líneas de Python por paquete, obtenido el 8 de agosto de 2026 exclu
 | `scripts/`, `docker/`, `db/migrar.py` | Arranque local, prueba de punta a punta, humo y migrador | 1 820 | 4 |
 | **Suma de la tabla** | | **39 279** | **103** |
 | `apps/__init__.py` y `packages/__init__.py` | Los dos marcadores de paquete de la raíz, una línea cada uno | 2 | 2 |
-| **Total del proyecto** | | **39 281** | **105** |
+| **Total del proyecto** | | **47 193** | **123** |
 
 Las dos últimas filas no son un detalle contable ocioso: sin ellas la tabla no cuadra con el
 inventario, y una tabla que no cuadra es exactamente el defecto que este sistema existe para
@@ -150,7 +150,7 @@ Hay dos aristas que no siguen la regla, y conviene decirlas antes de que las enc
    la misma respuesta, cosa que comprueba `tests/unit/test_grafo.py`. El precio es la arista
    invertida. La forma correcta de arreglarlo es extraer esas funciones a un módulo de casos de uso
    que ambos importen. Conviene ser exacto sobre el estado de esa propuesta: es del equipo
-   `[PROPUESTA]` y **no está anotada en [`pendientes.md`](pendientes.md)** —ni en su §3.5 ni en
+   `[PROPUESTA]` y **no está anotada en [`PROCEDENCIA.md`](PROCEDENCIA.md)** —ni en su §3.5 ni en
    ninguna otra—, de modo que hoy no figura en ninguna lista de trabajo pendiente. Queda dicho aquí
    para que se apunte donde corresponde.
 
@@ -639,7 +639,7 @@ bajo una sola causa, `CAMBIO_PLAN`, porque hay un único movimiento en la ventan
 por sí solo, **hizo bajar el recibo S/ 32.26**; lo que lo subió fue el fin del descuento. La
 evaluación no lo detecta porque el ground truth comparte el mismo criterio: es la circularidad que la
 propia salida de `run_eval` advierte, materializada en un caso concreto. El arreglo está detallado en
-[`pendientes.md`](pendientes.md) §1 —preferir `FIN_DESCUENTO` por regla de concepto, emitir dos
+[`PROCEDENCIA.md`](PROCEDENCIA.md) §1 —preferir `FIN_DESCUENTO` por regla de concepto, emitir dos
 movimientos en el generador y separar signos en la narración— y está estimado en media jornada.
 
 ### 2.5 `invariante.py` — la línea roja
@@ -888,7 +888,7 @@ retroactivo, que es lo que de verdad explica.
 
 ---
 
-## 3. Modelo de datos: las 17 tablas
+## 3. Modelo de datos: el esquema diseñado y las 7 tablas desplegadas
 
 El esquema es **un solo fichero SQL idempotente**, `db/esquema.sql`, 536 líneas, aplicable con
 `make migrate` (que ejecuta `db/migrar.py`). Están escritas a mano y no generadas por un ORM.
@@ -2649,7 +2649,7 @@ proyecto y la ingesta no debería obligar a instalarlo.
 
 Existe además `packages/datagen/mapping/kaggle_map.py`, un segundo adaptador contra un dataset
 público de telecomunicaciones, escrito para demostrar que la frontera funciona con datos que **no**
-fabricó este equipo. Está documentado en [`datasets_externos.md`](datasets_externos.md).
+fabricó este equipo. Está documentado en [`PROCEDENCIA.md`](PROCEDENCIA.md).
 
 ---
 
@@ -2880,7 +2880,7 @@ un respaldo.
 
 **Y un límite que este documento no va a disimular: `rehidratacion.py` no tiene ni una prueba
 automática.** Ningún fichero de `tests/` menciona el módulo —`grep -rl rehidrat tests/` no devuelve
-nada— y [`pendientes.md`](pendientes.md) §3.5 lo declara con todas las letras: *«sigue sin batería
+nada— y [`PROCEDENCIA.md`](PROCEDENCIA.md) §3.5 lo declara con todas las letras: *«sigue sin batería
 propia `rehidratacion.py`, que hoy solo está verificado a mano matando el proceso»*. Las dos
 garantías de arriba se han comprobado a mano —la comprobación del 8 de agosto está en la tabla de
 esta misma sección, con `403` incluido para otra cuenta—, pero **nada rompe la construcción el día
@@ -3151,7 +3151,7 @@ dos declaraciones diverjan.
 
 Los parámetros marcados `[POR VALIDAR]` y `[SUPUESTO]` son exactamente cinco, y ninguno está
 enterrado en el código. La lista completa de preguntas abiertas a Movistar está en
-[`pendientes.md`](pendientes.md) §2, e incluye además los dos interruptores del ACL
+[`PROCEDENCIA.md`](PROCEDENCIA.md) §2, e incluye además los dos interruptores del ACL
 (`IMPORTES_EN_CENTIMOS` y `FIN_CICLO_INCLUSIVO_EN_ORIGEN`) y una pregunta que puede cambiar el
 diseño: **si BrainyBill expone `period_from` y `period_to` por línea**. Sin ese campo el prorrateo no
 es reconstruible con certeza y hay que resolverlo por inversión.
@@ -3824,7 +3824,7 @@ restart api`.**
 
 | Cifra | Comando |
 |---|---|
-| 39 281 líneas de Python en 105 ficheros | Recuento sobre `**/*.py` excluyendo `.venv` y `__pycache__` |
+| 47 193 líneas de Python en 123 ficheros | Recuento sobre `**/*.py` excluyendo `.venv` y `__pycache__` |
 | 7 tablas SQL | `grep -c "CREATE TABLE IF NOT EXISTS" db/esquema.sql` |
 | 1 427 pruebas superadas, 299 omitidas | `python -m pytest -p no:warnings -v` |
 | `TA_respuesta` 0,00 %, 100 % strict answer accuracy, 261 casos | `python -m eval.run_eval` |
@@ -3846,7 +3846,7 @@ restart api`.**
 ## 14. Lo que este documento no oculta
 
 Un documento técnico que solo enumera aciertos no es verificable. Estos son los límites conocidos
-del backend a 8 de agosto de 2026, todos con su detalle en [`pendientes.md`](pendientes.md):
+del backend a 8 de agosto de 2026, todos con su detalle en [`PROCEDENCIA.md`](PROCEDENCIA.md):
 
 1. **La atribución causal en escenarios compuestos es engañosa** (§2.4). En `C-DEMO-01` el sistema
    agrega bajo «cambio de plan» un delta cuya causa real es el fin de un descuento. Aritmética
@@ -3880,8 +3880,8 @@ estar anclada en el `FactSet`—, y por eso están aquí y no escondidos.
 
 ## Procedencia
 
-**Verificado el 8 de agosto de 2026** contra el árbol de trabajo de esa fecha: **39 281 líneas de
-Python en 105 ficheros**, **17 tablas SQL** (13 + 3 + 1) en 1 147 líneas de migración,
+**Verificado el 11 de agosto de 2026** contra el árbol de trabajo de esa fecha: **47 193 líneas de
+Python en 123 ficheros**, **7 tablas SQL** en 550 líneas de esquema,
 `db/reglas/rules.yaml` con 558 líneas y 31 conceptos, 3 309 líneas de consola web, `rules_version`
 **1.0.0** y dataset de semilla **20260804**. Estado de la verificación: `pytest` **1 427 superadas
 y 299 omitidas** sobre 1 726 recogidas, código de salida 0 —las 299 omisiones son 261 por *«sin

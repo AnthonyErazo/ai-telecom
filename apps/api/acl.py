@@ -15,8 +15,7 @@ Piezas
   :class:`~packages.core_domain.esquemas.recibo.Recibo`.
 * :class:`AdaptadorAmdocs` — filas del export de órdenes →
   :class:`~packages.core_domain.esquemas.movimiento.MovementEvent`, delegando la tabla
-  de columnas y de tipos en ``packages.datagen.mapping.movistar_map``, que es *el único
-  archivo que cambia cuando llegue el dataset real*.
+  de columnas y de tipos en ``packages.datagen.mapping.movistar_map``.
 * :class:`RepositorioCuentas` — fachada que junta ambos y entrega lo que el motor pide.
 
 Interruptores documentados (no adivinados)
@@ -443,9 +442,13 @@ class AdaptadorAmdocs:
     """Traduce el historial de órdenes de Amdocs (CRM) a ``MovementEvent``.
 
     La tabla de columnas (``ORDER_ID``, ``ORDER_TYPE``…) y la de tipos de orden viven en
-    ``packages.datagen.mapping.movistar_map``, no aquí: ese es el archivo que se toca
-    cuando llegue el export real. Este adaptador solo decide de dónde vienen las filas y
-    qué hacer con las que no se entienden.
+    ``packages.datagen.mapping.movistar_map``, no aquí. Este adaptador solo decide de
+    dónde vienen las filas y qué hacer con las que no se entienden.
+
+    El dataset del desafío **no trae órdenes de CRM**: son 297 002 líneas de cargo, sin
+    historial de movimientos. Así que este adaptador sigue leyendo el export de Amdocs, y
+    cuando no hay ninguno la atribución causal se apoya solo en las reglas de concepto y
+    lo declara con menos confianza. Es lo correcto: inventar una orden sería peor.
 
     Contrato del origen::
 

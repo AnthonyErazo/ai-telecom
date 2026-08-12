@@ -64,7 +64,7 @@ proceso las borra todas.** Consecuencias medibles, cada una con su línea:
 - La histéresis se pierde: `fue_derivada` vuelve a `False` y **una conversación ya derivada puede
   reentrar al flujo normal**.
 
-Está declarado como riesgo **R-03** en `pendientes.md` y como punto de rotura nº 2 del
+Está declarado como riesgo **R-03** en `PROCEDENCIA.md` y como punto de rotura nº 2 del
 dimensionamiento (`arquitectura.md` §10). Con varias réplicas el defecto no necesita ni un
 reinicio: basta con que el balanceador mande el segundo turno a otra réplica.
 
@@ -198,7 +198,7 @@ Transitivas que arrastran, todas permisivas y también verificadas por metadatos
 `ormsgpack` 1.12.2 (Apache-2.0 OR MIT), `aiosqlite` 0.22.1 (MIT), `sqlite-vec` 0.1.9 (MIT/Apache-2.0),
 `xxhash` 3.5.0 (BSD), `jsonpatch` 1.33 (BSD), `tenacity` 9.1.2 (Apache-2.0), `uuid-utils` 0.17.0 (BSD-3).
 **Ninguna GPL ni AGPL**, en coherencia con el criterio ya declarado en
-`declaracion_herramientas.md` §2.
+`PROCEDENCIA.md`
 
 ### Lo que se excluye deliberadamente
 
@@ -264,7 +264,7 @@ Lo que se compra a cambio:
   imagen; la política de retención **sigue sin definirse**.
 - **SQLite es de un nodo.** Resuelve el reinicio y la evidencia; **no** resuelve por sí solo el
   multi-réplica salvo sobre volumen compartido. Para varias réplicas, el mismo grafo apunta a un
-  checkpointer PostgreSQL sin tocar los nodos. Ver `pendientes.md`.
+  checkpointer PostgreSQL sin tocar los nodos. Ver `PROCEDENCIA.md`.
 
 ---
 
@@ -324,8 +324,8 @@ python -c "from packages.orquestacion.telemetria_externa import telemetria_exter
 - `packages/llm_layer/providers/base.py:226` — `ProveedorLLM`, protocolo `runtime_checkable` de dos miembros donde se enchufa el adaptador
 - `packages/llm_layer/providers/langchain_.py` — `LangChainProvider`, el adaptador
 - `docs/arquitectura.md` §5 — el grafo y el estado persistente
-- `docs/declaracion_herramientas.md` §2 — declaración de licencias exigida por BASES §10
-- `docs/pendientes.md` §3.4 y riesgo R-03 — lo que queda abierto
+- `docs/PROCEDENCIA.md` §2 — declaración de licencias exigida por BASES §10
+- `docs/PROCEDENCIA.md` §3.4 y riesgo R-03 — lo que queda abierto
 - ADR [001](001-el-recibo-no-se-vectoriza.md), [002](002-montos-en-centimos-enteros.md),
   [003](003-el-llm-no-calcula.md), [004](004-modelo-de-tramos.md) — lo que esta decisión
   deliberadamente no toca

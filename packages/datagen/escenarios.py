@@ -35,7 +35,7 @@ Procedencia del catálogo comercial
 ----------------------------------
 Los nombres y los precios de los planes, paquetes y bonos **no son inventados**: son
 los del catálogo oficial de ofertas que Movistar entregó para la Hackathon AI Telecom
-2026 (fichero ``catalogo_ofertas_entrega.csv``, veintidós ofertas ``OF001``–``OF022``).
+2026, con los nombres comerciales y los importes medidos sobre el dataset del Desafío 1.
 La propia ficha declara ese catálogo ficticio y creado para la hackaton, así que los
 nombres comerciales y los precios pueden reproducirse; el fichero, no. Aquí solo vive
 el **vocabulario**, transcrito a mano y con los importes convertidos a céntimos
@@ -141,13 +141,11 @@ CANALES_ORDEN: tuple[str, ...] = ("APP", "WEB", "TIENDA", "CALL_CENTER", "WHATSA
 # --------------------------------------------------------------------------- #
 # Perfil comercial del cliente — vocabulario del dataset real de Movistar
 # --------------------------------------------------------------------------- #
-# Los cuatro vocabularios que siguen reproducen, valor por valor, las columnas
-# ``tipo_cliente``, ``edad_rango``, ``ubicacion_departamento`` y ``canal_mas_usado`` de
-# ``dataset_clientes.csv``, el dataset que Movistar entregó para el Desafío 2 de la
-# Hackathon AI Telecom 2026 (cien mil clientes, veinticuatro columnas). Se transcribe el
-# **vocabulario**, jamás el fichero: la cláusula 9 de las bases impone diez años de
-# confidencialidad sobre los datos entregados, así que ningún CSV de Movistar entra en
-# este repositorio.
+# Los cuatro vocabularios que siguen son genéricos y públicos: la dicotomía
+# postpago/prepago, los rangos de edad al uso y los veinticinco departamentos del Perú.
+# No proceden de ningún fichero entregado por Movistar, y por eso pueden estar aquí: la
+# cláusula 9 de las bases impone diez años de confidencialidad sobre los datos entregados,
+# así que ningún CSV de Movistar entra en este repositorio.
 #
 # Por qué están aquí y no en `rules.yaml`: no son reglas de cálculo. Ninguno de estos
 # campos toca un importe. Sirven para personalizar el trato —a un prepago no se le habla
@@ -180,29 +178,75 @@ DEPARTAMENTOS: tuple[str, ...] = (
 #: ``canal_mas_usado`` del dataset real: por dónde prefiere resolver este cliente.
 CANALES_CLIENTE: tuple[str, ...] = ("Digital", "Tienda", "Call In", "Call Out")
 
-#: Planes móviles ``OF001``–``OF004`` del catálogo oficial: (nombre, tarifa mensual en
-#: céntimos). En orden ascendente de precio, que es lo que hace realista un cambio de
-#: plan: se sube un escalón (``OF001 → OF002``) o se baja uno (``OF003 → OF002``).
+#: Planes móviles del **dataset del Desafío 1**, con el importe medio medido sobre
+#: ``cargo_facturado`` (4 336 apariciones el más común). En orden ascendente de precio, que es
+#: lo que hace realista un cambio de plan: se sube un escalón o se baja uno.
+#:
+#: Antes esto reproducía el catálogo ``OF001``–``OF022`` del **Desafío 2**, de cuando el
+#: generador se construyó sin dataset propio. Ya no hace falta y además era una fuente de
+#: datos que la declaración de procedencia no debía tener que justificar: los nombres reales
+#: están en el dataset de este desafío, y son los que el cliente ve en su recibo.
 PLANES_MOVIL: tuple[tuple[str, Centimos], ...] = (
-    ("Plan Movil Basico 10GB", 3990),
-    ("Plan Movil Plus 25GB", 5990),
-    ("Plan Movil Max 50GB", 7990),
-    ("Plan Movil Ilimitado", 9990),
+    ("Plan Ahorro Mi Movistar S/20.9", 1980),
+    ("Plan Ahorro Mi Movistar S/25.9", 2272),
+    ("Plan Mi Movistar S/29.9", 2764),
+    ("Plan Mi Movistar S/31.9", 2846),
 )
 
-#: Planes de internet fijo ``OF005``–``OF006``. Son los dos únicos de internet a secas
-#: del catálogo: el salto entre ambos es el que la oferta ``OF013`` llama "Upgrade
-#: Velocidad Hogar". Los paquetes ``OF008``–``OF010`` quedan fuera a propósito porque
-#: incluyen televisión y telefonía fija, que aquí se facturan en su propia línea.
+#: Canales por los que entra una orden en Amdocs. Es el vocabulario del **sistema de
+#: órdenes**, no el del perfil comercial del cliente: son dos cosas distintas y se
+#: mantienen separadas (véase :data:`CANALES_CLIENTE`).
+CANALES_ORDEN: tuple[str, ...] = ("APP", "WEB", "TIENDA", "CALL_CENTER", "WHATSAPP")
+
+# --------------------------------------------------------------------------- #
+# Perfil comercial del cliente — vocabulario del dataset real de Movistar
+# --------------------------------------------------------------------------- #
+# Los cuatro vocabularios que siguen son genéricos y públicos: la dicotomía
+# postpago/prepago, los rangos de edad al uso y los veinticinco departamentos del Perú.
+# No proceden de ningún fichero entregado por Movistar, y por eso pueden estar aquí: la
+# cláusula 9 de las bases impone diez años de confidencialidad sobre los datos entregados,
+# así que ningún CSV de Movistar entra en este repositorio.
+#
+# Por qué están aquí y no en `rules.yaml`: no son reglas de cálculo. Ninguno de estos
+# campos toca un importe. Sirven para personalizar el trato —a un prepago no se le habla
+# de "su recibo mensual", a quien resuelve todo por la app no se le ofrece ir a una
+# tienda— y para que, el día que llegue un export real, el perfil encaje sin traducir.
+#
+# Cuidado al narrarlos: ``edad_rango`` es el único que lleva dígitos. "18-25" no produce
+# ninguna aserción numérica (el guion bloquea la extracción), pero "65+" sí extraería un
+# 65 suelto. Estos campos viajan en la metainformación del recibo, no en el texto.
+
+#: ``tipo_cliente`` del dataset real.
+TIPOS_CLIENTE: tuple[str, ...] = ("postpago", "prepago")
+
+#: ``edad_rango`` del dataset real.
+EDADES_RANGO: tuple[str, ...] = ("18-25", "26-35", "36-45", "46-55", "56-65", "65+")
+
+#: ``ubicacion_departamento`` del dataset real (ocho departamentos más "Otro").
+DEPARTAMENTOS: tuple[str, ...] = (
+    "Lima",
+    "Arequipa",
+    "La Libertad",
+    "Piura",
+    "Lambayeque",
+    "Cusco",
+    "Junin",
+    "Ica",
+    "Otro",
+)
+
+#: Internet fijo. Dos escalones, para que el cambio de velocidad sea un escenario posible.
+#: Los paquetes con televisión y telefonía quedan fuera a propósito: aquí se facturan en su
+#: propia línea.
 PLANES_HOGAR: tuple[tuple[str, Centimos], ...] = (
     ("Internet Hogar 100Mb", 8990),
     ("Internet Hogar 200Mb", 10990),
 )
 
-#: Televisión ``OF007``. El catálogo solo trae una oferta de TV suelta.
+#: Televisión suelta, una sola oferta.
 PLANES_TV: tuple[tuple[str, Centimos], ...] = (("TV Hogar Sola", 6990),)
 
-#: Paquetes convergentes Movistar Total ``OF020``–``OF022``.
+#: Paquetes convergentes Movistar Total.
 PLANES_TOTAL: tuple[tuple[str, Centimos], ...] = (
     ("Movistar Total Basico", 14990),
     ("Movistar Total Plus", 18990),
@@ -220,7 +264,7 @@ EQUIPOS: tuple[tuple[str, Centimos], ...] = (
 )
 
 #: Paquetes de compra puntual: (concepto_id, nombre, importe). El roaming es la oferta
-#: ``OF019`` del catálogo oficial. Las bolsas de datos no tienen equivalente en ese
+#: Bolsas de datos. No tienen equivalente en el catálogo del propio dataset, así que el
 #: catálogo —solo cubre altas comerciales, no recargas—, así que conservan un nombre
 #: genérico y sin números; no son un plan, son una compra suelta dentro del ciclo.
 PAQUETES_UNICOS: tuple[tuple[str, str, Centimos], ...] = (
@@ -230,7 +274,7 @@ PAQUETES_UNICOS: tuple[tuple[str, str, Centimos], ...] = (
     ("PAQUETE_ROAMING", "Paquete Roaming Internacional", 2990),
 )
 
-#: Paquetes recurrentes que se dan de alta a mitad de ciclo: ``OF017`` y ``OF018``.
+#: Paquetes recurrentes que se dan de alta a mitad de ciclo.
 PAQUETES_RECURRENTES: tuple[tuple[str, str, Centimos], ...] = (
     ("PAQUETE_TV_PREMIUM", "Paquete Streaming Video", 1990),
     ("SERVICIO_ADICIONAL_SEGURO", "Paquete Seguridad Digital", 1290),

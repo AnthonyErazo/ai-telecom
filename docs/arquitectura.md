@@ -394,14 +394,14 @@ checkpointer, el estado, el apagado de telemetría y el adaptador de proveedor;
 **no está escrito el grafo** (`packages/orquestacion/grafo.py` no existe) ni su
 enganche con el ciclo de vida de la API. El diagrama de §5.1 describe el destino, no lo que hoy
 ejecuta el endpoint. Ver [`ADR/005`](ADR/005-langgraph-para-la-orquestacion.md) y
-[`pendientes.md`](pendientes.md) §3.5.
+[`PROCEDENCIA.md`](PROCEDENCIA.md) §3.5.
 
 **Ninguna dependencia con licencia restringida entra por esta puerta.** `langgraph`,
 `langgraph-checkpoint`, `langgraph-checkpoint-sqlite` y `langchain-core` son MIT, verificado
 leyendo el `LICENSE` de cada paquete instalado. Se excluyen `langgraph-api`, `langgraph-cli` y el
 **servicio** LangSmith, con el tracing apagado por variable de entorno y comprobado con un
 cortafuegos de sockets. El detalle está en
-[`declaracion_herramientas.md`](declaracion_herramientas.md) §2.1 y §2.2.
+[`PROCEDENCIA.md`](PROCEDENCIA.md) §2.1 y §2.2.
 
 ---
 
@@ -764,7 +764,7 @@ volumen, es la exactitud**.
 | # | Se rompe | Mitigación | Estado |
 |---|---|---|---|
 | 1 | **La cuota del proveedor generativo.** A 3× se pega contra el límite de peticiones por minuto antes que contra la CPU | **La degradación a plantilla determinística.** Bajo presión el sistema deja de llamar al modelo y responde con plantilla: mismas cifras del `FactSet`, misma exactitud, menos naturalidad. Es el amortiguador natural del pico | ✅ implementado en `packages/llm_layer/generador.py`. `[POR VALIDAR]` la cuota real |
-| 2 | **La memoria de conversación**, un LRU de 512 entradas en el proceso | **Implementado:** checkpointer persistente de LangGraph con `thread_id = conversation_id` ([`ADR/005`](ADR/005-langgraph-para-la-orquestacion.md), §5.2). `ORQUESTADOR=grafo` es el valor por defecto (`apps/api/settings.py:162`) y el arranque publica `checkpoints: {'tipo': 'SqliteSaver', 'persistente': True}`. Para varias réplicas, el mismo grafo apunta a un checkpointer PostgreSQL sin tocar los nodos | ✅ implementado y por defecto: `packages/orquestacion/checkpointer.py` (SQLite en `data/checkpoints/turnos.sqlite`), con `tests/integracion/test_rehidratacion.py` cruzando la frontera del disco en un proceso nuevo. 🟡 **queda abierto el multi-réplica**: SQLite es de un nodo — riesgo R-03 de [`pendientes.md`](pendientes.md) |
+| 2 | **La memoria de conversación**, un LRU de 512 entradas en el proceso | **Implementado:** checkpointer persistente de LangGraph con `thread_id = conversation_id` ([`ADR/005`](ADR/005-langgraph-para-la-orquestacion.md), §5.2). `ORQUESTADOR=grafo` es el valor por defecto (`apps/api/settings.py:162`) y el arranque publica `checkpoints: {'tipo': 'SqliteSaver', 'persistente': True}`. Para varias réplicas, el mismo grafo apunta a un checkpointer PostgreSQL sin tocar los nodos | ✅ implementado y por defecto: `packages/orquestacion/checkpointer.py` (SQLite en `data/checkpoints/turnos.sqlite`), con `tests/integracion/test_rehidratacion.py` cruzando la frontera del disco en un proceso nuevo. 🟡 **queda abierto el multi-réplica**: SQLite es de un nodo — riesgo R-03 de [`PROCEDENCIA.md`](PROCEDENCIA.md) |
 | 3 | **BrainyBill y Amdocs.** Cada turno hace dos llamadas; el pico se les traslada íntegro | Caché por `(cuenta_id, periodo)` con TTL corto: el recibo de un mes cerrado **no cambia**, así que es cacheable sin riesgo de servir dato viejo | ⛔ **no implementado.** `[POR VALIDAR]` su capacidad y sus límites |
 | 4 | Caché de arquetipo narrativo para ahorrar llamadas al modelo — la clave sería `causas + signo + banda de monto + producto + modalidad + verbosidad + versiones`, **sin montos**, precisamente porque el modelo genera la forma y el código inyecta las cifras | Reduciría la dependencia del proveedor por debajo del 20 % de los turnos | ⛔ **no implementado.** `[PROPUESTA]` para la siguiente fase |
 | 5 | El arranque en frío de las réplicas nuevas | Ya resuelto: el `lifespan` de `apps/api/main.py` construye reglas, corpus e índice **antes** de aceptar tráfico. Ninguna petición paga la construcción de un índice | ✅ implementado |
@@ -854,5 +854,5 @@ entre ambas, en vez de un número optimista.
 | [004](ADR/004-modelo-de-tramos.md) | Un modelo de tramos, no una fórmula por escenario |
 | [005](ADR/005-langgraph-para-la-orquestacion.md) | LangGraph orquesta y persiste el estado; no calcula ni verifica |
 
-Pendientes, supuestos abiertos y riesgos: [`pendientes.md`](pendientes.md).
-Declaración de herramientas exigida por BASES §10: [`declaracion_herramientas.md`](declaracion_herramientas.md).
+Pendientes, supuestos abiertos y riesgos: [`PROCEDENCIA.md`](PROCEDENCIA.md).
+Declaración de herramientas exigida por BASES §10: [`PROCEDENCIA.md`](PROCEDENCIA.md).

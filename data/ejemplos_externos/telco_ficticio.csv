@@ -1,0 +1,16 @@
+customerID,tenure,MonthlyCharges,TotalCharges,Contract,PaymentMethod,PhoneService,InternetService,Churn
+FIC-0001,34,56.95,1889.50,One year,Mailed check,Yes,DSL,No
+FIC-0002,2,53.85,108.15,Month-to-month,Mailed check,Yes,DSL,Yes
+FIC-0003,45,42.30,1840.75,One year,Bank transfer,No,DSL,No
+FIC-0004,8,70.70,565.60,Month-to-month,Electronic check,Yes,Fiber optic,Yes
+FIC-0005,22,89.10,1960.20,Month-to-month,Electronic check,Yes,Fiber optic,No
+FIC-0006,71,29.75,2112.25,Two year,Credit card,Yes,No,No
+FIC-0007,10,55.20,552.00,Month-to-month,Mailed check,Yes,DSL,No
+FIC-0008,62,99.65,6178.30,Two year,Bank transfer,Yes,Fiber optic,No
+FIC-0009,1,45.30,45.30,Month-to-month,Electronic check,Yes,DSL,Yes
+FIC-0010,38,74.40,2827.20,One year,Credit card,Yes,Fiber optic,No
+FIC-0011,16,20.15,322.40,Month-to-month,Mailed check,Yes,No,No
+FIC-0012,55,105.50,5802.50,Two year,Bank transfer,Yes,Fiber optic,No
+FIC-0013,4,80.85,323.40,Month-to-month,Electronic check,Yes,Fiber optic,Yes
+FIC-0014,29,60.05,1741.45,One year,Credit card,Yes,DSL,No
+FIC-0015,48,35.60,1708.80,Two year,Mailed check,No,DSL,No

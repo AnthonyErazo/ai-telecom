@@ -266,6 +266,9 @@ class ConfiguracionReglas(BaseModel):
     ruta_origen: str | None = Field(default=None, description="Fichero del que se cargó")
 
     _indice: dict[str, ConceptoCatalogo] = PrivateAttr(default_factory=dict)
+    #: Códigos que trae el dataset oficial. Existen pero no tienen ficha; ver
+    #: :meth:`registrar_conceptos_del_dataset`.
+    _del_dataset: set[str] = PrivateAttr(default_factory=set)
 
     @model_validator(mode="after")
     def _indexar_y_propagar(self) -> Self:
@@ -313,7 +316,33 @@ class ConfiguracionReglas(BaseModel):
 
     def existe_concepto(self, concepto_id: str) -> bool:
         """Un concepto fuera de catálogo es una **regla dura de derivación**."""
-        return concepto_id in self._indice
+        return concepto_id in self._indice or concepto_id in self._del_dataset
+
+    def registrar_conceptos_del_dataset(self, ids: set[str]) -> int:
+        """Declara los ``concepto_id`` que trae el dataset oficial. Devuelve cuántos hay.
+
+        Por qué existe este método
+        --------------------------
+        ``rules.yaml`` cataloga los conceptos que el equipo **modeló**: los treinta y uno
+        con su definición, su familia y sus causas permitidas. El dataset del desafío trae
+        setecientos treinta y dos códigos reales que nadie modeló a mano y que no podrían
+        estarlo: son el catálogo del facturador, no el nuestro.
+
+        Sin esto, la regla dura ``CONCEPTO_FUERA_CATALOGO`` derivaba a un asesor **toda**
+        cuenta real, porque ningún código del dataset estaba en ``rules.yaml``. El
+        asistente se negaba a explicar precisamente los recibos para los que se construyó.
+
+        Lo que NO cambia
+        ----------------
+        Un concepto registrado aquí existe, pero **no tiene ficha**: ``concepto()`` sigue
+        devolviendo ``None`` y ``causas_permitidas()`` sigue vacío. Es deliberado. Que el
+        facturador emita un código no significa que sepamos qué causa lo mueve, y fingir
+        una ficha que no tenemos convertiría una laguna declarada en una invención
+        silenciosa. La atribución causal se apoya entonces en las reglas de familia y lo
+        declara con menos confianza, que es lo correcto.
+        """
+        self._del_dataset = set(ids)
+        return len(self._del_dataset)
 
     def concepto_ids(self) -> set[str]:
         """Todos los ``concepto_id`` del catálogo."""

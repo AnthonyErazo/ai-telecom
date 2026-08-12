@@ -1,14 +1,11 @@
-# Declaración de herramientas, APIs, datasets y servicios de terceros
+# Procedencia: datos, herramientas y lo que queda abierto
 
-**Obligación de origen** `[CONFIRMADO-OFICIAL]` — BASES, sección 10 «Uso de herramientas de IA generativa»:
+> **Qué es este documento.** La declaración que exigen las BASES §9 y §10: qué inteligencia
+> artificial se usa, con qué licencias, sobre qué datos, y qué sigue sin resolverse. Sustituye
+> a `PROCEDENCIA.md`, `PROCEDENCIA.md` y `PROCEDENCIA.md`, que decían lo
+> mismo repartido en tres sitios y en 797 líneas.
 
-> «Se permite el uso de herramientas de desarrollo, plataformas low-code/no-code y herramientas de inteligencia artificial generativa. El uso de inteligencia artificial deberá ser declarado, especificando las herramientas utilizadas y su rol en la solución. El uso de datasets, API o servicios de terceros deberá ser declarado.»
-
-Y BASES, sección 9:
-
-> «Los participantes garantizan que los contenidos presentados son originales. Todo uso de herramientas de terceros (IA generativa, API, open source o datasets) debe cumplir estrictamente con sus respectivas licencias, sin vulnerar derechos de propiedad intelectual ajenos.»
-
-Todo lo que sigue es la declaración del equipo `[PROPUESTA]`, salvo las citas marcadas.
+**Verificado el 11 de agosto de 2026** contra el árbol de trabajo y contra la base de datos.
 
 ---
 
@@ -30,6 +27,9 @@ Todo lo que sigue es la declaración del equipo `[PROPUESTA]`, salvo las citas m
 | # | Herramienta | Rol | ¿Forma parte del sistema en ejecución? |
 |---|---|---|---|
 | 7 | Asistentes de IA generativa de propósito general | Apoyo a la programación, a la redacción de documentación y al análisis de los documentos del desafío | **No.** No intervienen en ninguna respuesta al cliente ni en ningún cálculo |
+
+---
+
 
 ---
 
@@ -128,36 +128,154 @@ Deben fijarse **antes** de importar `langgraph` o `langchain_core`: `langsmith.u
 
 ---
 
-## 3. Datasets
 
-| Dataset | Origen | Licencia | Contenido | Uso |
+---
+
+## 3. Datos: las cuatro fuentes, y ninguna más
+
+El sistema se alimenta de cuatro cosas. No hay una quinta.
+
+| # | Fuente | Procedencia | Licencia / términos | Qué aporta |
 |---|---|---|---|---|
-| **Dataset sintético propio** | Generado por `packages/datagen` con semilla fija (`DEMO_SEED=20260804`) | Original del equipo; ninguna licencia de terceros | 300 cuentas ficticias, recibo actual + 5 previos, historial de órdenes, catálogo de conceptos, FAQs y casuísticas | **Único dataset usado para calcular, demostrar y evaluar.** No contiene ningún dato personal ni real. Identificadores del tipo `C-00001`, sin DNI ni teléfono |
-| **CSV de ejemplo del adaptador de ensayo** (`data/ejemplos_externos/telco_ficticio.csv`) | **Inventado a mano por el equipo.** No se descargó de ninguna parte | Original del equipo; ninguna licencia de terceros | 15 filas con el **esquema típico** de los datasets públicos de fuga de clientes (identificador, antigüedad, cargo mensual, cargo total, contrato, método de pago, servicios) | Permite probar `packages/datagen/mapping/kaggle_map.py` **sin conexión y sin cuenta en ninguna plataforma**. Único archivo versionado bajo `data/` junto al `README.md`. **No alimenta la demo ni la evaluación** |
-| **Datasets públicos de telecomunicaciones** (p. ej. los de fuga de clientes) | Repositorios públicos de terceros | — | — | **NO SE USA NINGUNO.** No se ha descargado, inspeccionado ni incorporado ninguno. Razón técnica: tienen **una fila agregada por cliente** y carecen de líneas de recibo, de seis recibos por cliente y de historial de órdenes, por lo que **no permiten construir un solo `FactSet`**. Razonamiento completo en [`docs/datasets_externos.md`](datasets_externos.md) |
-| **Dataset del Desafío 2 entregado por Movistar** (`dataset_clientes`, `catalogo_ofertas_entrega`, `historial_campanias`, `diccionario_datos_participantes`) | **Entregado por la organización.** Es de otro desafío, pero es lo único real que se ha recibido | Términos de la Hackathon — **confidencialidad de 10 años, BASES §9** | 100 000 clientes ficticios · 22 ofertas con nombre comercial y precio · 300 112 ofrecimientos · el diccionario oficial campo por campo | **Se usa su vocabulario y su catálogo; no sus datos.** Del catálogo se adoptan los **nombres comerciales y los precios** —la propia ficha los declara ficticios y creados para la hackatón— y del `dataset_clientes` los **valores admisibles** de `tipo_cliente`, `edad_rango`, `ubicacion_departamento` y `canal_mas_usado`, para que el generador sintético hable el idioma real de Movistar. **Ninguna fila, ningún identificador de cliente y ningún fichero se han incorporado al repositorio**; los CSV y XLSX se leen desde su ruta original, fuera del árbol del proyecto. Ver §3.1 |
-| **Dataset oficial del Desafío 1** | Pendiente de entrega por la organización | Términos de la Hackathon (BASES §9) | — | **Aún no recibido.** Cuando llegue se integrará exclusivamente a través de `packages/datagen/mapping/movistar_map.py`. Quedará sujeto a la obligación de confidencialidad de 10 años de BASES §9 y **no se incorporará al repositorio** |
+| 1 | **Dataset del Desafío 1** (carpeta `desafio1`) | Entregado por la organización | Hackathon — confidencialidad de 10 años, BASES §9 | **La fuente de la demo y de la evaluación.** 297 002 líneas de cargo · 98 389 recibos · 18 471 cuentas · 732 códigos, más 20 000 cuentas de planta |
+| 2 | **Datos que genera este sistema** | `packages/datagen`, semilla fija `DEMO_SEED=20260804` | Original del equipo | Recibos sintéticos con ground truth escrito en el mismo acto. Sirven para las pruebas golden, no para demostrar exactitud sobre datos reales |
+| 3 | **Corpus de FAQs** | Corpus público de atención al cliente, traducido a español peruano | Permisiva (ver §3.1) | 400 preguntas frecuentes en la tabla `faq` de Supabase |
+| 4 | **Catálogo de conceptos: la jerga peruana** | Transcripción de los vídeos del desafío, uso documentado y aportación del equipo | Original del equipo | 240 términos en `vocabulario_peruano`. Es lo que permite que «me tumbaron la señal» o «pásame con un pata» se entiendan |
 
-### 3.1 El dataset del Desafío 2: qué se tomó y qué se dejó fuera
+**Ningún fichero del dataset se versiona.** `data/` está en `.gitignore` y los CSV se leen desde
+su ruta original, fuera del árbol del proyecto. La confidencialidad de diez años de BASES §9 se
+cumple por construcción: al repositorio viaja el esquema, nunca las filas.
 
-`[CONFIRMADO-OFICIAL]` BASES §9: la información proporcionada por Movistar «tendrá carácter confidencial y no podrá ser divulgada […] durante 10 años posterior a la finalización de la Hackathon». **Esa obligación se aplica aquí en su forma más estricta: ningún fichero entregado por Movistar entra en el repositorio, ni siquiera para pruebas, ni siquiera recortado.**
+No se usa **ningún dataset público de terceros**. No se ha descargado, inspeccionado ni
+incorporado ninguno; el razonamiento está en la sección siguiente.
 
-La regla operativa que se siguió, y que debe seguir cualquiera que retome el proyecto:
+### 3.1 De dónde salen las FAQs, exactamente
 
-| | Qué |
+No existe corpus de atención al cliente de telecomunicaciones **en español** con licencia
+utilizable. El único del dominio está bajo GPL-3.0, que BASES §9 prohíbe al ceder la propiedad
+intelectual a Integratel. Se partió de un corpus permisivo en inglés y se tradujo a español
+peruano —«recibo», nunca «factura»; trato de usted— con el propio modelo. Cada fila traducida
+queda marcada con `traducida = true`: nadie debe poder confundir una FAQ traducida con una
+pregunta recogida en Perú.
+
+### 3.2 El catálogo del Desafío 2 se retiró
+
+Hasta el 11 de agosto, `packages/datagen/escenarios.py` conservaba el catálogo comercial
+`OF001`–`OF022` transcrito del **Desafío 2**, de cuando el generador sintético se construyó
+antes de que llegara el dataset de este desafío. Ya no está: los planes del generador son
+ahora nombres reales del **Desafío 1**, con el importe medio medido sobre `cargo_facturado`.
+
+| Plan | Importe medido | Apariciones en el dataset |
+|---|---|---|
+| Plan Ahorro Mi Movistar S/20.9 | S/ 19.80 | 667 |
+| Plan Ahorro Mi Movistar S/25.9 | S/ 22.72 | 2 095 |
+| Plan Mi Movistar S/29.9 | S/ 27.64 | 4 336 |
+| Plan Mi Movistar S/31.9 | S/ 28.46 | 623 |
+
+Los otros vocabularios de ese fichero —«postpago/prepago», los rangos de edad y los
+veinticinco departamentos del Perú— son genéricos y públicos: no proceden de ningún fichero
+entregado por Movistar.
+
+**Del Desafío 2 no queda nada.** Las cuatro fuentes de la tabla anterior son las únicas.
+
+## Por qué no se usa ningún dataset público
+
+**No se usa ningún dataset público de terceros como fuente de datos de facturación.** El
+único dataset del proyecto es el sintético propio, generado por `packages/datagen` con semilla
+fija (`DEMO_SEED=20260804`), cuyo *ground truth* es exacto por construcción.
+
+Esta decisión no es una preferencia: es una consecuencia de mirar qué hay disponible.
+
+### 1.1 Qué hay realmente en los datasets públicos de telecomunicaciones
+
+Los datasets públicos de telecomunicaciones disponibles son, casi sin excepción, **datasets de
+fuga de clientes** (*churn prediction*). Su forma es siempre la misma:
+
+- **una fila por cliente**, no por recibo ni por línea de recibo;
+- **variables agregadas**: identificador de cliente, antigüedad en meses, cargo mensual, cargo
+  total acumulado, tipo de contrato, servicios contratados, método de pago, y una etiqueta de
+  si el cliente se fue o no;
+- pensados para entrenar un clasificador binario, que es un problema **completamente distinto**
+  del nuestro.
+
+### 1.2 Qué les falta, y es exactamente lo que este proyecto necesita
+
+| Lo que el proyecto necesita | ¿Está en un dataset público de fuga? |
 |---|---|
-| **Se toma** | El **vocabulario**: los valores admisibles de `tipo_cliente` (postpago, prepago), `edad_rango`, `ubicacion_departamento` y `canal_mas_usado`. Y el **catálogo comercial**: los 22 nombres de oferta `OF001`–`OF022` con su precio mensual |
-| **Por qué se puede** | La ficha del desafío declara ese catálogo **ficticio y creado para la hackatón**. Un nombre de plan y su tarifa de lista no son información confidencial de cliente; son el idioma en el que un recibo de Movistar está escrito, y sin él la explicación suena a laboratorio |
-| **No se toma** | Ninguna fila de `dataset_clientes.csv` ni de `historial_campanias.csv`; ningún `cliente_id` del tipo `CLI000001`; ningún campo de comportamiento (consumo, mora, reclamos, contactabilidad, medio probatorio) |
-| **No se copia** | **Ningún fichero.** Ni CSV, ni XLSX, ni el DOCX del diccionario. Cuando hubo que leerlos se leyeron **desde su ruta original**, fuera del árbol del proyecto |
+| Líneas de recibo por concepto (renta, prorrateo, descuento, IGV…) | **No.** Hay un único importe agregado |
+| Seis recibos por cliente (actual + cinco previos) | **No.** Hay una sola fila por cliente |
+| Historial de órdenes (cambio de plan, suspensión, reconexión, alta de paquete) | **No.** No hay eventos, solo el estado final |
+| Fechas de ciclo, emisión y vencimiento | **No** |
+| Modalidad de renta (adelantada / vencida) y convención de prorrateo | **No.** Esa distinción no existe en el dominio del *churn* |
+| Notas de crédito y débito, ajustes por días de suspensión | **No** |
+| **Variación entre un mes y el anterior** | **No.** Y esta es la definitiva |
 
-**Comprobado, no supuesto** (8 de agosto de 2026). Se comparó por **md5** cada uno de los 514 ficheros del repositorio contra los 8 del dataset —**cero coincidencias**— y se buscó por **contenido**: las cabeceras literales de los tres CSV y el patrón `CLI\d{6}` de identificador de cliente. Ninguna aparece en ningún fichero del repositorio. Las únicas apariciones de la cadena `OF0nn` son referencias a los códigos de oferta en tres ficheros de documentación y en el comentario de procedencia de `packages/datagen/escenarios.py`, que es exactamente lo que esta declaración describe.
+La ficha del Desafío 1 pide `[CONFIRMADO-OFICIAL]` *«analizar recibo actual + previos →
+identificar causas más probables de variación»*, y las nueve causas oficiales del desafío
+(cambio de plan, equipo financiado, compra de paquetes, cargos adicionales, promociones
+vencidas, notas de crédito/débito, prorrateos, reconexiones y ajustes por días de suspensión)
+son todas **diferencias entre dos documentos**.
 
-Donde se ve el resultado: `packages/datagen/escenarios.py` (constantes `PLANES_MOVIL`, `PLANES_HOGAR`, `PLANES_TV`, `PLANES_TOTAL`, `PAQUETES_*`, con el precio en céntimos enteros y el código `OFnnn` en el comentario) y `packages/datagen/generar.py` (`_perfil_comercial`). Los 300 recibos sintéticos usan **13 de las 22 ofertas** y **ningún nombre de plan fuera del catálogo**.
+**Con una sola fila agregada por cliente no se puede construir ni un solo `FactSet`**, porque
+no hay nada que diferenciar entre meses. No es que el dato sea de peor calidad: es que el dato
+que hace falta no está. Usar uno de estos datasets como fuente obligaría a inventar los seis
+recibos, el desglose por concepto y el historial de órdenes; es decir, a inventar precisamente
+aquello que el sistema tiene que explicar. El resultado sería un dataset **peor** que el
+sintético propio —sin *ground truth* exacto— con la apariencia engañosa de ser «datos reales».
 
-**Adaptador de ensayo `packages/datagen/mapping/kaggle_map.py`** `[PROPUESTA]` — ingiere el esquema tabular típico de los datasets públicos de fuga y sintetiza cuentas canónicas para demostrar que el *anti-corruption layer* funciona contra un esquema ajeno. **Advertencia metodológica declarada:** los recibos que produce son **parcialmente sintéticos** (el cargo mensual y la antigüedad vendrían del dataset; el desglose por concepto, las fechas de ciclo y los movimientos los sintetiza el equipo) y por tanto **sirven para ejercitar la ingesta, no para validar la exactitud del motor**. Cada cuenta producida lleva su procedencia campo por campo (`DATASET_EXTERNO` / `DERIVADO_DEL_DATASET` / `SINTETIZADO_POR_EL_EQUIPO`).
+### 1.3 Y una razón de fondo
 
-**Compromiso si algún día se usara un dataset de terceros** `[PROPUESTA]` — se declararía aquí con nombre, autor, URL, versión y **licencia literal**; se verificaría que permite uso comercial y obras derivadas (BASES §9 prevé la cesión de derechos de PI a Integratel, incompatible con licencias no comerciales); se comprobaría la ausencia de datos personales; no se versionaría; y sus datos no entrarían en ninguna métrica de exactitud. La lista de comprobación completa está en [`docs/datasets_externos.md`](datasets_externos.md) §4.2.
+La ficha del Desafío 1 dice `[CONFIRMADO-OFICIAL]` que se compartirá una *«base sintética/
+ficticia (Dummy Data) […] sin PII real»* y un *«dataset simplificado que simule la factura
+actual y CINCO recibos previos, con inyección de variaciones»*. El dataset del desafío es, por
+diseño, sintético. Sustituirlo por un dataset público de otro problema no aportaría realismo:
+aportaría ruido.
+
+---
+
+---
+
+## Parámetros por validar con Movistar
+
+Ninguno está enterrado en el código: todos viven en `db/reglas/rules.yaml` o en `.env`, y la
+`rules_version` viaja dentro de cada respuesta.
+
+| Parámetro | Dónde vive | Valor actual | Qué preguntar |
+|---|---|---|---|
+| `cobro_en_suspension` | `rules.yaml` | `false` | ¿Se cobra la renta durante los días de suspensión por deuda? |
+| `convencion_prorrateo` | `rules.yaml` | `actual` | ¿Actual/actual o 30/360? **Se implementan ambas**; se elige la que cierra el invariante |
+| `cargo_reconexion_cent` | `rules.yaml` | `2500` | ¿Importe vigente del cargo de reconexión? Hoy es un `[SUPUESTO]` |
+| `dias_gracia_suspension` | `rules.yaml` | `15` | ¿Días antes de suspender por deuda? `[SUPUESTO]` |
+| `igv_bp` | `rules.yaml` | `1800` | IGV al 18 %. ¿Hay conceptos exentos que el catálogo no marca? |
+| `IMPORTES_EN_CENTIMOS` | `apps/api/acl.py` | `True` | ¿BrainyBill entrega céntimos enteros o soles decimales? |
+| `FIN_CICLO_INCLUSIVO_EN_ORIGEN` | `apps/api/acl.py` | `False` | ¿El fin de ciclo del origen es inclusivo? Si lo fuera, **todos** los prorrateos se desplazan un día |
+| Campos de BrainyBill por línea | ACL | supuestos | ¿Expone `period_from` y `period_to` **por línea**? Sin ese campo el prorrateo no es reconstruible con certeza y hay que resolverlo por inversión |
+| Modalidad de renta predominante | — | ambas soportadas | ¿Cuál predomina en la planta B2C? |
+| `GEMINI_MODEL` / `GEMINI_EMBED_MODEL` | `.env` | vacíos | **No se fija ningún identificador de modelo en el código.** Debe verificarse el vigente en la documentación de Google |
+| «~1 millón de transacciones» de explicación en la App | ficha | asumido mensual | La ficha no declara el periodo. Afecta el dimensionamiento del pico 3× |
+| Reclamo formal | — | no implementado | ¿La disconformidad con el monto expresada en el chat obliga a abrir reclamo formal bajo el reglamento OSIPTEL vigente? |
+| Correspondencia canal → nivel de aseguramiento | `apps/api/security.py` | `[PROPUESTA]` | ¿WhatsApp con verificación adicional alcanza LOA2? Es configuración del emisor de tokens, no código |
+
+---
+
+---
+
+## Riesgos abiertos
+
+Numerados para poder citarlos desde el resto de la documentación. **R-01** («el
+dataset oficial no llega») y **R-02** («llega con esquema incompatible») se cerraron el 10 de agosto:
+llegó, se ingirió y las 297 002 filas concilian.
+
+| # | Riesgo | Severidad | Mitigación actual | Pendiente |
+|---|---|---|---|---|
+| **R-03** | **Memoria de conversación en el proceso** — **reducido.** `GET /v1/evidencia/{id}` ya sobrevive al reinicio; el historial de turnos y la histéresis de derivación, todavía no | Media | Un solo trabajador por contenedor, para no fragmentarla en silencio dentro de una réplica. El checkpointer está enganchado al ciclo de vida y el endpoint delega en el grafo ([`ADR/005`](ADR/005-langgraph-para-la-orquestacion.md)) | Leer el historial y `fue_derivada` desde el checkpoint en vez de desde RAM; índice inverso `explicacion_id → thread_id` para no depender de un barrido acotado; y checkpointer PostgreSQL para el multi-réplica —SQLite es de un nodo— |
+| **R-09** | **Dependencia de un framework de terceros en el camino de una respuesta al cliente** | Baja | Los nodos solo **llaman** a funciones ya probadas: si LangGraph estorbara, se retira la capa de coordinación y el motor sigue calculando igual. Cuatro paquetes MIT, con `langgraph-api`, `langgraph-cli` y el servicio LangSmith excluidos, y el tracing apagado y comprobado con un cortafuegos de sockets | Rangos ya fijados en `pyproject.toml` (extra `[orquestacion]`). Sigue faltando el test de `tracing_is_enabled() is False` (§3.5) |
+| **R-04** | **La circularidad de la evaluación** — ground truth y sistema comparten autor | Alta | Declarada en la salida de `run_eval`, en el README y en el pitch. En la demo se cede al jurado la elección del caso. La §1 de este documento es la prueba de que la advertencia no es retórica | Casos golden redactados por facturación |
+| **R-05** | **Cuota o latencia del proveedor generativo durante la demo** | Media | `LLM_MODE=mock` corre sin red y es determinístico; la degradación a plantilla está implementada y anunciada con `X-Degradado`. Al menos uno de los ensayos debe hacerse en ese modo | Confirmar cuota real |
+| **R-06** | **Fuga de datos de Movistar al repositorio** | Crítica | Repositorio privado; `data/` en `.gitignore` **y** en `.dockerignore`; la imagen no lleva datos. Confidencialidad de 10 años según BASES §9 | Revisión antes de cualquier publicación |
+| **R-07** | **Narrativa causal engañosa** en escenarios compuestos — **cerrado el 8 de agosto de 2026** | Alta → **Baja residual** | Corregido en los cuatro frentes y protegido por regresión: `preferencia_causa` en `rules.yaml`, causas agregadas separadas por signo, `tests/golden/test_atribucion_causal.py` y los casos `G35`–`G38`, uno de ellos **inverso** para que la corrección no se pase de frenada. `precision_causa_raiz` = 100 % (391/391) sobre una verdad ya corregida | Lo residual es genérico y no tiene arreglo interno: **un escenario compuesto que el generador no imagine puede volver a producir una narrativa engañosa sin romper ninguna métrica**. Solo lo cierra el ground truth de facturación (R-04). `precision_causa_raiz` **no** entra en `InformeEvaluacion.aprobado`: decidir si debe (§1.1) |
+| **R-08** | **Elegibilidad del equipo** | Fatal | Verificar que los 4 integrantes se inscribieron individualmente antes del 30 de julio, que el equipo es mixto y tiene ≥2 carreras distintas | **No tiene arreglo posterior** |
+
 
 ---
 
@@ -182,7 +300,7 @@ Donde se ve el resultado: `packages/datagen/escenarios.py` (constantes `PLANES_M
 Medidas adoptadas `[PROPUESTA]`:
 
 - **Repositorio privado desde el primer commit.**
-- `data/` está en `.gitignore`. Ningún archivo proporcionado por Movistar se versiona, **ni siquiera el ficticio**. Del dataset del Desafío 2 se tomaron **solo el vocabulario y el catálogo comercial**, y la ausencia de cualquier fichero suyo en el árbol se verificó por md5 y por contenido (§3.1).
+- `data/` está en `.gitignore`. Ningún archivo proporcionado por Movistar se versiona, **ni siquiera el ficticio**. Del Desafío 2 no queda nada en el árbol de trabajo: el catálogo comercial que se le había tomado se sustituyó por los nombres reales del Desafío 1 (§3.2).
 - Todo el código es original del equipo. No se ha incorporado ningún repositorio de terceros más allá de las bibliotecas declaradas en la sección 2, todas instaladas por gestor de paquetes y sin modificar.
 - Se descarta cualquier dependencia con licencia copyleft fuerte o no comercial.
 - El modelo generativo se consume por API; **no se redistribuye ningún peso de modelo**.

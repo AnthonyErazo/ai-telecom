@@ -87,3 +87,8 @@ desktop.ini
 *.orig
 *.rej
 *.bak
+
+# Documentación generada: se reconstruye con `python scripts/publicar_docs.py`.
+# Es 1,5 MB derivados de los .md, y versionarla haría que cada cambio de una frase
+# apareciera como un diff de miles de líneas.
+docs/sitio/

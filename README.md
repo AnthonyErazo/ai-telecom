@@ -125,7 +125,7 @@ PostgreSQL levantado).
 **Y una métrica al 100 % puede convivir con un defecto de producto.** Lo encontramos leyendo el
 texto generado, no mirando la tabla: en `C-DEMO-01` la explicación atribuye toda la subida al
 cambio de plan cuando el cambio de plan, en realidad, **abarató** el recibo. Está documentado
-con su corrección en [`docs/pendientes.md`](docs/pendientes.md) §1. Preferimos enseñarlo a que
+con su corrección en [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) §1. Preferimos enseñarlo a que
 lo encuentre el jurado.
 
 ---
@@ -387,7 +387,7 @@ Estado: ✅ implementado y verificado · 🟡 parcial (se dice hasta dónde) · 
 | 12 | **«Efecto efervescente»**: *«cerrar la interacción recordando proactivamente el diferencial comercial y los beneficios con los que YA CUENTA el cliente en su plan actual, SIN presentarlos como adiciones nuevas»* | ✅ | `efecto_efervescente` en `rules.yaml` (frase de apertura, máx. 2 beneficios) + macro `cierre` en `packages/llm_layer/plantillas/_comun.jinja` |
 | 13 | **«Cross-selling restrictivo»**: *«activado única y exclusivamente si el modelo clasifica la consulta original como RESUELTA POSITIVAMENTE y existe una REGLA DE NEGOCIO EXPLÍCITA que lo habilite»* | ✅ | Doble condición implementada en `evaluar_cross_selling(…, resuelta, derivar)`; guardas adicionales en `rules.yaml`: prohibido si hay derivación, si el delta es negativo o si la confianza < 0.90 |
 | 14 | *«dar pase al asesor humano con contexto si no logra resolver la duda, siempre con 0 % de alucinaciones»* | ✅ | `packages/llm_layer/verificador.py` bloquea y deriva; medido como `TA_respuesta = 0` en `make eval` |
-| 15 | *«uso responsable de IA, protección de datos y autenticación para el acceso a información sensible»* | ✅ | `apps/api/security.py` (JWT HS256, matriz de niveles, `redactar_para_nivel`); `docs/declaracion_herramientas.md`; `data/` fuera del control de versiones |
+| 15 | *«uso responsable de IA, protección de datos y autenticación para el acceso a información sensible»* | ✅ | `apps/api/security.py` (JWT HS256, matriz de niveles, `redactar_para_nivel`); `docs/PROCEDENCIA.md`; `data/` fuera del control de versiones |
 
 ### 6.2 Métricas e indicadores (ficha §«Indicadores»)
 
@@ -434,7 +434,7 @@ Comprobación en `ejemplos/curl.md` §10 y en `tests/contract/test_respuestas_ap
 
 | # | Requisito literal | Estado | Dónde está |
 |---|---|---|---|
-| 32 | *«El uso de IA deberá ser declarado, especificando herramientas y su rol en la solución»* | ✅ | [`docs/declaracion_herramientas.md`](docs/declaracion_herramientas.md) |
+| 32 | *«El uso de IA deberá ser declarado, especificando herramientas y su rol en la solución»* | ✅ | [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) |
 | 33 | *«El uso de datasets, API o servicios de terceros deberá ser declarado»* | ✅ | Misma tabla, con columna de licencia real y de si procesa datos de Movistar |
 | 34 | *«Todo uso de terceros … debe cumplir estrictamente sus licencias»* | ✅ | Solo licencias permisivas (MIT / Apache-2.0 / BSD / PSF / PostgreSQL). **Ninguna GPL/AGPL.** Declaradas una por una en `pyproject.toml` y en la declaración de herramientas |
 | 35 | *«la información, datos y archivos proporcionados por Movistar son confidenciales y no divulgables»* (10 años) | ✅ | `data/*` en `.gitignore` y en `.dockerignore`; `data/README.md` explica por qué el directorio está vacío; **ningún dato de Movistar entra al repositorio ni a la imagen** |
@@ -444,11 +444,11 @@ Comprobación en `ejemplos/curl.md` §10 y en `tests/contract/test_respuestas_ap
 ## 7. Lo que NO está hecho
 
 Se lista aquí y no en letra pequeña. El detalle completo, con riesgos y responsables, está en
-[`docs/pendientes.md`](docs/pendientes.md).
+[`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md).
 
 | Falta | Por qué | Impacto |
 |---|---|---|
-| **Corregir la atribución causal en escenarios compuestos** ← *el defecto que sí duele* | El generador y el motor etiquetan **todos** los deltas de un escenario con su causa principal | En `C-DEMO-01` la aritmética es exacta (residual 0, `PASS`) pero la narrativa dice *«subió porque cambió de plan»* cuando el cambio de plan le **ahorró S/ 32.26**: lo que subió el recibo fue el fin del descuento. Diagnóstico completo y plan de corrección en [`docs/pendientes.md`](docs/pendientes.md) §1, riesgo **R-07**. **Media jornada de trabajo** |
+| **Corregir la atribución causal en escenarios compuestos** ← *el defecto que sí duele* | El generador y el motor etiquetan **todos** los deltas de un escenario con su causa principal | En `C-DEMO-01` la aritmética es exacta (residual 0, `PASS`) pero la narrativa dice *«subió porque cambió de plan»* cuando el cambio de plan le **ahorró S/ 32.26**: lo que subió el recibo fue el fin del descuento. Diagnóstico completo y plan de corrección en [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) §1, riesgo **R-07**. **Media jornada de trabajo** |
 | **Interfaz gráfica** (App / Bot / WhatsApp) | Excluida del alcance por decisión del equipo: el valor está en el motor y en la garantía numérica, no en pintar bloques | La demo se hace con `curl` y con `/docs`. Los bloques tipados están listos para consumir |
 | **Integración con el sistema facturador** | Sin contrato publicado; el recibo ya llega por BrainyBill | Ninguno para el prototipo; sería trabajo de ACL |
 | **Catálogo comercial real** para el cross-selling | No forma parte de los datos del Desafío 1 | La acción `VER_ALTERNATIVAS` se emite sin oferta concreta; la doble condición sí está implementada |
@@ -464,11 +464,11 @@ Se lista aquí y no en letra pequeña. El detalle completo, con riesgos y respon
 | Documento | Qué contiene |
 |---|---|
 | [`docs/arquitectura.md`](docs/arquitectura.md) | Diagramas de contexto, flujo y secuencia; el ACL; el posicionamiento como *skill* del Bot Lucía; niveles por canal; dimensionamiento del pico 3× con el cálculo a la vista; separación tabular vs. vectorial del RAG |
-| [`docs/declaracion_herramientas.md`](docs/declaracion_herramientas.md) | La tabla que exige BASES §10: herramienta, tipo, versión, licencia, rol exacto, si procesa datos de Movistar y dónde se ejecuta |
+| [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) | La tabla que exige BASES §10: herramienta, tipo, versión, licencia, rol exacto, si procesa datos de Movistar y dónde se ejecuta |
 | [`docs/ADR/`](docs/ADR/) | Cuatro decisiones de arquitectura: por qué el recibo no se vectoriza · por qué céntimos enteros · por qué el LLM no calcula · por qué tramos y no fórmulas por escenario |
 | [`docs/ELECCION_DEL_MODELO.md`](docs/ELECCION_DEL_MODELO.md) | Qué modelo generativo conviene y **por qué la elección pesa menos de lo que parece**: precios verificados, coste por explicación, la decisión según se priorice humanización, velocidad, coste o control, y qué invalidaría la recomendación |
 | [`docs/ACCESO_SUPABASE.md`](docs/ACCESO_SUPABASE.md) | Cómo dar acceso al equipo: ver las tablas, ejecutar la app contra la base y el rol de solo lectura |
-| [`docs/pendientes.md`](docs/pendientes.md) | Lo que falta, lo `[POR VALIDAR]` con Movistar y los riesgos abiertos |
+| [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) | Lo que falta, lo `[POR VALIDAR]` con Movistar y los riesgos abiertos |
 | [`ejemplos/curl.md`](ejemplos/curl.md) | Recorrido completo de la demo, 16 secciones, con los tres clientes de guion |
 | [`data/README.md`](data/README.md) | Por qué `data/` está vacío en el repositorio |
 
@@ -496,7 +496,7 @@ los valores por defecto arrancan el sistema completo en modo determinístico y s
 ## 10. Licencia y autoría
 
 Código bajo licencia MIT. Las dependencias, todas permisivas, están declaradas con su licencia
-real en [`docs/declaracion_herramientas.md`](docs/declaracion_herramientas.md).
+real en [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md).
 
 `[CONFIRMADO-OFICIAL]` Conforme a las BASES, la inscripción *«implica cesión de los derechos de
 PI sobre las propuestas a favor de Integratel, permitiendo su desarrollo y utilización futura.

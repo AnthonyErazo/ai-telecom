@@ -25,8 +25,8 @@ p95— salen de cuatro corridas consecutivas de la evaluación en las que la med
 y 17 ms y el p95 entre 22 y 23 ms. Son una medición, no una promesa de rendimiento.
 
 Documentos hermanos: [`arquitectura.md`](arquitectura.md) describe **cómo** está construido;
-[`declaracion_herramientas.md`](declaracion_herramientas.md) cumple la obligación de declaración de
-BASES §10; [`pendientes.md`](pendientes.md) enumera lo que falta y lo que está roto; los
+[`PROCEDENCIA.md`](PROCEDENCIA.md) cumple la obligación de declaración de
+BASES §10; [`PROCEDENCIA.md`](PROCEDENCIA.md) enumera lo que falta y lo que está roto; los
 [`ADR/`](ADR/) registran las decisiones una a una. Este documento explica **por qué**.
 
 ---
@@ -983,7 +983,7 @@ API y los dos endpoints—. Tres detalles que no son casuales:
 
 **Comprobado, no supuesto.** El estado consultado a la propia biblioteca —no a nuestra
 reinterpretación de las variables— devuelve `tracing activo: False`. Y en el banco de pruebas
-documentado en [`declaracion_herramientas.md`](declaracion_herramientas.md) §2.2, con
+documentado en [`PROCEDENCIA.md`](PROCEDENCIA.md) §2.2, con
 `socket.socket.connect` parcheado para abortar cualquier salida, se midieron **cero conexiones
 salientes** durante una ejecución completa del grafo, con **control negativo**: encendiendo
 `LANGSMITH_TRACING=true`, el proceso **sí** intenta salir. El control negativo es lo que demuestra que
@@ -1262,7 +1262,7 @@ Un documento que oculta un defecto es peor que no tenerlo. Estas son las renunci
 
 ### El defecto conocido, y por qué se cuenta aquí
 
-Hay un defecto abierto y documentado en [`pendientes.md`](pendientes.md) §1, y es el más instructivo
+Hay un defecto abierto y documentado en [`PROCEDENCIA.md`](PROCEDENCIA.md) §1, y es el más instructivo
 del proyecto.
 
 En `C-DEMO-01` el motor agrupa tres líneas bajo una sola causa —«cambio de plan»— y la explicación
@@ -1301,7 +1301,7 @@ prueba de mecánica y no como medida de calidad.
 
 **`packages/orquestacion/rehidratacion.py` no tiene pruebas automáticas.** Es el módulo que hace que
 `GET /v1/evidencia/{id}` sobreviva a un reinicio, y su corrección se ha comprobado **a mano**,
-matando el proceso. Ningún fichero de `tests/` lo menciona, y [`pendientes.md`](pendientes.md) §3.5
+matando el proceso. Ningún fichero de `tests/` lo menciona, y [`PROCEDENCIA.md`](PROCEDENCIA.md) §3.5
 lo declara así. Las dos garantías que promete —que nunca lanza y que no relaja la autorización— se
 han observado, pero nada hace fallar la construcción el día que dejen de cumplirse. Es una pieza de
 recuperación sin red de seguridad propia, y presentarla de otro modo sería vender de más.
@@ -1332,8 +1332,8 @@ Todas las cifras se obtuvieron el 8 de agosto de 2026 sobre el árbol de trabajo
 
 ## Procedencia
 
-**Verificado el 8 de agosto de 2026** contra el árbol de trabajo de esa fecha: **39 281 líneas de
-Python en 105 ficheros**, 17 tablas SQL (13 + 3 + 1), 3 309 líneas de consola web, `rules_version`
+**Verificado el 11 de agosto de 2026** contra el árbol de trabajo de esa fecha: **47 193 líneas de
+Python en 123 ficheros**, 7 tablas SQL, 3 309 líneas de consola web, `rules_version`
 **1.0.0**, dataset de semilla **20260804** y corpus de **95 documentos** (31 + 36 + 28). Estado de
 la verificación: `pytest` **1.511 superadas y 299 omitidas** sobre 1.810 recogidas, código de salida 0;
 `make eval` **APROBADA** con `TA_respuesta` 0,00 % sobre 4.625 aserciones; `probar_e2e.py` **19/19**

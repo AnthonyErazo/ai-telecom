@@ -808,7 +808,7 @@ Es lo mismo que abre el panel *"De dónde salió esta cifra"* de la consola.
 > narrativa causal no lo es del todo: el motor agrupa las tres primeras líneas bajo *cambio de
 > plan*, cuando el cambio de plan por sí solo le **bajó** el recibo S/ 32.26; lo que lo subió fue
 > la desaparición del descuento de S/ 49.90. Está diagnosticado, con plan de corrección y
-> estimación, en [`docs/pendientes.md`](pendientes.md) §1 (riesgo R-07). No afecta a ninguna
+> estimación, en [`docs/PROCEDENCIA.md`](PROCEDENCIA.md) §1 (riesgo R-07). No afecta a ninguna
 > cifra ni al veredicto del verificador.
 
 ---
@@ -1574,7 +1574,7 @@ El repositorio trae un **adaptador de ensayo** para datasets tabulares de teleco
 tipo *customer churn*: un cliente por fila, con su cargo mensual, su antigüedad y sus servicios).
 No sustituye al dataset sintético: demuestra que la ingesta acepta un origen ajeno, rechaza lo que
 no cuadra y **sintetiza el resto declarando qué inventó**. La decisión y sus límites están en
-[`docs/datasets_externos.md`](datasets_externos.md).
+[`PROCEDENCIA.md`](PROCEDENCIA.md).
 
 Se prueba contra el CSV de ejemplo del repositorio, que **lo escribió el equipo** (15 filas, ver
 `data/ejemplos_externos/README.md`):
@@ -1819,7 +1819,7 @@ cambio en el código reinicia el proceso.
 **Solución:** vuelva a llamar a `POST /v1/explicar` y use el `trace_id` nuevo
 (`telemetria.explicacion_id`, que es el mismo valor que la cabecera `X-Trace-Id`). Con varias
 réplicas pasaría lo mismo entre réplicas: está registrado como riesgo R-03 en
-[`docs/pendientes.md`](pendientes.md).
+[`docs/PROCEDENCIA.md`](PROCEDENCIA.md).
 
 ### 12. `422 PETICION_INVALIDA` por un campo de más
 
@@ -1955,7 +1955,7 @@ Para que nadie se sorprenda delante de un cliente o de un jurado.
 | **La consola `/ui` no es la App de Movistar** | Es una **consola de demostración** servida por la propia API para enseñar el producto y la gobernanza lado a lado. No hay App, ni Bot Lucía, ni WhatsApp: la integración con los canales reales está fuera del alcance. La respuesta viaja en bloques tipados (`texto`, `kv`, `puente`, `tabla`, `aviso`) listos para que los pinte cualquier canal |
 | **No está integrado con el facturador real** | Lee de BrainyBill y de Amdocs a través de un Anti-Corruption Layer. El salto a los sistemas reales es cambiar dos URLs y, si el formato difiere, un solo archivo de mapeo (`packages/datagen/mapping/movistar_map.py`) |
 | **No recuerda entre reinicios ni entre réplicas** | La memoria de conversación es un LRU de 512 turnos en el proceso. Afecta a `GET /v1/evidencia` y a `GET /v1/derivacion/{ref}`. Registrado como riesgo R-03 |
-| **No garantiza que la narrativa causal sea perfecta en escenarios compuestos** | La aritmética siempre cuadra y la verificación siempre bloquea las invenciones, pero la atribución de causas puede agrupar de más. Caso concreto y plan de corrección: [`docs/pendientes.md`](pendientes.md) §1 |
+| **No garantiza que la narrativa causal sea perfecta en escenarios compuestos** | La aritmética siempre cuadra y la verificación siempre bloquea las invenciones, pero la atribución de causas puede agrupar de más. Caso concreto y plan de corrección: [`docs/PROCEDENCIA.md`](PROCEDENCIA.md) §1 |
 | **Sus reglas de negocio no están validadas por Movistar** | Todo lo marcado `[POR VALIDAR]` en `db/reglas/rules.yaml` y en `.env.example`: cobro en suspensión, convención de prorrateo, cargo de reconexión, días de gracia |
 | **No se ha probado bajo el pico de 3x** | El dimensionamiento está calculado en `docs/arquitectura.md` §6, pero es una estimación del equipo, no una medición |
 
@@ -1969,4 +1969,4 @@ Para que nadie se sorprenda delante de un cliente o de un jurado.
 | [`ejemplos/curl.md`](../ejemplos/curl.md) | 16 secciones de comandos, incluido un guion de demo de cinco minutos |
 | [`docs/arquitectura.md`](arquitectura.md) | Diagramas, el ACL, los niveles por canal, el dimensionamiento |
 | [`docs/ADR/`](ADR/) | Por qué el recibo no se vectoriza · por qué céntimos enteros · **por qué el LLM no calcula** · por qué tramos |
-| [`docs/pendientes.md`](pendientes.md) | Lo que falta, lo `[POR VALIDAR]` y los riesgos abiertos |
+| [`docs/PROCEDENCIA.md`](PROCEDENCIA.md) | Lo que falta, lo `[POR VALIDAR]` y los riesgos abiertos |

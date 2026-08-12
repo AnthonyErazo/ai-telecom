@@ -828,7 +828,31 @@ def cargar_catalogo(
         extra += 1
     if extra:
         _LOG.info("catálogo: %d conceptos adicionales desde %s", extra, fichero)
+    _declarar_al_motor(configuracion, conceptos)
     return conceptos
+
+
+def _declarar_al_motor(
+    configuracion: ConfiguracionReglas, conceptos: list[ConceptoCatalogo]
+) -> None:
+    """Le dice al motor qué códigos existen en el dataset, además de los de ``rules.yaml``.
+
+    Sin esto, la regla dura ``CONCEPTO_FUERA_CATALOGO`` derivaba a un asesor **toda** cuenta
+    real: comprobaba contra los treinta y un conceptos que el equipo modeló a mano, mientras
+    el recuperador ya tenía cargados los del dataset. Dos catálogos que no se hablaban, y el
+    asistente negándose a explicar precisamente los recibos para los que se construyó.
+
+    Se declara desde aquí y no al arrancar la API porque este es el punto donde el catálogo
+    real acaba de cargarse: cualquier otro sitio tendría que volver a consultarlo.
+    """
+    del_dataset = {
+        concepto.concepto_id
+        for concepto in conceptos
+        if not configuracion.existe_concepto(concepto.concepto_id)
+    }
+    if del_dataset:
+        configuracion.registrar_conceptos_del_dataset(del_dataset)
+        _LOG.info("catálogo: %d códigos del dataset declarados al motor", len(del_dataset))
 
 
 def cargar_faqs(
