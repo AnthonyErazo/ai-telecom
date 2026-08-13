@@ -177,11 +177,14 @@ class GeminiProvider:
             # vienen calculados y el modelo solo redacta.
             "max_output_tokens": 8192,
         }
-        # Desactivar el pensamiento donde el SDK lo permita: ahorra latencia y evita
-        # que se coma el presupuesto de salida. Si la versión no lo admite, basta con
-        # el límite ampliado de arriba.
-        with suppress(Exception):  # pragma: no cover - depende de la versión
-            comun["thinking_config"] = self._types.ThinkingConfig(thinking_budget=0)
+        # Desactivar el pensamiento donde el SDK **y el modelo** lo permitan: ahorra
+        # latencia y evita que se coma el presupuesto de salida. Si la versión no lo
+        # admite, basta con el límite ampliado de arriba; si lo admite el SDK pero lo
+        # rechaza el modelo, se descubre en la primera llamada y no se vuelve a enviar
+        # (ver `_es_pensamiento_no_desactivable`).
+        if not getattr(self, "_sin_pensamiento_configurable", False):
+            with suppress(Exception):  # pragma: no cover - depende de la versión
+                comun["thinking_config"] = self._types.ThinkingConfig(thinking_budget=0)
         # El timeout por llamada es opcional según la versión del SDK.
         with suppress(Exception):  # pragma: no cover - depende de la versión
             comun["http_options"] = self._types.HttpOptions(
@@ -215,9 +218,41 @@ class GeminiProvider:
                 config=self._configuracion(esquema, efectivo),
             )
         except Exception as exc:
-            raise self._traducir_error(exc) from exc
+            if self._es_pensamiento_no_desactivable(exc):
+                # Reintento sin `thinking_config`. Los modelos de la generación 3 no
+                # admiten `thinking_budget=0` y responden 400 INVALID_ARGUMENT, así que
+                # pedir un modelo nuevo dejaba al sistema degradando a plantilla en TODOS
+                # los turnos sin decir por qué: el error solo dice «argumento inválido»,
+                # sin nombrar el argumento. El `suppress` de `_configuracion` no cubría
+                # esto porque construir la opción funciona; lo que falla es enviarla.
+                #
+                # Se reintenta una vez y sin conmutador de configuración: qué modelos
+                # aceptan desactivar el pensamiento cambia con el catálogo de Google, y
+                # una tabla de capacidades caducada miente peor que no tenerla.
+                self._sin_pensamiento_configurable = True
+                _LOG.info(
+                    "%s no admite desactivar el pensamiento; se reintenta sin esa opción",
+                    self.modelo,
+                )
+                try:
+                    respuesta = self._cliente.models.generate_content(
+                        model=self.modelo,
+                        contents=prompt,
+                        config=self._configuracion(esquema, efectivo),
+                    )
+                except Exception as reintento:
+                    raise self._traducir_error(reintento) from reintento
+            else:
+                raise self._traducir_error(exc) from exc
 
         return self._parsear(respuesta, esquema)
+
+    def _es_pensamiento_no_desactivable(self, error: Exception) -> bool:
+        """``True`` si el 400 se debe a haber pedido ``thinking_budget=0``."""
+        if getattr(self, "_sin_pensamiento_configurable", False):
+            return False  # ya se sabe: la opción no se envió, el fallo es otro
+        texto = str(error)
+        return "INVALID_ARGUMENT" in texto or "400" in texto
 
     # ------------------------------------------------------------------ #
     # Interno
