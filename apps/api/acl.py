@@ -640,11 +640,20 @@ def crear_repositorio(
         transporte_am: Transporte = TransporteHTTP(
             amdocs_base_url, nombre="Amdocs", timeout_s=timeout_s
         )
-    elif brainybill_base_url or isinstance(transporte_bb, TransporteArchivo) is False:
-        # Amdocs nunca hereda el transporte de recibos salvo que ambos sean el mismo
-        # disco. Con Supabase sirviendo los recibos, el de órdenes debe seguir siendo el
-        # archivo: el dataset del desafío **no trae órdenes de CRM**, y pedirle `/orders`
-        # a un transporte que solo sabe de `/bills` rompía la carga entera.
+    elif getattr(transporte_bb, "sirve_ordenes", False):
+        # El dataset actualizado del desafío **sí trae órdenes de CRM** (`Ordenes.csv`,
+        # 58 170 filas) y el transporte de Supabase las sirve en `/orders`. Cuando los
+        # recibos vienen de ahí, las órdenes vienen del mismo sitio: es la diferencia
+        # entre atribuir una causa con una orden detrás y tener que decirle al cliente
+        # que el motivo no consta.
+        #
+        # Se pregunta por la CAPACIDAD (`sirve_ordenes`) y no por la clase: mañana puede
+        # haber otro transporte que también las sirva, y este `if` no tiene por qué
+        # enterarse.
+        transporte_am = transporte_bb
+    elif brainybill_base_url or not isinstance(transporte_bb, TransporteArchivo):
+        # Sin órdenes en el origen de recibos, Amdocs vuelve al disco: pedirle `/orders` a
+        # un transporte que solo sabe de `/bills` rompería la carga entera.
         transporte_am = TransporteArchivo(raiz_datos, nombre="Amdocs")
     else:
         transporte_am = transporte_bb

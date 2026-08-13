@@ -49,6 +49,7 @@ from typing import Any
 
 from apps.api.acl import CuentaNoEncontradaExterna, ErrorSistemaExterno
 from packages.core_domain.dinero import a_centimos
+from packages.datagen.mapping.movistar_map import tipo_desde_crm
 
 __all__ = ["VAR_DSN", "TransporteSupabase"]
 
@@ -100,6 +101,10 @@ class TransporteSupabase:
 
     nombre = "supabase"
 
+    #: Este transporte sirve además `/orders`. Lo consulta `crear_repositorio` para
+    #: decidir si Amdocs puede apoyarse en él en vez de volver al disco.
+    sirve_ordenes = True
+
     def __init__(self, dsn: str | None = None) -> None:
         """Abre la conexión.
 
@@ -139,12 +144,69 @@ class TransporteSupabase:
 
     # -- protocolo Transporte ------------------------------------------------ #
     def obtener(self, ruta: str, *, params: Mapping[str, Any] | None = None) -> Any:
-        """Responde a ``/bills/{cuenta_id}``. Cualquier otra ruta es un error de uso."""
-        if not ruta.startswith("/bills/"):
-            raise ErrorSistemaExterno(self.nombre, f"ruta no servida por este transporte: {ruta}")
-        cuenta_id = ruta.removeprefix("/bills/").strip("/")
-        ciclos = int((params or {}).get("cycles", 6))
-        return self._documento(cuenta_id, ciclos)
+        """Responde a ``/bills/{cuenta_id}`` y a ``/orders/{cuenta_id}``."""
+        if ruta.startswith("/bills/"):
+            cuenta_id = ruta.removeprefix("/bills/").strip("/")
+            ciclos = int((params or {}).get("cycles", 6))
+            return self._documento(cuenta_id, ciclos)
+        if ruta.startswith("/orders/"):
+            return self._ordenes(ruta.removeprefix("/orders/").strip("/"))
+        raise ErrorSistemaExterno(self.nombre, f"ruta no servida por este transporte: {ruta}")
+
+    def _ordenes(self, cuenta_id: str) -> dict[str, Any]:
+        """Órdenes del CRM de la cuenta, en el formato que espera el adaptador de Amdocs.
+
+        Es la pieza que faltaba. Sin órdenes, la atribución causal solo podía apoyarse en
+        reglas de concepto y toda explicación tenía que decir que el motivo no constaba;
+        con ellas, un «Cargo por Reconexión» deja de ser una hipótesis del motor y pasa a
+        tener detrás una orden de reconexión con su fecha.
+
+        Se devuelve el formato ``amdocs`` —el mismo que sirve el mock— para no abrir un
+        segundo camino de conversión: la traducción a movimientos canónicos sigue estando
+        donde estaba, en :class:`AdaptadorAmdocs` y en ``movistar_map``.
+
+        Las órdenes cuyo par (razón, tipo de ítem) no es concluyente se entregan igual,
+        con ``ORDER_TYPE`` vacío: descartarlas aquí escondería en el transporte una
+        decisión que el ACL ya toma —y registra— con su aviso.
+        """
+        filas = self._conexion.execute(
+            """
+            SELECT id, subscriber_key, razon_desc, tipo_item, completado, inicio, estado
+            FROM orden_servicio
+            WHERE financial_account = %s
+            ORDER BY completado NULLS LAST, id
+            """,
+            (cuenta_id,),
+        ).fetchall()
+
+        ordenes: list[dict[str, Any]] = []
+        for identificador, suscripcion, razon, item, completado, inicio, estado in filas:
+            tipo = tipo_desde_crm(razon, item)
+            momento = completado or inicio
+            ordenes.append(
+                {
+                    "ORDER_ID": str(identificador),
+                    "ACCOUNT_ID": cuenta_id,
+                    "ORDER_TYPE": str(tipo) if tipo else "",
+                    "ORDER_DATE": momento.isoformat() if momento else "",
+                    "SERVICE_ID": str(suscripcion or ""),
+                    "CHANNEL": "CRM",
+                    # El detalle conserva el vocabulario ORIGINAL del CRM. Es lo que
+                    # permite que un asesor lea «Cobranza Manual con Cargo» y lo reconozca
+                    # en su propio sistema, en vez de un tipo canónico que allí no existe.
+                    "DETAIL_JSON": {
+                        "razon": razon or "",
+                        "tipo_item": item or "",
+                        "estado": estado or "",
+                    },
+                }
+            )
+        return {
+            "cuenta_id": cuenta_id,
+            "formato": "amdocs",
+            "total": len(ordenes),
+            "orders": ordenes,
+        }
 
     def cerrar(self) -> None:
         """Cierra la conexión. Idempotente y silenciosa: cerrar no debe propagar."""

@@ -224,6 +224,52 @@ TIPO_ORDEN_MAP: dict[str, TipoMovimiento] = {
 }
 
 
+def tipo_desde_crm(razon: str | None, tipo_item: str | None) -> TipoMovimiento | None:
+    """Traduce el vocabulario real del CRM de Movistar a un :class:`TipoMovimiento`.
+
+    El export de órdenes del desafío no trae un ``ORDER_TYPE`` como el que asumía
+    ``TIPO_ORDEN_MAP``: trae dos campos en castellano, y **la acción está en el tipo de
+    ítem**, no en la razón. «Cobranza - Reactivación con Cargo» aparece con ítem
+    «Cambiar Cobranza», y lo que de verdad ocurrió lo dice la razón. Por eso se miran los
+    dos, con la razón desambiguando los casos de cobranza.
+
+    Qué se mapea y qué **no**
+    -------------------------
+    Solo lo inequívoco: reconexiones, suspensiones, altas y promociones. El par más
+    frecuente del fichero —«Pedido de Cliente» con ítem «Cambiar», 11 648 filas— se deja
+    **sin mapear a propósito**: «cambiar» a petición del cliente puede ser un cambio de
+    plan, de SIM, de domicilio o de titularidad, y elegir uno sería inventarse la causa
+    de un cargo. El ACL descarta lo no mapeado con un aviso y la atribución baja su
+    confianza, que es el comportamiento correcto: una orden que falta hace una
+    explicación más prudente; una orden inventada, una explicación falsa.
+
+    Es exactamente la misma regla que ya aplica :func:`concepto_canonico` con los
+    conceptos fuera de catálogo.
+
+    Returns:
+        El tipo canónico, o ``None`` si el par no es concluyente.
+    """
+    r = (razon or "").strip().lower()
+    i = (tipo_item or "").strip().lower()
+
+    # La acción manda cuando el ítem es explícito.
+    if i.startswith("reconectar"):
+        return TipoMovimiento.RECONEXION
+    if i.startswith(("suspender", "suspensión", "suspension")):
+        return TipoMovimiento.SUSPENSION
+    if i == "alta":
+        return TipoMovimiento.ALTA_SERVICIO
+
+    # Y si el ítem es genérico («Cambiar Cobranza»), decide la razón.
+    if "reactivación con cargo" in r or "reactivacion con cargo" in r:
+        return TipoMovimiento.RECONEXION
+    if "suspensión" in r or "suspension" in r or "corte" in r:
+        return TipoMovimiento.SUSPENSION
+    if r == "promociones":
+        return TipoMovimiento.ALTA_PAQUETE
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # Conversión de valores
 # --------------------------------------------------------------------------- #
