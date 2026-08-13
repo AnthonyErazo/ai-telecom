@@ -50,8 +50,12 @@ describe("login de cuenta", () => {
   // asistente, y cerrar sesión devuelve a la pantalla de acceso.
   it("no muestra el asistente hasta obtener un token LOA2", async () => {
     renderApp();
+    // La aplicación abre en WhatsApp, que no pide sesión. El acceso vive en la
+    // pestaña de Mi Movistar, y es allí donde se comprueba.
+    fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
 
-    expect(screen.getByRole("heading", { name: "¡Bienvenido a Mi Movistar!" })).toBeInTheDocument();
+    // `findBy`, no `getBy`: cambiar de pestaña pasa por `stopLive()`, que es async.
+    expect(await screen.findByRole("heading", { name: "¡Bienvenido a Mi Movistar!" })).toBeInTheDocument();
     // Se espera a que la pantalla traiga la cuenta servible, igual que una persona no
     // puede pulsar antes de que el campo esté relleno.
     await screen.findByDisplayValue("C-DEMO-01");
@@ -65,6 +69,9 @@ describe("login de cuenta", () => {
 
   it("cierra la sesión y vuelve a pedir acceso", async () => {
     renderApp();
+    // La aplicación abre en WhatsApp, que no pide sesión. El acceso vive en la
+    // pestaña de Mi Movistar, y es allí donde se comprueba.
+    fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
     // Se espera a que la pantalla traiga la cuenta servible, igual que una persona no
     // puede pulsar antes de que el campo esté relleno.
     await screen.findByDisplayValue("C-DEMO-01");

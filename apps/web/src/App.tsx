@@ -15,7 +15,7 @@ import { microphoneSupportError } from "./live/audio";
 // —hacerlo dejaba «C-DEMO-01» escrito de entrada y, contra el dataset real, entrar sin
 // tocar nada fallaba con «la cuenta no existe»—.
 const fallback = ["C-DEMO-01", "C-DEMO-02", "C-DEMO-03"];
-type View = "login" | "assistant" | "whatsapp" | "asesor";
+type View = "whatsapp" | "mimovistar" | "conversacional";
 
 /** Un turno de la conversación, tal y como se pinta.
  *
@@ -28,7 +28,7 @@ type Turno =
   | { rol: "asistente"; explicacion: Explanation };
 
 export default function App() {
-  const [view, setView] = useState<View>("login");
+  const [view, setView] = useState<View>("whatsapp");
   const [account, setAccount] = useState("");
   const [accountDraft, setAccountDraft] = useState("");
   const [token, setToken] = useState("");
@@ -90,7 +90,6 @@ export default function App() {
       setTurns([]);
       setAudit(null);
       setError("");
-      setView("assistant");
     },
     onError: (cause) => setError(message(cause)),
   });
@@ -156,10 +155,10 @@ export default function App() {
   };
 
   const selectView = async (next: View) => {
-    if (next === "assistant" && !token) return;
-    // La voz pertenece a la vista de asistente: al salir de ella se corta, o seguiría
-    // escuchando el micrófono desde una pantalla que ya no la ofrece.
-    if (next !== "assistant") await stopLive();
+    // WhatsApp y Mi Movistar no exigen sesión previa: uno identifica por teléfono y el
+    // otro pide el id del usuario en su propia pantalla. La conversacional sí, porque
+    // reutiliza el token que emitió Mi Movistar.
+    if (next !== "conversacional") await stopLive();
     setView(next);
   };
 
@@ -176,7 +175,7 @@ export default function App() {
     setOutputTranscript("");
     setError("");
     setLiveStatus("idle");
-    setView("login");
+    setView("mimovistar");
   };
 
   const toggleLive = async () => {
@@ -226,10 +225,14 @@ export default function App() {
           de Mi Movistar, que es donde el cliente se autentica de verdad. WhatsApp y la
           consola del 104 no lo necesitan —uno identifica por teléfono y el otro por
           credencial de asesor—, así que ninguna está bloqueada por una sesión ajena. */}
+      {/* Tres canales, tres pestañas, y cada uno ocupa la pantalla entera. Antes se
+          compartía el ancho con el panel de gobernanza y ninguna de las dos cosas se
+          leía bien: una maqueta de móvil encajonada en media pantalla no parece un
+          móvil, y un panel de auditoría en una columna estrecha no se audita. */}
       <nav className="app-tabs" aria-label="Navegación principal">
-        <button type="button" className={view === "login" || view === "assistant" ? "active" : ""} aria-pressed={view === "assistant"} onClick={() => void selectView(token ? "assistant" : "login")}>Mi Movistar</button>
         <button type="button" className={view === "whatsapp" ? "active" : ""} aria-pressed={view === "whatsapp"} onClick={() => void selectView("whatsapp")}>WhatsApp</button>
-        <button type="button" className={view === "asesor" ? "active" : ""} aria-pressed={view === "asesor"} onClick={() => void selectView("asesor")}>Asesor 104</button>
+        <button type="button" className={view === "mimovistar" ? "active" : ""} aria-pressed={view === "mimovistar"} onClick={() => void selectView("mimovistar")}>Mi Movistar</button>
+        <button type="button" className={view === "conversacional" ? "active" : ""} aria-pressed={view === "conversacional"} onClick={() => void selectView("conversacional")}>IA conversacional</button>
       </nav>
       <div className="topbar-status">
         {/* La sesión se cierra desde aquí, junto a la cuenta a la que pertenece. Antes
@@ -242,46 +245,19 @@ export default function App() {
     </header>
     {error && <div className="error-banner" role="alert">{error}</div>}
 
-    {view === "login" || view === "assistant" ? <main className="mimovistar-main">
-      <div className="mimovistar-marco">
-        {/* `key` atado a la cuenta: al cerrar sesión el componente se REMONTA y vuelve
-            a su pantalla de acceso. Sin esto, la sesión se cerraba en la barra pero el
-            teléfono seguía enseñando el recibo del cliente anterior. */}
-        <MiMovistar
-          key={sesionesCerradas}
-          onSesion={(cuentaEntrada, tokenEmitido) => { setAccount(cuentaEntrada); setToken(tokenEmitido); setView("assistant"); }}
-          onExplicacion={async (resultado) => {
-            setExplanation(resultado);
-            try { setAudit(await api.audit(token || "", resultado.trace_id)); } catch { setAudit(null); }
-          }}
-        />
-        {/* El panel de gobernanza se queda al lado del teléfono: es lo que distingue a
-            esta demo de un chat bonito, y esconderlo sería tirar el argumento. */}
-        <aside className="governance panel">
-<div className="panel-heading"><div><p className="eyebrow">Gobernanza en tiempo real</p><h2>Cada cifra tiene respaldo</h2></div><span className={`verdict ${governance?.verificacion_numerica === "PASS" ? "pass" : "idle"}`}>{governance?.verificacion_numerica ?? "ESPERANDO"}</span></div>
-          <div className="metrics"><div><strong>{governance?.aserciones_totales ?? "—"}</strong><small>Afirmaciones</small></div><div><strong>{governance?.aserciones_ancladas ?? "—"}</strong><small>Ancladas</small></div><div><strong>{governance?.aserciones_no_ancladas ?? "—"}</strong><small>Sin respaldo</small></div></div>
-          <div className="model-card"><span>Modo de generación</span><strong>{governance?.modo ?? String(health.data?.llm_mode ?? "mock")}</strong><small>{governance?.model_version ?? "Esperando una explicación"}</small></div>
-          {explanation?.derivacion.requerida && <div className="handoff"><strong>Derivación requerida</strong><p>{explanation.derivacion.motivo}</p></div>}
-          <button className="danger" disabled={!token || adversarial.isPending} onClick={() => adversarial.mutate()}>Inyectar cifra adversaria</button>
-          {/* Cerrado de entrada y con el resumen legible delante. Antes se abría solo
-              (`open={Boolean(audit)}`) y volcaba el JSON íntegro de la traza: con el
-              dataset real son ~620 líneas, que en esta columna tapaban la explicación y
-              hacían parecer que la respuesta al cliente salía dentro de la auditoría. La
-              traza es una PRUEBA que se consulta, no el mensaje que se lee. */}
-          <details><summary>Auditoría del turno</summary>
-            {auditLines.length > 0 && <pre className="audit-summary">{auditLines.join("\n")}</pre>}
-            {audit
-              ? <details><summary>Traza completa (JSON)</summary><pre>{JSON.stringify(audit, null, 2)}</pre></details>
-              : <p className="audit-empty">La traza aparecerá después de la primera explicación.</p>}
-          </details>
-        </aside>
-      </div>
-    </main> : view === "whatsapp" ? <main>
-      <section className="hero"><p className="eyebrow">Canal WhatsApp · Identidad LOA1</p><h1>El mismo motor, sin un solo importe.</h1><p>La misma respuesta que la App, servida como texto y redactada por nivel de aseguramiento.</p></section>
+    {view === "whatsapp" ? <main className="canal-completo">
+      {/* Sin panel lateral: es el canal del cliente, no una consola de auditoría. La
+          garantía de «cero importes» se enseña dentro de la propia conversación. */}
       <WhatsApp cuentaSugerida={account} />
-    </main> : view === "asesor" ? <main>
-      <section className="hero"><p className="eyebrow">Call center 104 · Canal ASESOR</p><h1>El asesor no empieza de cero.</h1><p>El expediente se reconstruye desde la bitácora encadenada, con lo que no se pudo confirmar por delante.</p></section>
-      <Asesor cuentaSugerida={account || cuentaElegida} />
+    </main> : view === "mimovistar" ? <main className="canal-completo">
+      <MiMovistar
+        key={sesionesCerradas}
+        onSesion={(cuentaEntrada, tokenEmitido) => { setAccount(cuentaEntrada); setToken(tokenEmitido); }}
+        onExplicacion={async (resultado) => {
+          setExplanation(resultado);
+          try { setAudit(await api.audit(token || "", resultado.trace_id)); } catch { setAudit(null); }
+        }}
+      />
     </main> : <main>
       <section className="hero"><p className="eyebrow">App Mi Movistar · Cero cifras inventadas</p><h1>Entiende qué cambió en tu recibo.</h1><p>El motor calcula; la IA explica; el verificador comprueba cada número antes de mostrarlo.</p></section>
       <div className="workspace">

@@ -104,10 +104,6 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
     enviar.mutate(texto);
   };
 
-  const ultima = [...mensajes].reverse().find((m) => m.explicacion)?.explicacion;
-  // La comprobación que hace honesta a esta pantalla: si el servidor hubiera dejado
-  // escapar un importe, aquí se vería. Se cuentan dígitos sobre el texto ENTREGADO.
-  const digitos = mensajes.filter((m) => m.rol === "bot").join("").replace(/\D/g, "").length;
 
   return <div className="wa">
     <div className="wa-phone">
@@ -137,30 +133,9 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
       </form>
     </div>
 
-    <aside className="wa-nota panel">
-      <p className="eyebrow">Por qué esto no es otra API</p>
-      <h2>El mismo contenido, otro transporte</h2>
-      <p>
-        Esta pantalla llama al mismo <code>POST /v1/explicar</code> y recibe la misma
-        respuesta que la App. Lo único que cambia es el <b>nivel del token</b>: aquí es
-        <b> LOA1</b>, y el servidor entrega la explicación sin importes. La pantalla no
-        borra nada.
-      </p>
-      <div className="wa-metricas">
-        <div><strong>{digitos}</strong><small>dígitos entregados</small></div>
-        <div><strong>{ultima?.gobernanza.verificacion_numerica ?? "—"}</strong><small>verificación</small></div>
-        <div><strong>{ultima?.gobernanza.aserciones_totales ?? "—"}</strong><small>afirmaciones</small></div>
-      </div>
-      {ultima && <p className="wa-pie">
-        {digitos === 0
-          ? "Cero dígitos en el texto entregado: es la redacción por nivel, comprobada sobre lo que se envió."
-          : "Se detectaron dígitos en el texto: revise redactar_para_nivel."}
-      </p>}
-      {ultima?.derivacion.requerida && <div className="handoff">
-        <strong>Derivación abierta</strong>
-        <p>{ultima.derivacion.motivo}</p>
-      </div>}
-    </aside>
+    {/* El panel explicativo se retiró: este canal ocupa la pantalla entera y es la
+        vista del cliente. Lo que había que demostrar —que aquí no viaja ni un
+        importe— se demuestra mejor en el propio mensaje que en una nota al lado. */}
   </div>;
 }
 
