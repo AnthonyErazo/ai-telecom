@@ -51,25 +51,30 @@ describe("login de cuenta", () => {
   it("no muestra el asistente hasta obtener un token LOA2", async () => {
     renderApp();
 
-    expect(screen.getByRole("heading", { name: "Ingrese a su cuenta" })).toBeInTheDocument();
-    expect(screen.queryByText("Cuenta autenticada")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Ingresar" }));
+    expect(screen.getByRole("heading", { name: "¡Bienvenido a Mi Movistar!" })).toBeInTheDocument();
+    // Se espera a que la pantalla traiga la cuenta servible, igual que una persona no
+    // puede pulsar antes de que el campo esté relleno.
+    await screen.findByDisplayValue("C-DEMO-01");
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
 
-    expect(await screen.findByText("Cuenta autenticada")).toBeInTheDocument();
+    // Tras validar, la app pasa a la pantalla del recibo y la cuenta aparece en la barra.
+    expect(await screen.findByRole("heading", { name: "Mi Recibo" })).toBeInTheDocument();
     expect(api.token).toHaveBeenCalledWith("C-DEMO-01");
     expect(api.facts).toHaveBeenCalledWith("jwt-loa2");
   });
 
   it("cierra la sesión y vuelve a pedir acceso", async () => {
     renderApp();
-    fireEvent.click(screen.getByRole("button", { name: "Ingresar" }));
-    await screen.findByText("Cuenta autenticada");
+    // Se espera a que la pantalla traiga la cuenta servible, igual que una persona no
+    // puede pulsar antes de que el campo esté relleno.
+    await screen.findByDisplayValue("C-DEMO-01");
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
+    await screen.findByRole("heading", { name: "Mi Recibo" });
 
     fireEvent.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Ingrese a su cuenta" })).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: "¡Bienvenido a Mi Movistar!" })).toBeInTheDocument()
     );
-    expect(screen.queryByText("Cuenta autenticada")).not.toBeInTheDocument();
   });
 });

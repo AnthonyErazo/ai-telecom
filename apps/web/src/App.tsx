@@ -5,6 +5,7 @@ import type { Explanation, FactSet } from "./api/types";
 import { Blocks, money } from "./components/Blocks";
 import { WhatsApp } from "./components/WhatsApp";
 import { Asesor } from "./components/Asesor";
+import { MiMovistar } from "./components/MiMovistar";
 import { GeminiLiveClient, type LiveStatus } from "./live/client";
 import { microphoneSupportError } from "./live/audio";
 
@@ -37,6 +38,10 @@ export default function App() {
   const [explanation, setExplanation] = useState<Explanation | null>(null);
   const [turns, setTurns] = useState<Turno[]>([]);
   const [audit, setAudit] = useState<Record<string, unknown> | null>(null);
+  // Cambia SOLO al cerrar sesión, y se usa como `key` de Mi Movistar para remontarla.
+  // Atarla a la cuenta no servía: entrar también cambia la cuenta, y el remontaje
+  // borraba la pantalla del recibo justo después de conseguirla.
+  const [sesionesCerradas, setSesionesCerradas] = useState(0);
   const [error, setError] = useState("");
   const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
   const [inputTranscript, setInputTranscript] = useState("");
@@ -160,6 +165,7 @@ export default function App() {
 
   const logout = async () => {
     await stopLive();
+    setSesionesCerradas((n) => n + 1);
     setToken("");
     setAccount("");
     setFacts(null);
@@ -236,25 +242,40 @@ export default function App() {
     </header>
     {error && <div className="error-banner" role="alert">{error}</div>}
 
-    {view === "login" ? <main className="login-main">
-      <section className="login-panel" aria-labelledby="login-title">
-        <div className="login-copy">
-          <p className="eyebrow">App Mi Movistar · Acceso del cliente</p>
-          <h1 id="login-title">Ingrese a su cuenta</h1>
-          <p>La sesión identifica el recibo que puede consultar y habilita la conexión segura con Gemini Live.</p>
-        </div>
-        {!token ? <form className="login-form" onSubmit={login}>
-          <label htmlFor="login-account">Cuenta de usuario</label>
-          <input id="login-account" list="account-options" autoComplete="username" autoFocus value={accountDraft} onChange={(event) => setAccountDraft(event.target.value)} placeholder={`Ej. ${accountList[0] ?? "C-DEMO-01"}`} />
-          <datalist id="account-options">{accountList.map((id) => <option key={id} value={id} />)}</datalist>
-          <button type="submit" disabled={!cuentaElegida || bootstrap.isPending}>{bootstrap.isPending ? "Validando…" : "Ingresar"}</button>
-          <small>Acceso de demostración: usa <code>/dev/token</code>. No solicita contraseña.</small>
-        </form> : <div className="session-card">
-          <span className="session-check">✓</span>
-          <div><small>Sesión activa</small><strong>{account}</strong><p>El asistente y Gemini Live están habilitados para esta cuenta.</p></div>
-          <div className="session-actions"><button type="button" className="primary" onClick={() => setView("assistant")}>Abrir asistente</button><button type="button" onClick={() => void logout()}>Cerrar sesión</button></div>
-        </div>}
-      </section>
+    {view === "login" || view === "assistant" ? <main className="mimovistar-main">
+      <div className="mimovistar-marco">
+        {/* `key` atado a la cuenta: al cerrar sesión el componente se REMONTA y vuelve
+            a su pantalla de acceso. Sin esto, la sesión se cerraba en la barra pero el
+            teléfono seguía enseñando el recibo del cliente anterior. */}
+        <MiMovistar
+          key={sesionesCerradas}
+          onSesion={(cuentaEntrada, tokenEmitido) => { setAccount(cuentaEntrada); setToken(tokenEmitido); setView("assistant"); }}
+          onExplicacion={async (resultado) => {
+            setExplanation(resultado);
+            try { setAudit(await api.audit(token || "", resultado.trace_id)); } catch { setAudit(null); }
+          }}
+        />
+        {/* El panel de gobernanza se queda al lado del teléfono: es lo que distingue a
+            esta demo de un chat bonito, y esconderlo sería tirar el argumento. */}
+        <aside className="governance panel">
+<div className="panel-heading"><div><p className="eyebrow">Gobernanza en tiempo real</p><h2>Cada cifra tiene respaldo</h2></div><span className={`verdict ${governance?.verificacion_numerica === "PASS" ? "pass" : "idle"}`}>{governance?.verificacion_numerica ?? "ESPERANDO"}</span></div>
+          <div className="metrics"><div><strong>{governance?.aserciones_totales ?? "—"}</strong><small>Afirmaciones</small></div><div><strong>{governance?.aserciones_ancladas ?? "—"}</strong><small>Ancladas</small></div><div><strong>{governance?.aserciones_no_ancladas ?? "—"}</strong><small>Sin respaldo</small></div></div>
+          <div className="model-card"><span>Modo de generación</span><strong>{governance?.modo ?? String(health.data?.llm_mode ?? "mock")}</strong><small>{governance?.model_version ?? "Esperando una explicación"}</small></div>
+          {explanation?.derivacion.requerida && <div className="handoff"><strong>Derivación requerida</strong><p>{explanation.derivacion.motivo}</p></div>}
+          <button className="danger" disabled={!token || adversarial.isPending} onClick={() => adversarial.mutate()}>Inyectar cifra adversaria</button>
+          {/* Cerrado de entrada y con el resumen legible delante. Antes se abría solo
+              (`open={Boolean(audit)}`) y volcaba el JSON íntegro de la traza: con el
+              dataset real son ~620 líneas, que en esta columna tapaban la explicación y
+              hacían parecer que la respuesta al cliente salía dentro de la auditoría. La
+              traza es una PRUEBA que se consulta, no el mensaje que se lee. */}
+          <details><summary>Auditoría del turno</summary>
+            {auditLines.length > 0 && <pre className="audit-summary">{auditLines.join("\n")}</pre>}
+            {audit
+              ? <details><summary>Traza completa (JSON)</summary><pre>{JSON.stringify(audit, null, 2)}</pre></details>
+              : <p className="audit-empty">La traza aparecerá después de la primera explicación.</p>}
+          </details>
+        </aside>
+      </div>
     </main> : view === "whatsapp" ? <main>
       <section className="hero"><p className="eyebrow">Canal WhatsApp · Identidad LOA1</p><h1>El mismo motor, sin un solo importe.</h1><p>La misma respuesta que la App, servida como texto y redactada por nivel de aseguramiento.</p></section>
       <WhatsApp cuentaSugerida={account} />
