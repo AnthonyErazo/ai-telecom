@@ -49,7 +49,7 @@ from typing import Any
 
 from apps.api.acl import CuentaNoEncontradaExterna, ErrorSistemaExterno
 from packages.core_domain.dinero import a_centimos
-from packages.datagen.mapping.movistar_map import tipo_desde_crm
+from packages.datagen.mapping.movistar_map import concepto_desde_grupo, tipo_desde_crm
 
 __all__ = ["VAR_DSN", "TransporteSupabase"]
 
@@ -373,8 +373,15 @@ class TransporteSupabase:
             lineas.append(
                 {
                     "linea_id": indice,
-                    "concepto_id": fila[3],
+                    # El código canónico si el grupo lo identifica; si no, el código
+                    # crudo del facturador. Sin esta traducción, `regla_concepto_causa`
+                    # no encontraba entrada para ningún cargo real y la atribución se
+                    # quedaba sin candidatos aunque hubiera una orden del CRM delante.
+                    "concepto_id": concepto_desde_grupo(fila[6], fila[3]) or fila[3],
+                    # El código original se conserva como nombre técnico: el asesor tiene
+                    # que poder buscarlo en el facturador, donde el canónico no existe.
                     "nombre_comercial": fila[4] or fila[3],
+                    "codigo_origen": fila[3],
                     "familia": _familia(fila[6]),
                     "descripcion": fila[4] or "",
                     "monto_cent": monto,

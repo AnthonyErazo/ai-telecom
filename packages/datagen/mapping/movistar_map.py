@@ -224,6 +224,51 @@ TIPO_ORDEN_MAP: dict[str, TipoMovimiento] = {
 }
 
 
+#: Grupo del facturador → código de cargo canónico del catálogo.
+#:
+#: El dataset del desafío trae **471 códigos de cargo** propios (``OC1_RECONEXION``,
+#: ``FRIORX_001``…) y el catálogo del proyecto razona sobre 31 conceptos de negocio. Sin
+#: puente entre ambos, ``regla_concepto_causa`` no encuentra entrada para ningún cargo
+#: real y la atribución se queda sin candidatos **aunque haya una orden del CRM delante**.
+#:
+#: El puente se hace por GRUPO y no código a código, por dos razones. La primera es que
+#: el grupo es un dato que el propio facturador afirma, no una heurística nuestra: las
+#: correspondencias de abajo salen de `SELECT grupo, count(*) FROM cargo_facturado`. La
+#: segunda es que una tabla de 471 líneas escritas a mano caduca con el próximo export,
+#: y once grupos no.
+#:
+#: Lo ambiguo no se mapea. «OTROS» y «CARGA EXTERNA» agrupan cargos heterogéneos: darles
+#: un concepto sería atribuirles una causa que no les consta, que es exactamente lo que
+#: este proyecto existe para no hacer.
+GRUPO_A_CONCEPTO: dict[str, str] = {
+    "CARGO FIJO": "RENTA_PLAN_MOVIL",
+    "CARGO FIJO VENCIDO": "RENTA_PLAN_MOVIL",
+    # «Proporcional» es la palabra del facturador para el prorrateo: el cobro por los
+    # días usados, que es la casuística de alta y de cambio de plan a mitad de ciclo.
+    "CARGO FIJO PROPORCIONAL": "PRORRATEO_PLAN",
+    "CARGO FIJO PROPORCIONAL VENCIDO": "PRORRATEO_PLAN",
+    "CARGO POR RECONEXION": "CARGO_RECONEXION",
+    "DESCUENTO CARGO RECURRENTE": "DESCUENTO_PROMOCIONAL",
+    "PAQUETES": "PAQUETE_DATOS_ADICIONAL",
+    "ROAMING": "PAQUETE_ROAMING",
+    "TRAFICO ADICIONAL": "CONSUMO_DATOS_ADICIONAL",
+}
+
+
+def concepto_desde_grupo(grupo: str | None, codigo: str | None = None) -> str | None:
+    """Código canónico para un cargo real, a partir del grupo que declara el facturador.
+
+    Returns:
+        El ``concepto_id`` del catálogo, o ``None`` si el grupo no es concluyente. Un
+        ``None`` no rompe nada: el cargo se explica igual —el cuánto sale del recibo— y
+        lo que no se afirma es su causa.
+    """
+    canonico = GRUPO_A_CONCEPTO.get((grupo or "").strip().upper())
+    if canonico:
+        return canonico
+    return concepto_canonico(codigo) if codigo else None
+
+
 def tipo_desde_crm(razon: str | None, tipo_item: str | None) -> TipoMovimiento | None:
     """Traduce el vocabulario real del CRM de Movistar a un :class:`TipoMovimiento`.
 
