@@ -283,7 +283,7 @@ class TransporteSupabase:
             (cuenta_id, GRUPO_EXCLUIDO),
         ).fetchall()
         if not filas:
-            raise CuentaNoEncontradaExterna(self.nombre, cuenta_id)
+            raise CuentaNoEncontradaExterna(self.nombre, cuenta_id, "supabase:cargo_facturado")
 
         por_ciclo: dict[str, list[tuple]] = defaultdict(list)
         for fila in filas:

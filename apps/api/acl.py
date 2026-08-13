@@ -141,11 +141,29 @@ class ErrorSistemaExterno(RuntimeError):
 
 
 class CuentaNoEncontradaExterna(ErrorSistemaExterno):
-    """El sistema respondió correctamente y la cuenta no existe."""
+    """El sistema respondió correctamente y la cuenta no existe.
 
-    def __init__(self, sistema: str, cuenta_id: str) -> None:
+    El mensaje nombra **dónde se buscó**, y no es un adorno. La causa más frecuente de
+    este error no es una cuenta equivocada: es un origen equivocado. Un clon reciente no
+    trae `.env` —está en `.gitignore`— así que se queda sin `ORIGEN_RECIBOS=supabase` y
+    sirve `data/sintetico`, donde solo existen las cuentas de guion `C-DEMO-*`. Entonces
+    una cuenta perfectamente real del dataset «no existe», y el mensaje anterior no daba
+    ninguna pista de por qué.
+
+    Decir el origen convierte una tarde de depuración en una línea de log.
+    """
+
+    def __init__(self, sistema: str, cuenta_id: str, origen: str | None = None) -> None:
         self.cuenta_id = cuenta_id
-        super().__init__(sistema, f"la cuenta {cuenta_id} no existe")
+        self.origen = origen
+        donde = f" en {origen}" if origen else ""
+        pista = (
+            ""
+            if origen and origen.startswith("supabase")
+            else " · si esperaba una cuenta del dataset del desafío, falta"
+            " ORIGEN_RECIBOS=supabase y SUPABASE_DB_URL en el .env"
+        )
+        super().__init__(sistema, f"la cuenta {cuenta_id} no existe{donde}{pista}")
 
 
 # --------------------------------------------------------------------------- #
@@ -243,7 +261,7 @@ class TransporteArchivo:
         """Documento de BrainyBill de una cuenta, recortado a ``ciclos`` recibos."""
         ruta = self.raiz / "bills" / f"{cuenta_id}.json"
         if not ruta.is_file():
-            raise CuentaNoEncontradaExterna(self.nombre, cuenta_id)
+            raise CuentaNoEncontradaExterna(self.nombre, cuenta_id, f"archivo:{self.raiz}")
         documento = json.loads(ruta.read_text(encoding="utf-8"))
         recibos = documento.get("recibos", [])
         documento["recibos"] = recibos[: max(ciclos, 1)]
