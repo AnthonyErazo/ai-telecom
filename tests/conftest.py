@@ -38,6 +38,28 @@ def pytest_configure(config: pytest.Config) -> None:
     # El retriever cae solo a índice en memoria sin DATABASE_URL; se explicita para que
     # ninguna prueba toque una base de datos por accidente.
     os.environ.pop("DATABASE_URL", None)
+    # Y estas dos, que llegan del `.env` desde que `apps.api.settings` lo vuelca al
+    # entorno del proceso. Se fijan **vacías** en vez de borrarse: al existir la clave,
+    # `load_dotenv(override=False)` ya no la repone, así que da igual quién importe qué
+    # primero. Sin esto, un `.env` con credenciales de Supabase convertía la suite en una
+    # prueba de integración contra la nube —lenta, en red, y contra el dataset real— sin
+    # que nadie lo hubiera pedido, y `ORIGEN_RECIBOS=supabase` haría que las pruebas del
+    # dataset sintético buscaran cuentas C-DEMO que allí no existen.
+    os.environ["SUPABASE_DB_URL"] = ""
+    os.environ["ORIGEN_RECIBOS"] = ""
+    # Y el embedder, que es el agujero que quedaba en la garantía nº 1. `LLM_MODE=mock`
+    # calla al generador, pero **no** al modelo de embeddings: el índice vectorial seguía
+    # llamando a Gemini durante la suite. Eso no era solo lentitud —de 52 s a más de dos
+    # minutos— sino un resultado que dependía de una cuota ajena: agotado el cupo diario,
+    # el retriever degrada a BM25 puro, devuelve otra evidencia y
+    # `test_rehidratacion` empieza a contar 23 items donde esperaba 25. Un test que pasa
+    # por la mañana y falla por la tarde sin que nadie toque el código no está probando
+    # el código.
+    #
+    # `setdefault`, no asignación: quien exporte la variable a mano está pidiendo
+    # explícitamente ejercitar el embedder de verdad, y eso se respeta.
+    #   GEMINI_EMBED_MODEL=gemini-embedding-2 python -m pytest tests/integracion
+    os.environ.setdefault("GEMINI_EMBED_MODEL", "")
     # Los *checkpoints* del grafo van a un fichero temporal propio de la sesión, no al
     # `data/checkpoints/turnos.sqlite` del proyecto. Sigue siendo SQLite **en disco**
     # —la suite tiene que ejercitar el almacén de verdad, no uno en memoria—, pero cada

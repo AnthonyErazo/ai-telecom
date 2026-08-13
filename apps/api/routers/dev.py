@@ -232,9 +232,39 @@ def alucinar(
     )
 
 
-@router.get("/cuentas", summary="Cuentas de guion disponibles en el dataset")
-def cuentas(ajustes: AjustesDep) -> dict[str, Any]:
-    """Lista las cuentas de la demo y cuántas hay en total en el dataset."""
+@router.get("/cuentas", summary="Cuentas disponibles en el origen que sirve los recibos")
+def cuentas(ajustes: AjustesDep, repositorio: RepositorioDep) -> dict[str, Any]:
+    """Lista cuentas que se pueden explicar **en el origen que está sirviendo ahora**.
+
+    La pregunta que responde no es «qué hay en disco» sino «qué puedo escribir en la
+    pantalla de entrada para que funcione». Son la misma cosa solo cuando los recibos
+    salen del disco; con ``ORIGEN_RECIBOS=supabase`` dejan de serlo, y la diferencia se
+    pagaba entera en la cara del usuario: la interfaz ofrecía ``C-DEMO-01``, el ACL la
+    buscaba en Supabase, saltaba «la cuenta no existe» y el login moría. El desplegable
+    prometía cuentas que el motor no podía servir.
+
+    Por eso se le pregunta al **transporte que de verdad atiende los recibos**, en lugar
+    de mirar un directorio. Si ese transporte sabe enumerar sus cuentas se le pide la
+    lista; si no —el de fichero no la necesita, los ficheros ya están ahí— se recorre el
+    disco como siempre.
+    """
+    transporte = getattr(repositorio.brainybill, "transporte", None)
+    enumerar = getattr(transporte, "cuentas", None)
+    if callable(enumerar):
+        reales = list(enumerar(10))
+        return {
+            "raiz": f"{getattr(transporte, 'nombre', 'externo')}:cargo_facturado",
+            "total": len(reales),
+            # Van en ``demo`` porque es la clave que lee la interfaz para poblar el
+            # desplegable. No son cuentas de guion —el dataset real no trae guion— pero
+            # sí son las únicas que la pantalla puede ofrecer sin mentir.
+            "demo": reales,
+            # Sin guion: describir el caso de una cuenta real exigiría abrir su recibo, y
+            # este endpoint no explica nada, solo dice a quién se puede preguntar.
+            "guion": {},
+            "muestra": reales,
+        }
+
     directorio = ajustes.ruta_datos / "bills"
     disponibles = (
         sorted(ruta.stem for ruta in directorio.glob("*.json")) if directorio.is_dir() else []

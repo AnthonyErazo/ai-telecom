@@ -40,6 +40,7 @@ import logging
 import math
 import os
 import struct
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Final
@@ -65,6 +66,14 @@ __all__ = [
 ]
 
 _LOG = logging.getLogger(__name__)
+
+#: Cuánto se deja de llamar al proveedor tras un 429 **diario**. Diez minutos no
+#: recupera la cuota —eso tarda horas— pero acota el daño si la clave se cambia en
+#: caliente: el servicio se recupera solo sin reiniciar nada.
+_ENFRIAMIENTO_CUOTA_DIARIA_S: Final = 600
+
+#: Y tras un 429 **por minuto**, que sí se repone solo.
+_ENFRIAMIENTO_CUOTA_MINUTO_S: Final = 60
 
 #: Dimensión por defecto de los vectores (``EMBED_DIM`` en el entorno).
 DIMENSION_POR_DEFECTO: Final = 768
@@ -118,8 +127,32 @@ def normalizar_dsn(dsn: str | None) -> str | None:
 
 
 def dsn_configurado() -> str | None:
-    """DSN de PostgreSQL desde ``DATABASE_URL``, ya normalizado."""
-    return normalizar_dsn(os.getenv("DATABASE_URL"))
+    """DSN de PostgreSQL desde ``DATABASE_URL``, con ``SUPABASE_DB_URL`` de reserva.
+
+    ``DATABASE_URL`` manda siempre. Si viene vacía y hay ``SUPABASE_DB_URL``, se usa esa:
+    apuntan a la misma base y exigir que se declare dos veces solo servía para que el
+    índice no encontrara la suya.
+
+    Y lo que costaba no era una advertencia en el log. Sin DSN, el índice **degrada a
+    memoria**, y un índice en memoria no encuentra los vectores que ya están guardados:
+    le pide al proveedor el corpus entero —los cientos de documentos del catálogo, las
+    FAQ y las casuísticas— **en cada arranque del proceso**. Con un modelo que no admite
+    lotes eso es una petición por documento contra una cuota diaria de mil, así que dos o
+    tres reinicios dejaban al servicio sin embeddings para el resto del día. La reserva
+    no es comodidad: es lo que evita que un nombre de variable queme la cuota.
+
+    A diferencia de ``ORIGEN_RECIBOS`` —que exige valor explícito para que tener
+    credenciales de Supabase no cambie en silencio de dónde salen los recibos de un
+    cliente— aquí la reserva es segura: el índice vectorial es una **caché derivada** del
+    corpus, no un dato de facturación, y reconstruirlo da el mismo contenido.
+    """
+    directa = normalizar_dsn(os.getenv("DATABASE_URL"))
+    if directa:
+        return directa
+    reserva = normalizar_dsn(os.getenv("SUPABASE_DB_URL"))
+    if reserva:
+        _LOG.info("DATABASE_URL vacía: el índice vectorial usa SUPABASE_DB_URL")
+    return reserva
 
 
 # --------------------------------------------------------------------------- #
@@ -290,10 +323,61 @@ class GeminiEmbedder(Embedder):
         #: modelo porque el catálogo de Google cambia y una tabla de capacidades
         #: caducada miente peor que no tener tabla.
         self.lote_maximo: int | None = None
+        #: Instante hasta el que **no** se vuelve a llamar. Ver :meth:`_agotada`.
+        self._sin_cuota_hasta: float = 0.0
 
     def firma_modelo(self) -> str:
         """``gemini:<modelo>:<dimension>`` — cambia si cambia el modelo, y obliga a reindexar."""
         return f"{self.nombre}:{self.modelo}:{self.dimension}"
+
+    # ------------------------------------------------------------------ #
+    # Cortacircuitos de cuota
+    # ------------------------------------------------------------------ #
+    def _exigir_cuota(self) -> None:
+        """Falla en el acto si la cuota está agotada, sin salir a la red.
+
+        Sin esto, cada turno pagaba el viaje de ida y vuelta hasta Google **para recibir
+        el mismo 429 que ya se sabía**: medido en la bitácora, 1,25 s de los 4,3 s que
+        tardaba una explicación se iban en preguntar algo cuya respuesta ya se conocía.
+        Y la cuota diaria no se repone en un minuto: son horas. Insistir no solo era
+        lento, era una espera garantizada e inútil delante del cliente.
+
+        Se falla con el mismo :class:`ErrorEmbedder` que produciría la llamada real, así
+        que quien llama no distingue los dos casos y sigue degradando a BM25 igual: el
+        cortacircuitos cambia el **coste**, nunca el comportamiento.
+
+        Raises:
+            ErrorEmbedder: mientras dure el enfriamiento.
+        """
+        restante = self._sin_cuota_hasta - time.monotonic()
+        if restante > 0:
+            raise ErrorEmbedder(
+                f"cuota de embeddings agotada en {self.modelo}; no se reintenta hasta "
+                f"dentro de {int(restante)} s"
+            )
+
+    def _anotar_si_es_cuota(self, error: Exception) -> None:
+        """Abre el cortacircuitos si el fallo es de cuota agotada, y solo entonces.
+
+        Un 429 puede ser *por minuto* —se repone solo— o **por día**, que no. Se
+        distinguen por el identificador de la violación que trae el propio error: los
+        diarios lo llevan en ``PerDay``. Ante la duda se aplica el enfriamiento corto:
+        cerrar el paso de más ante un error transitorio dejaría sin vectores un servicio
+        que podía tenerlos.
+        """
+        texto = str(error)
+        if "RESOURCE_EXHAUSTED" not in texto and "429" not in texto:
+            return
+        por_dia = "PerDay" in texto
+        espera = _ENFRIAMIENTO_CUOTA_DIARIA_S if por_dia else _ENFRIAMIENTO_CUOTA_MINUTO_S
+        self._sin_cuota_hasta = time.monotonic() + espera
+        _LOG.warning(
+            "cuota de embeddings agotada en %s (%s); no se vuelve a llamar en %d s: "
+            "la búsqueda se sirve con BM25",
+            self.modelo,
+            "límite diario" if por_dia else "límite por minuto",
+            espera,
+        )
 
     def _obtener_cliente(self) -> Any:
         """Instancia perezosa del cliente: importar el SDK no debe ser un efecto de importar el módulo."""
@@ -364,6 +448,7 @@ class GeminiEmbedder(Embedder):
                 vectores_uno_a_uno.extend(self.incrustar([texto], tipo_tarea=tipo_tarea))
             return vectores_uno_a_uno
 
+        self._exigir_cuota()
         cliente = self._obtener_cliente()
         try:
             respuesta = cliente.models.embed_content(
@@ -375,6 +460,7 @@ class GeminiEmbedder(Embedder):
                 },
             )
         except Exception as error:  # la causa exacta la aporta el SDK
+            self._anotar_si_es_cuota(error)
             raise ErrorEmbedder(f"fallo al pedir embeddings a Gemini: {error}") from error
 
         vectores = self._extraer_vectores(respuesta)
@@ -520,7 +606,26 @@ class IndiceVectorial:
             # Timeout corto: si la base no responde, se degrada en segundos. Un
             # arranque colgado esperando a PostgreSQL es peor que uno sin vectores.
             conexion_args = (
-                {"connect_timeout": _TIMEOUT_CONEXION_S} if "postgresql" in normalizado else {}
+                {
+                    "connect_timeout": _TIMEOUT_CONEXION_S,
+                    # Sin sentencias preparadas. Los DSN de Supabase apuntan al **pooler
+                    # de transacciones** (pgbouncer, puerto 6543), que multiplexa cada
+                    # consulta sobre conexiones de servidor distintas y no admite
+                    # `PREPARE`. psycopg3 prepara sola a partir de la quinta ejecución de
+                    # la misma sentencia, así que el índice funcionaba un rato y luego
+                    # empezaba a fallar con `DuplicatePreparedStatement: prepared
+                    # statement "_pg3_0" already exists` justo al sincronizar el corpus.
+                    #
+                    # El fallo no tumbaba el turno —el retriever degrada a BM25— pero sí
+                    # dejaba el índice sin poblar, con lo que el corpus se volvía a
+                    # vectorizar en el arranque siguiente. Y el volcado del error entero,
+                    # con sus vectores de 768 dimensiones, acababa dentro del payload de
+                    # `RETRIEVE`: decenas de miles de caracteres de ruido en cada evento
+                    # de una bitácora que es evidencia.
+                    "prepare_threshold": None,
+                }
+                if "postgresql" in normalizado
+                else {}
             )
             motor = create_engine(
                 normalizado, pool_pre_ping=True, future=True, connect_args=conexion_args
@@ -687,6 +792,61 @@ class IndiceVectorial:
             "vectorizados": len(pendientes),
             "sin_cambios": len(documentos) - len(pendientes),
         }
+
+    def adoptar(
+        self, documentos: Sequence[DocumentoCorpus], vectores: Sequence[list[float]]
+    ) -> dict[str, int]:
+        """Indexa vectores **ya calculados en otro sitio**, sin llamar al proveedor.
+
+        Por qué existe
+        --------------
+        Este proyecto acabó con dos almacenes de vectores que no se hablaban. El esquema
+        (``db/esquema.sql``) guarda el vector **pegado a la fila** del dato —
+        ``faq.embedding``, ``casuistica.embedding``, ``vocabulario_peruano.embedding``—
+        y ahí es donde escribe ``scripts/vectorizar_corpus.py``. Este índice, en cambio,
+        lee una tabla propia, ``rag_documento``. Las dos decisiones son defendibles por
+        separado; juntas significaban que un corpus vectorizado al 100 % no le servía de
+        nada al servicio en marcha, que volvía a pedirle los embeddings al proveedor en
+        **cada arranque** contra una cuota diaria.
+
+        La pieza que faltaba era esta: un puente que **traslade** los vectores existentes
+        en vez de recalcularlos. No hay aproximación de por medio —ambos lados vectorizan
+        exactamente ``DocumentoCorpus.texto_indexable()``, y la firma del modelo se
+        comprueba antes de aceptar nada—, así que adoptar es equivalente a haber
+        vectorizado, y cuesta cero llamadas.
+
+        Args:
+            documentos: los documentos, con el mismo texto que se vectorizó.
+            vectores: sus vectores, en el mismo orden y con la dimensión de este índice.
+
+        Returns:
+            ``{"adoptados": n}``.
+
+        Raises:
+            ValueError: si las longitudes no casan o algún vector tiene otra dimensión.
+                Se falla en vez de recortar: un vector de otra dimensión es un vector de
+                otro modelo, y mezclarlos daría un ranking con buena pinta y sin sentido.
+        """
+        if len(documentos) != len(vectores):
+            raise ValueError(
+                f"{len(documentos)} documentos y {len(vectores)} vectores: no casan"
+            )
+        esperada = int(self.embedder.dimension)
+        for documento, vector in zip(documentos, vectores, strict=True):
+            if len(vector) != esperada:
+                raise ValueError(
+                    f"{documento.doc_id}: vector de {len(vector)} componentes, "
+                    f"pero el índice es de {esperada}"
+                )
+        if not documentos:
+            return {"adoptados": 0}
+        self._guardar(list(documentos), [normalizar_vector(vector) for vector in vectores])
+        _LOG.info(
+            "índice vectorial: %d documentos adoptados sin llamar al proveedor (modelo %s)",
+            len(documentos),
+            self.modelo,
+        )
+        return {"adoptados": len(documentos)}
 
     def _guardar(self, documentos: Sequence[DocumentoCorpus], vectores: Sequence[list[float]]) -> None:
         """Escribe un lote en la base o en memoria (upsert por ``doc_id`` + ``modelo``)."""

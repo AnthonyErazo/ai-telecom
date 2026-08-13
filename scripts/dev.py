@@ -82,8 +82,47 @@ ENTORNO_SIN_INFRAESTRUCTURA = {
     "ENTORNO": "dev",
     "LLM_MODE": "mock",
     # El interruptor del que depende todo esto: ni una conexión a PostgreSQL.
+    # Ojo: solo se impone si NO hay una base configurada. Ver `_modo_almacenamiento`.
     "MODO_ALMACENAMIENTO": "memoria",
 }
+
+
+#: Claves cuyo valor, si existe, significa «este equipo sí tiene una base».
+CLAVES_DE_BASE = ("DATABASE_URL", "SUPABASE_DB_URL")
+
+
+def _valor_en_env(clave: str) -> str:
+    """Busca una clave en el entorno y, si no está, en el ``.env`` del proyecto.
+
+    Este guion es **solo biblioteca estándar** a propósito —tiene que correr en un equipo
+    recién clonado, sin ``pip install`` de por medio— así que no usa ``python-dotenv``.
+    El fichero se lee a mano y con el mínimo indispensable: no interpreta comillas,
+    ``export`` ni sustituciones, porque para decidir «¿hay base configurada?» basta con
+    saber si la clave tiene algo escrito.
+    """
+    del_entorno = (os.environ.get(clave) or "").strip()
+    if del_entorno:
+        return del_entorno
+    fichero = RAIZ / ".env"
+    if not fichero.is_file():
+        return ""
+    try:
+        lineas = fichero.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    for linea in lineas:
+        limpia = linea.strip()
+        if limpia.startswith("#") or "=" not in limpia:
+            continue
+        nombre, _, valor = limpia.partition("=")
+        if nombre.strip() == clave:
+            return valor.strip()
+    return ""
+
+
+def _hay_base_configurada() -> bool:
+    """``True`` si el equipo tiene un PostgreSQL declarado al que merezca la pena ir."""
+    return any(_valor_en_env(clave) for clave in CLAVES_DE_BASE)
 
 
 def _avisar(texto: str = "") -> None:
@@ -233,9 +272,20 @@ def _abrir_cuando_este_lista(base: str, *, espera_s: float = 45.0) -> None:
 # Servidor
 # --------------------------------------------------------------------------- #
 def _entorno_preparado() -> dict[str, str]:
-    """Copia del entorno con los valores sin infraestructura ya puestos."""
+    """Copia del entorno con los valores sin infraestructura ya puestos.
+
+    ``MODO_ALMACENAMIENTO=memoria`` se salta cuando el equipo **sí** tiene una base
+    declarada. La promesa de este guion es *«arranca aunque no tengas nada»*, no
+    *«ignora lo que tengas»*, y la diferencia se pagaba cara: sin base, el índice
+    vectorial vive en el proceso, no encuentra los vectores ya calculados y le pide al
+    proveedor el corpus entero **en cada arranque** —cientos de documentos, uno por
+    petición— contra una cuota diaria. Quien tiene Supabase configurado y ejecuta esto
+    esperaba un arranque rápido, no quedarse sin cuota de embeddings a media tarde.
+    """
     entorno = dict(os.environ)
     for clave, valor in ENTORNO_SIN_INFRAESTRUCTURA.items():
+        if clave == "MODO_ALMACENAMIENTO" and _hay_base_configurada():
+            continue
         entorno.setdefault(clave, valor)
     return entorno
 

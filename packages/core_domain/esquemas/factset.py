@@ -182,6 +182,28 @@ class LineaDelta(BaseModel):
         """
         return self.causa is not None or self.causa_oficial is not None
 
+    @property
+    def exige_causa(self) -> bool:
+        """Si esta línea **necesita** una causa para estar explicada.
+
+        No todas la necesitan, y confundirlo hace que el sistema se disculpe por algo que
+        sí sabe. El IGV se mueve porque se movió la base afecta: no existe —ni puede
+        existir— una orden en el CRM que lo explique, y aun así está perfectamente
+        explicado. Lo mismo el redondeo. El motor ya lo sabe y los marca con la evidencia
+        ``regla:derivado_del_recibo`` y la familia ``IMPUESTO``.
+
+        El síntoma de no distinguirlo se veía en el cliente de guion: la explicación
+        nombraba el fin del descuento y el cambio de plan, cuadraba al céntimo, y a
+        continuación decía *«no consta la orden que originó ese cambio»* — porque el IGV
+        no tenía causa. Una salvedad que salta cuando no toca enseña a ignorarla, y esa
+        salvedad es justo la que **sí** hay que leer cuando aparece de verdad.
+        """
+        from packages.core_domain.enums import FamiliaConcepto
+
+        if self.familia is FamiliaConcepto.IMPUESTO:
+            return False
+        return not any(marca.startswith("regla:derivado") for marca in self.evidencia)
+
 
 class Invariante(BaseModel):
     """Conciliación entre el delta total y la suma de deltas por línea.
@@ -544,6 +566,9 @@ class FactSet(BaseModel):
                     # Va al prompt a propósito: decirle al modelo que el porqué NO está
                     # confirmado es la mejor defensa contra que se lo invente.
                     "causa_confirmada": linea.causa_confirmada,
+                    # Y esto distingue «no se sabe el porqué» de «no hay porqué que
+                    # saber»: el IGV no necesita una orden que lo explique.
+                    "exige_causa": linea.exige_causa,
                     "dias_prorrateo": linea.dias_prorrateo,
                     "cuota": (
                         f"{linea.cuota_numero} de {linea.cuotas_totales}"

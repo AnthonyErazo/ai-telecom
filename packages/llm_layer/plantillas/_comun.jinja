@@ -62,12 +62,19 @@ A la vez, {{ d.causa_que_ahorra.etiqueta }} jugó a su favor y le ahorró {{ d.c
    quiere además el motivo documentado. Callarlo sería insinuar una causa que no consta;
    derivar por ello convertiría el hand-off en el caso normal.
    Sin una sola cifra nueva: aquí no se imprime ningún importe. #}
+{# Una frase, no tres. La versión anterior decía lo mismo tres veces —que detalla el
+   cuánto, que no consta el motivo, y que puede pasar con un asesor— y el cierre volvía a
+   ofrecer el asesor en la frase siguiente. El resultado era un párrafo más largo que la
+   propia explicación y con el ofrecimiento duplicado en dos frases seguidas: la salvedad
+   dejaba de leerse como honestidad y pasaba a leerse como excusa.
+   Lo que se dice sigue siendo exactamente lo mismo, y sigue sin llevar ni una cifra. #}
 {% macro salvedad_causal(d) -%}
 {% if d.causa_sin_confirmar and not d.sin_variacion %}
-Le detallo cuánto cambió y en qué líneas, que es lo que figura en su recibo. Lo que no le puedo confirmar es el motivo: en nuestros sistemas no consta la orden que originó ese cambio, y prefiero decírselo a suponerlo. Si quiere el motivo documentado, lo paso con un asesor y lo revisa con usted.
+Eso sí: en nuestros sistemas no consta la orden que originó ese cambio, así que el motivo no se lo puedo confirmar.
 {% endif %}
 {%- endmacro %}
 
+{# El ofrecimiento de asesor va aquí y en ningún otro sitio: una sola vez, al final. #}
 {% macro cierre_estandar(d) -%}
 {{ neto(d) }} {{ deuda_frase(d) }} {{ salvedad_causal(d) }} {{ efervescente(d) }} Si gusta, le muestro el detalle línea por línea o lo paso con un asesor.
 {%- endmacro %}

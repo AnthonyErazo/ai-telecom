@@ -65,6 +65,17 @@ con el cambio. Es correcto, es explicable en dos frases, y hoy termina en una ll
 
 Ese cliente es `C-DEMO-01` en este repositorio, y `make demo` lo explica.
 
+> **De dónde salen los recibos.** El origen del sistema es el **dataset del Desafío 1**:
+> las 297 002 filas de `cargo_facturado` en Supabase, con cuentas numéricas reales
+> (`750684421`, `604511549`…). Es lo que sirve la interfaz y lo que fija
+> `ORIGEN_RECIBOS=supabase` en el `.env`.
+>
+> Las cuentas `C-DEMO-*` que aparecen en este documento son del **dataset sintético
+> determinístico** (`make seed`), que existe por dos razones concretas: el dataset real no
+> está en el repositorio —cláusula de confidencialidad de las bases— y las pruebas no
+> pueden depender de una base en la nube. Sirve para `make demo`, para los casos golden y
+> para trabajar sin red. **No es el origen de los datos del producto.**
+
 ---
 
 ## 2. Qué es esto
@@ -406,7 +417,7 @@ Estado: ✅ implementado y verificado · 🟡 parcial (se dice hasta dónde) · 
 |---|---|---|---|
 | 22 | *«arquitectura RAG»* | ✅ | `packages/retriever/` — tres corpus con acceso distinto: catálogo por clave, FAQs híbrido BM25+vectorial con fusión RRF (k=60), casuísticas por firma causal |
 | 23 | *«respuestas limitadas estrictamente a la base de datos de facturación provista, para garantizar 0 % de alucinaciones financieras, apoyándose en reglas / base de conocimiento»* | ✅ | El conjunto permitido del verificador se construye **solo** desde el `FactSet` (`verificador.py::construir_permitidos`); `packages/retriever/saneador.py` garantiza que el texto recuperado **no contiene un solo dígito** |
-| 24 | *«experiencia omnicanal App + Bot (+ WhatsApp)»* | ✅ | `RespuestaCanalAgnostica` con bloques que cada canal degrada; `Canal` = `APP·BOT·WHATSAPP·ASESOR`; WhatsApp resuelto por nivel de aseguramiento (§6.4) |
+| 24 | *«experiencia omnicanal App + Bot (+ WhatsApp)»* | ✅ | `RespuestaCanalAgnostica` con bloques que cada canal degrada; `Canal` = `APP·BOT·WHATSAPP·ASESOR`; WhatsApp resuelto por nivel de aseguramiento (§6.4). **Los tres canales tienen interfaz**: `apps/web/src/App.tsx` (App), `components/WhatsApp.tsx` (LOA1, cero importes) y `components/Asesor.tsx` (cola + expediente + sala) |
 | 25 | *«motor de recomendación de siguientes acciones: pago, consulta, derivación con contexto o propuesta comercial personalizada cuando aplique»* | ✅ | `packages/llm_layer/generador.py::accion_sugerida` + reglas de `explicar.py` |
 | 26 | *«usando datos simulados o anonimizados y reglas de negocio simplificadas»* | ✅ | `packages/datagen/` (300 clientes, 1 800 recibos, ground truth escrito en el mismo acto) + `db/reglas/rules.yaml`. **Sin PII: ni DNI ni teléfono** (hay un `CHECK` en `db/esquema.sql` que los rechaza) |
 | 27 | *«categorizando los motivos de consulta en lenguaje cliente alineado al de la atención humana Movistar (ej. prorrateos, reconexiones)»* | ✅ | `ETIQUETAS_CAUSA_OFICIAL` en `packages/core_domain/enums.py` — las 9 etiquetas son las de la ficha, literales |
@@ -448,8 +459,8 @@ Se lista aquí y no en letra pequeña. El detalle completo, con riesgos y respon
 
 | Falta | Por qué | Impacto |
 |---|---|---|
-| **Corregir la atribución causal en escenarios compuestos** ← *el defecto que sí duele* | El generador y el motor etiquetan **todos** los deltas de un escenario con su causa principal | En `C-DEMO-01` la aritmética es exacta (residual 0, `PASS`) pero la narrativa dice *«subió porque cambió de plan»* cuando el cambio de plan le **ahorró S/ 32.26**: lo que subió el recibo fue el fin del descuento. Diagnóstico completo y plan de corrección en [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md) §1, riesgo **R-07**. **Media jornada de trabajo** |
-| **Interfaz gráfica** (App / Bot / WhatsApp) | Excluida del alcance por decisión del equipo: el valor está en el motor y en la garantía numérica, no en pintar bloques | La demo se hace con `curl` y con `/docs`. Los bloques tipados están listos para consumir |
+| ~~**Corregir la atribución causal en escenarios compuestos**~~ **— corregido** | Se cerró en los cuatro frentes (`preferencia_causa` en `rules.yaml`, causas agregadas separadas por signo, prompt y plantillas) | `C-DEMO-01` dice ahora *«le llegó S/ 20.82 más caro **porque se le venció el descuento**»* y añade *«a la vez, cambió a un plan más barato, lo que le **ahorró S/ 32.26**»*. Protegido por `tests/golden/test_atribucion_causal.py` y los casos `G35`–`G38`, uno **inverso** para que la corrección no se pase de frenada. Riesgo **R-07** en [`docs/PROCEDENCIA.md`](docs/PROCEDENCIA.md), cerrado con residual declarado |
+| ~~**Interfaz gráfica** (App / Bot / WhatsApp)~~ **— ya no falta** | Se construyó: `apps/web` sirve los tres canales de la ficha desde la misma API. App Mi Movistar (chat con bloques, cascada y panel de gobernanza), **WhatsApp** (texto plano con token `LOA1`, sin un solo importe) y **consola del asesor 104** (cola, expediente desde la bitácora y sala compartida) | La demo ya no necesita `curl`. Sigue existiendo `/docs` para auditar el contrato |
 | **Integración con el sistema facturador** | Sin contrato publicado; el recibo ya llega por BrainyBill | Ninguno para el prototipo; sería trabajo de ACL |
 | **Catálogo comercial real** para el cross-selling | No forma parte de los datos del Desafío 1 | La acción `VER_ALTERNATIVAS` se emite sin oferta concreta; la doble condición sí está implementada |
 | **Bucle de mejora continua** | Requiere histórico de producción | La telemetría que lo alimenta ya se emite |

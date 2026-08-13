@@ -306,6 +306,82 @@ def _consultar(sql: str, parametros: Sequence[Any] | None = None) -> list[tuple[
 
 
 # --------------------------------------------------------------------------- #
+# Puente hacia el índice del recuperador
+# --------------------------------------------------------------------------- #
+def sincronizar_indice_rag() -> dict[str, int]:
+    """Copia a ``rag_documento`` los vectores que ya están en las columnas. **Sin API.**
+
+    El agujero que tapa
+    -------------------
+    Este script escribe el vector **pegado a la fila** del dato (``faq.embedding``,
+    ``casuistica.embedding``), porque así lo define ``db/esquema.sql`` y así cuelgan de
+    ahí los índices HNSW. Pero el recuperador en marcha no lee esas columnas: lee su
+    propia tabla, ``rag_documento``. Eran dos diseños de persistencia que no se hablaban,
+    y la consecuencia se pagaba entera en producción: un corpus vectorizado al 100 % no
+    le servía de nada al servicio, que volvía a pedirle los embeddings al proveedor **en
+    cada arranque** contra una cuota de mil al día.
+
+    La solución no es elegir un diseño y tirar el otro —las columnas son las que permiten
+    borrar una FAQ y su vector en la misma transacción; la tabla propia es la que permite
+    buscar en los tres corpus con una sola consulta—. Es **trasladar**: los dos lados
+    vectorizan exactamente ``DocumentoCorpus.texto_indexable()``, así que el vector ya
+    calculado vale igual en los dos sitios.
+
+    Cuesta **cero llamadas al proveedor**: los vectores se leen de Supabase y se escriben
+    en Supabase. Solo se trasladan las filas cuya ``modelo_embedding`` coincide con la
+    firma del embedder actual; un vector de otro modelo no es comparable y se ignora.
+
+    Returns:
+        ``{"adoptados": n, "ignorados": n}``.
+    """
+    from packages.core_domain.enums import CorpusRag
+    from packages.retriever.corpus import cargar_corpus
+    from packages.retriever.vectorial import IndiceVectorial, crear_embedder
+
+    embedder = crear_embedder()
+    firma = embedder.firma_modelo()
+    indice = IndiceVectorial(embedder)
+    if indice.motivo_degradacion:
+        _LOG.error(
+            "el índice vectorial está degradado a memoria (%s): no hay dónde trasladar. "
+            "Defina DATABASE_URL o SUPABASE_DB_URL.",
+            indice.motivo_degradacion,
+        )
+        return {"adoptados": 0, "ignorados": 0}
+
+    corpus = cargar_corpus()
+    # `vocabulario_peruano` se queda fuera a propósito: no es un corpus del recuperador
+    # —lo consume `facts_engine/jerga.py` para normalizar la jerga— y no tiene documento
+    # que indexar. Sus vectores viven en su columna y ahí se usan.
+    por_doc_id = {
+        documento.doc_id: documento
+        for corpus_pedido in ("faq", "casuistica")
+        for documento in corpus.documentos(CorpusRag(corpus_pedido))
+    }
+
+    documentos, vectores, ignorados = [], [], 0
+    for tabla, clave, prefijo in (("faq", "faq_id", "faq"), ("casuistica", "casuistica_id", "casuistica")):
+        filas = _consultar(
+            f"""
+            SELECT {clave}, embedding::text
+            FROM {tabla}
+            WHERE embedding IS NOT NULL AND modelo_embedding = %s
+            """,
+            (firma,),
+        )
+        for identificador, vector_texto in filas:
+            documento = por_doc_id.get(f"{prefijo}:{identificador}")
+            if documento is None:
+                ignorados += 1
+                continue
+            documentos.append(documento)
+            vectores.append([float(x) for x in vector_texto.strip("[]").split(",")])
+
+    resultado = indice.adoptar(documentos, vectores)
+    return {"adoptados": resultado["adoptados"], "ignorados": ignorados}
+
+
+# --------------------------------------------------------------------------- #
 # Control de cuota
 # --------------------------------------------------------------------------- #
 def estimar_tokens(textos: Sequence[str]) -> int:
@@ -786,6 +862,11 @@ def _argumentos(argv: Sequence[str] | None) -> argparse.Namespace:
     analizador.add_argument(
         "--verificar", action="store_true", help="solo cuenta lo vectorizado; no gasta cuota"
     )
+    analizador.add_argument(
+        "--solo-sincronizar",
+        action="store_true",
+        help="solo traslada a rag_documento los vectores ya calculados; NO gasta cuota",
+    )
     analizador.add_argument("--consulta", help="lanza una búsqueda de prueba y compara con BM25")
     analizador.add_argument("-v", "--verboso", action="store_true")
     return analizador.parse_args(argv)
@@ -811,6 +892,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if opciones.consulta:
             consulta_de_humo(crear_embedder(), opciones.consulta)
         return _SALIDA_OK
+
+    if opciones.solo_sincronizar:
+        resumen = sincronizar_indice_rag()
+        print(
+            f"\nÍNDICE DEL RECUPERADOR (rag_documento): {resumen['adoptados']} documentos "
+            f"trasladados, {resumen['ignorados']} ignorados. Sin llamadas al proveedor."
+        )
+        return _SALIDA_OK if resumen["adoptados"] else _SALIDA_ERROR
 
     embedder = crear_embedder()
     if embedder.nombre != "gemini":
@@ -847,6 +936,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         except CuotaAgotada as error:
             _LOG.error("%s — se para aquí; relance el script cuando la cuota se libere", error)
             cortado = True
+
+    # Los vectores recién escritos en las columnas se trasladan al índice que el servicio
+    # lee de verdad. Va aquí, al final de CADA ejecución, para que los dos almacenes no
+    # puedan volver a divergir: divergieron precisamente porque esto era un paso manual
+    # que nadie hacía. No cuesta ninguna llamada al proveedor.
+    traslado = sincronizar_indice_rag()
+    _LOG.info(
+        "índice del recuperador: %d documentos trasladados desde las columnas",
+        traslado["adoptados"],
+    )
 
     print("\nESTADO EN SUPABASE tras la ejecución:")
     faltan = 0

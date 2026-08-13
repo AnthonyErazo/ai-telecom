@@ -116,7 +116,24 @@ class TransporteSupabase:
         except ImportError as exc:  # pragma: no cover - psycopg es dependencia declarada
             raise ErrorSistemaExterno(self.nombre, "falta psycopg") from exc
         try:
-            self._conexion = psycopg.connect(cadena, connect_timeout=20, autocommit=True)
+            self._conexion = psycopg.connect(
+                cadena,
+                connect_timeout=20,
+                autocommit=True,
+                # Sin sentencias preparadas. El DSN de Supabase apunta al **pooler de
+                # transacciones** (puerto 6543, pgbouncer), que multiplexa cada consulta
+                # sobre conexiones de servidor distintas y no admite `PREPARE`: psycopg3
+                # prepara sola a partir de la quinta ejecución de la misma consulta, y la
+                # siguiente caía en otra conexión con
+                # `DuplicatePreparedStatement: prepared statement "_pg3_0" already exists`.
+                #
+                # El síntoma era desconcertante y peligrosísimo para una demostración: las
+                # cinco primeras cuentas se explicaban y **de la sexta en adelante todo el
+                # mundo recibía un 500**, sin que nada cambiara en los datos ni en el
+                # código. Se desactiva aquí y no se sube el umbral porque el pooler no las
+                # admite nunca, no es cuestión de cuántas.
+                prepare_threshold=None,
+            )
         except Exception as exc:
             raise ErrorSistemaExterno(self.nombre, f"no se pudo conectar: {exc}") from exc
 
@@ -133,6 +150,62 @@ class TransporteSupabase:
         """Cierra la conexión. Idempotente y silenciosa: cerrar no debe propagar."""
         with contextlib.suppress(Exception):
             self._conexion.close()
+
+    # -- listado para la demo ------------------------------------------------ #
+    def cuentas(self, limite: int = 10) -> list[str]:
+        """Cuentas reales que **sirven para demostrar**: las de mayor variación real.
+
+        Existe porque ``GET /dev/cuentas`` listaba siempre los ficheros del disco, sin
+        mirar de dónde salen de verdad los recibos. Con Supabase sirviendo el dataset, la
+        interfaz ofrecía las cuentas sintéticas ``C-DEMO-*``, el cliente elegía una, el
+        ACL no la encontraba y el login moría con «la cuenta no existe». El desplegable
+        contaba una cosa y el motor otra.
+
+        El criterio no es «que exista» sino **que tenga algo que explicar**. Este producto
+        responde *por qué varió su recibo*: una cuenta con dos ciclos idénticos abre una
+        pantalla que dice que no pasó nada, y quien la elija concluirá, con razón, que el
+        asistente no funciona. Se piden por tanto los dos ciclos más recientes de cada
+        cuenta, se comparan sus totales y se ofrecen las de mayor diferencia primero, de
+        modo que la que la interfaz precarga sea la más demostrativa que hay.
+
+        La comparación es una suma en SQL, no el ``FactSet``: aquí solo hace falta ordenar
+        candidatas. El importe que se le enseña al cliente lo sigue calculando el motor,
+        con sus reglas y su invariante, como todo lo demás.
+
+        Returns:
+            Los identificadores, de mayor a menor variación. Lista vacía si la consulta
+            falla: un desplegable incompleto es un incordio, pero tumbar ``/dev/cuentas``
+            dejaría la pantalla de entrada en blanco.
+        """
+        try:
+            filas = self._conexion.execute(
+                """
+                WITH por_ciclo AS (
+                    SELECT financial_account_key AS cuenta,
+                           ciclo,
+                           SUM(charge_total_amount) AS total,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY financial_account_key ORDER BY ciclo DESC
+                           ) AS puesto
+                    FROM cargo_facturado
+                    WHERE grupo <> %s
+                    GROUP BY financial_account_key, ciclo
+                )
+                SELECT actual.cuenta
+                FROM por_ciclo AS actual
+                JOIN por_ciclo AS previo
+                  ON previo.cuenta = actual.cuenta AND previo.puesto = 2
+                WHERE actual.puesto = 1
+                  AND ABS(actual.total - previo.total) >= 1
+                ORDER BY ABS(actual.total - previo.total) DESC
+                LIMIT %s
+                """,
+                (GRUPO_EXCLUIDO, max(1, limite)),
+            ).fetchall()
+        except Exception as error:
+            _LOG.warning("no se pudieron listar cuentas de Supabase: %s", error)
+            return []
+        return [str(fila[0]) for fila in filas]
 
     # -- construcción del documento ------------------------------------------ #
     def _documento(self, cuenta_id: str, ciclos: int) -> dict[str, Any]:

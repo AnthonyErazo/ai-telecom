@@ -77,6 +77,7 @@ puede tumbar el arranque de la API.
 from __future__ import annotations
 
 import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -126,6 +127,40 @@ def raiz_proyecto() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _volcar_env_al_proceso() -> None:
+    """Copia ``.env`` a ``os.environ``, que es donde media aplicación lo busca.
+
+    ``Ajustes`` declara ``env_file`` y pydantic-settings lee el fichero, pero lo carga
+    **solo dentro del objeto de ajustes**: no toca el entorno del proceso. Y hay tres
+    consumidores que no pasan por ``Ajustes`` y usan ``os.getenv`` directamente:
+
+    * ``ORIGEN_RECIBOS`` en :func:`apps.api.acl.crear_repositorio`, que decide si los
+      recibos salen de Supabase o del disco.
+    * ``SUPABASE_DB_URL`` en :class:`apps.api.transporte_supabase.TransporteSupabase`.
+    * ``DATABASE_URL`` en :func:`packages.retriever.vectorial.dsn_configurado`.
+
+    El efecto era desconcertante: se ponía ``ORIGEN_RECIBOS=supabase`` en el ``.env``, el
+    fichero se leía sin error, y el servicio seguía sirviendo el dataset sintético — con
+    lo que las cuentas reales respondían «la cuenta no existe». Volcarlo aquí, en el
+    módulo que importa todo lo demás, hace que el ``.env`` signifique lo mismo para los
+    dos mecanismos.
+
+    ``load_dotenv`` **no pisa** lo que ya venga del entorno: una variable exportada a mano
+    o inyectada por Docker sigue mandando sobre el fichero, que es el orden correcto.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:  # pragma: no cover - viene con pydantic-settings
+        _LOG.debug("python-dotenv no disponible: no se vuelca .env al entorno")
+        return
+    raiz = raiz_proyecto()
+    for nombre in (".env", ".env.local"):
+        load_dotenv(raiz / nombre, override=False)
+
+
+_volcar_env_al_proceso()
+
+
 def _destino_sin_credenciales(dsn: str | None) -> str:
     """``host:puerto/base`` de un DSN, sin usuario ni contraseña.
 
@@ -155,6 +190,10 @@ class Ajustes(BaseSettings):
     entorno: str = Field(default="dev", alias="ENTORNO")
     #: Vacía por defecto: la demo no exige PostgreSQL. El ``docker-compose`` la fija.
     database_url: str = Field(default="", alias="DATABASE_URL")
+    #: DSN de Supabase. Lo usan el transporte de recibos y los corpus; se declara aquí
+    #: además para que :meth:`dsn_postgres` pueda caer en él cuando ``DATABASE_URL`` esté
+    #: vacía, que es el caso normal en este proyecto.
+    supabase_db_url: str = Field(default="", alias="SUPABASE_DB_URL")
     modo_almacenamiento: str = Field(default=ALMACENAMIENTO_AUTO, alias="MODO_ALMACENAMIENTO")
 
     # --- Orquestación del turno ---------------------------------------------- #
@@ -271,10 +310,19 @@ class Ajustes(BaseSettings):
         Es el **único** sitio donde se decide. Con ``memoria`` devuelve ``None`` aunque
         ``DATABASE_URL`` venga heredada del entorno: quien pide memoria no quiere pagar
         ni el timeout de conexión.
+
+        Con ``DATABASE_URL`` vacía se cae en ``SUPABASE_DB_URL``, que apunta a la misma
+        base. Exigir que el mismo destino se declarara con dos nombres distintos tenía un
+        precio que no se veía: sin DSN el índice vectorial degrada a memoria, y un índice
+        en memoria **no encuentra los vectores ya calculados**, así que le pedía a Gemini
+        el corpus entero —cientos de documentos, uno por petición porque el modelo de
+        embeddings no admite lotes— en cada arranque del proceso, contra una cuota de mil
+        al día. El síntoma era un arranque de varios minutos y la cuota agotada a media
+        tarde; la causa, un nombre de variable.
         """
         if self.modo_almacenamiento == ALMACENAMIENTO_MEMORIA:
             return None
-        return self.database_url.strip() or None
+        return self.database_url.strip() or self.supabase_db_url.strip() or None
 
     @property
     def usa_postgres(self) -> bool:
@@ -323,7 +371,28 @@ class Ajustes(BaseSettings):
         return ["*"] if self.es_desarrollo else []
 
     def resumen(self) -> dict[str, object]:
-        """Vista de arranque **sin secretos**: se escribe en el log de inicio."""
+        """Vista de arranque **sin secretos**: se escribe en el log de inicio.
+
+        ``brainybill`` declara ``supabase:cargo_facturado`` cuando ``ORIGEN_RECIBOS`` lo
+        pide, porque decir ``archivo:data/sintetico`` mientras el ACL sirve el dataset
+        real es peor que no decir nada: es la primera línea que se mira cuando algo va
+        mal, y mandaba a buscar el problema al sitio equivocado.
+        """
+        recibos_en_supabase = (
+            os.environ.get("ORIGEN_RECIBOS", "").strip().lower() == "supabase"
+        )
+        if recibos_en_supabase:
+            return {
+                **self._resumen_base(),
+                "brainybill": "supabase:cargo_facturado",
+                # Amdocs sigue en disco a propósito: el dataset del desafío no trae
+                # órdenes de CRM. Lo dice `crear_repositorio`.
+                "amdocs": f"archivo:{self.ruta_datos}",
+            }
+        return self._resumen_base()
+
+    def _resumen_base(self) -> dict[str, object]:
+        """El resumen con los orígenes deducidos de la configuración HTTP/disco."""
         return {
             "entorno": self.entorno,
             "llm_mode": self.llm_mode,

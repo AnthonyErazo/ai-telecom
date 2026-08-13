@@ -265,6 +265,9 @@ def construir_datos(
                 "cuota": cruda.get("cuota"),
                 "tramos": tramos,
                 "causa_confirmada": bool(cruda.get("causa_confirmada", False)),
+                # Por defecto `True`: si una proyección antigua no trae el campo, se sigue
+                # exigiendo causa, que es el lado prudente.
+                "exige_causa": bool(cruda.get("exige_causa", True)),
             }
         )
 
@@ -335,7 +338,14 @@ def construir_datos(
         signos_mixtos=bool(causas_suben and causas_bajan),
         # `lineas` ya viene filtrada a las que varían (`lineas_explicables`), así que
         # esto es exactamente "queda variación cuyo motivo no consta en ningún sistema".
-        causa_sin_confirmar=any(not linea["causa_confirmada"] for linea in lineas),
+        #
+        # Se excluyen las líneas que NO exigen causa —IGV, redondeo—: ahí no falta
+        # información, es que no hay ninguna que buscar. Incluirlas hacía que el cliente
+        # de guion, con sus tres movimientos perfectamente atribuidos, terminara la
+        # explicación disculpándose por el IGV.
+        causa_sin_confirmar=any(
+            linea["exige_causa"] and not linea["causa_confirmada"] for linea in lineas
+        ),
         linea_principal=linea_principal,
         tramos=(con_tramos or {}).get("tramos", []),
         cuota=(
