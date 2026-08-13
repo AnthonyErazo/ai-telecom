@@ -258,8 +258,23 @@ export default function App() {
           try { setAudit(await api.audit(token || "", resultado.trace_id)); } catch { setAudit(null); }
         }}
       />
+    </main> : !token ? <main className="canal-completo">
+      {/* Sin sesión esta vista era un callejón: el chat no podía preguntar y el botón de
+          voz salía deshabilitado sin decir por qué. El acceso vive en Mi Movistar —es
+          donde el cliente se autentica— así que desde aquí se acompaña hasta allí en vez
+          de dejar una pantalla muerta. */}
+      <section className="panel sin-sesion">
+        <p className="eyebrow">IA conversacional · Requiere sesión</p>
+        <h2>Entre primero a Mi Movistar</h2>
+        <p>
+          Esta vista explica el recibo <b>con importes</b> y habilita la voz de Gemini
+          Live, así que necesita una sesión autenticada (<code>LOA2</code>). Se abre en la
+          pestaña <b>Mi Movistar</b> con el id del usuario.
+        </p>
+        <button onClick={() => void selectView("mimovistar")}>Ir a Mi Movistar</button>
+      </section>
     </main> : <main>
-      <section className="hero"><p className="eyebrow">App Mi Movistar · Cero cifras inventadas</p><h1>Entiende qué cambió en tu recibo.</h1><p>El motor calcula; la IA explica; el verificador comprueba cada número antes de mostrarlo.</p></section>
+      <section className="hero"><p className="eyebrow">IA conversacional · Cero cifras inventadas</p><h1>Entiende qué cambió en tu recibo.</h1><p>El motor calcula; la IA explica; el verificador comprueba cada número antes de mostrarlo.</p></section>
       <div className="workspace">
         <section className="customer panel">
           <div className="controls">
