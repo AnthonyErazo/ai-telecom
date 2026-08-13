@@ -4,7 +4,7 @@
 {% from "_comun.jinja" import apertura, totales, cierre_estandar, frase_generica, frase_residual_std, tabla_tramos, lista_lineas %}
 
 {% macro resumen(d) -%}
-{{ apertura(d) }}. Le explico concepto por concepto qué se movió respecto del mes pasado.
+{{ apertura(d) }}.
 {%- endmacro %}
 
 {% macro frase(d, c) -%}
@@ -16,7 +16,7 @@
 {%- endmacro %}
 
 {% macro detalle(d) -%}
-{{ lista_lineas(d) }} {{ tabla_tramos(d) }} {{ totales(d) }}
+{{ totales(d) }} {{ tabla_tramos(d) }}
 {%- endmacro %}
 
 {% macro cierre(d) -%}

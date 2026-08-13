@@ -477,8 +477,15 @@ def renderizar_explicacion(datos: DatosPlantilla) -> ExplicacionLLM:
     """
     modulo = _modulo(datos.plantilla)
 
+    #: Cuántas causas se NARRAN. Las demás siguen contando en el cuadre y siguen en la
+    #: tabla de la pantalla; lo que no hacen es alargar el texto. Una explicación que
+    #: enumera cuatro causas con la misma estructura gramatical no es más completa: es
+    #: más difícil de leer, y el cliente la abandona antes de llegar a la que importa.
+    #: Dos es el máximo que cabe en la pantalla de un móvil sin hacer scroll.
+    MAX_CAUSAS_NARRADAS = 2
+
     causas: list[CausaExplicadaLLM] = []
-    for causa in datos.causas:
+    for causa in datos.causas[:MAX_CAUSAS_NARRADAS]:
         causas.append(
             CausaExplicadaLLM(
                 concepto_id=causa["concepto_id"],

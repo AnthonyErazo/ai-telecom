@@ -48,6 +48,10 @@ A la vez, {{ d.causa_que_ahorra.etiqueta }} jugó a su favor y le ahorró {{ d.c
 {% endif %}
 {%- endmacro %}
 
+{# `neto` ya NO entra en el cierre estándar: la apertura dice la dirección y la cifra,
+   y repetirlas al final con otras palabras alargaba el mensaje sin añadir nada. La
+   honestidad de los signos mixtos la sostiene `contraste`, que nombra el ahorro. Se
+   conserva por si una plantilla concreta la necesita. #}
 {% macro neto(d) -%}
 {% if d.signos_mixtos %}
 {% if d.subio %}Sumando y restando, su recibo quedó {{ d.delta_abs }} más caro que el de {{ d.mes_previo }}.{% elif d.bajo %}Sumando y restando, su recibo quedó {{ d.delta_abs }} más barato que el de {{ d.mes_previo }}.{% else %}Sumando y restando, su recibo quedó igual que el de {{ d.mes_previo }}.{% endif %}
@@ -70,13 +74,18 @@ A la vez, {{ d.causa_que_ahorra.etiqueta }} jugó a su favor y le ahorró {{ d.c
    Lo que se dice sigue siendo exactamente lo mismo, y sigue sin llevar ni una cifra. #}
 {% macro salvedad_causal(d) -%}
 {% if d.causa_sin_confirmar and not d.sin_variacion %}
-Eso sí: en nuestros sistemas no consta la orden que originó ese cambio, así que el motivo no se lo puedo confirmar.
+El motivo exacto no me consta en el sistema.
 {% endif %}
 {%- endmacro %}
 
-{# El ofrecimiento de asesor va aquí y en ningún otro sitio: una sola vez, al final. #}
+{# El asesor NO se ofrece. Es el último recurso, y ofrecerlo en cada respuesta lo
+   convierte en el primero: al cliente que lee «¿le paso con un asesor?» al final de cada
+   explicación se le está diciendo que la explicación no bastaba. Si quiere una persona,
+   la pide él —hay una intención que lo detecta— y entonces sí se deriva. La acción
+   `DERIVAR_ASESOR` sigue disponible en la interfaz para quien la busque; lo que
+   desaparece es la invitación no pedida. #}
 {% macro cierre_estandar(d) -%}
-{{ neto(d) }} {{ deuda_frase(d) }} {{ salvedad_causal(d) }} {{ efervescente(d) }} Si gusta, le muestro el detalle línea por línea o lo paso con un asesor.
+{{ deuda_frase(d) }} {{ salvedad_causal(d) }} {{ efervescente(d) }}
 {%- endmacro %}
 
 {% macro frase_generica(d, c) -%}
@@ -84,7 +93,7 @@ Eso sí: en nuestros sistemas no consta la orden que originó ese cambio, así q
 {%- endmacro %}
 
 {% macro frase_residual_std(d) -%}
-El resto de la diferencia son conceptos menores del recibo, sin cambios que valga la pena detallar.
+El resto son conceptos menores.
 {%- endmacro %}
 
 {% macro tabla_tramos(d) -%}

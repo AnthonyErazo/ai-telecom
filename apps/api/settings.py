@@ -385,9 +385,11 @@ class Ajustes(BaseSettings):
             return {
                 **self._resumen_base(),
                 "brainybill": "supabase:cargo_facturado",
-                # Amdocs sigue en disco a propósito: el dataset del desafío no trae
-                # órdenes de CRM. Lo dice `crear_repositorio`.
-                "amdocs": f"archivo:{self.ruta_datos}",
+                # Amdocs también: el dataset actualizado trae `Ordenes.csv` y el mismo
+                # transporte las sirve. La línea anterior decía «archivo:data/sintetico»
+                # cuando ya no era cierto, y la primera línea del log de arranque es
+                # justo donde se mira cuando algo va mal.
+                "amdocs": "supabase:orden_servicio",
             }
         return self._resumen_base()
 

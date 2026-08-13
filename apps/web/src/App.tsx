@@ -220,7 +220,7 @@ export default function App() {
   const auditLines = Array.isArray(audit?.terminal) ? (audit.terminal as string[]) : [];
   return <div className="shell">
     <header className="topbar">
-      <a className="brand" href="/ui/"><span>RC</span><div>recibo claro<small>IA financiera verificable</small></div></a>
+      <a className="brand" href="/ui/"><span>RE</span><div>Recibo Explicado<small>IA financiera verificable</small></div></a>
       {/* Un canal, una pestaña. Ni más. El login dejó de ser un destino: es un paso DENTRO
           de Mi Movistar, que es donde el cliente se autentica de verdad. WhatsApp y la
           consola del 104 no lo necesitan —uno identifica por teléfono y el otro por
@@ -284,7 +284,7 @@ export default function App() {
           </div>
           {facts && <div className="summary"><div><small>Anterior</small><strong>{money(facts.total_previo_cent)}</strong></div><div><small>Actual</small><strong>{money(facts.total_actual_cent)}</strong></div><div className={facts.delta_total_cent >= 0 ? "up" : "down"}><small>Variación</small><strong>{facts.delta_total_cent > 0 ? "+" : ""}{money(facts.delta_total_cent)}</strong></div><div><small>Periodo</small><strong>{facts.periodo_actual}</strong></div></div>}
           <div className="conversation">
-            {turns.length === 0 && !explain.isPending && <div className="welcome"><span>✦</span><h2>Hola, soy Recibo Claro</h2><p>Pregúnteme por qué cambió su recibo, o inicie una conversación de voz verificable.</p></div>}
+            {turns.length === 0 && !explain.isPending && <div className="welcome"><span>✦</span><h2>Hola, soy su asistente de recibos</h2><p>Pregúnteme por qué cambió su recibo, o inicie una conversación de voz verificable.</p></div>}
             {turns.map((turno, indice) => turno.rol === "cliente"
               ? <div className="turn client" key={`c-${indice}`}><p>{turno.texto}</p></div>
               : <div className="turn agent" key={`a-${indice}`}><Blocks blocks={turno.explicacion.bloques} /></div>)}
@@ -314,7 +314,7 @@ export default function App() {
         </aside>
       </div>
     </main>}
-    <footer>Recibo Claro · Las cifras se calculan en el backend y nunca en el navegador.</footer>
+    <footer>Recibo Explicado · Las cifras se calculan en el backend y nunca en el navegador.</footer>
   </div>;
 }
 

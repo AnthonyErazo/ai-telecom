@@ -169,8 +169,8 @@ GUION: dict[Intencion, _Guion] = {
         respaldos=(
             "El consumo de datos no lo veo desde aquí; eso lo tiene en la App Mi "
             "Movistar. Lo mío es su recibo: qué le cobraron y por qué.",
-            "No tengo a la vista sus gigas. Si quiere le paso con un asesor que sí los "
-            "ve, o le explico los cargos de su recibo.",
+            "No tengo a la vista sus gigas. Lo que sí puedo es explicarle los cargos "
+            "de su recibo.",
         ),
     ),
     Intencion.VACIO: _Guion(
@@ -191,7 +191,7 @@ GUION: dict[Intencion, _Guion] = {
         debe=(
             "Reconocer con humor amable que eso se te escapa, si el mensaje era informal.",
             "Decir en una frase qué sí puedes hacer.",
-            "Ofrecer pasarlo con un asesor si lo suyo es otro tema de Movistar.",
+            "NUNCA ofrecer un asesor. Es el último recurso y lo pide el cliente, no usted.",
         ),
         no_debe=(
             "Disculparte tres veces.",
@@ -201,8 +201,7 @@ GUION: dict[Intencion, _Guion] = {
         respaldos=(
             "De eso no le puedo ayudar, la verdad. Lo mío son los recibos: "
             "por qué le cobraron lo que le cobraron. ¿Se lo reviso?",
-            "Ahí me agarró. Yo solo veo temas de su recibo y sus cargos. "
-            "Si es otra cosa de Movistar, lo paso con un asesor.",
+            "Ahí me agarró. Yo solo veo temas de su recibo y sus cargos.",
         ),
     ),
     Intencion.CONSULTA_CONCEPTO: _Guion(
