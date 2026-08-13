@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
 import { money } from "./Blocks";
@@ -49,6 +49,26 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
     enabled: Boolean(token),
     refetchInterval: 5000,
   });
+
+  // Aviso de caso nuevo. Un asesor no está mirando la cola: está atendiendo a alguien, o
+  // mirando otra pantalla. Si el sistema deriva y nadie se entera, el hand-off «con
+  // contexto» se convierte en una cola donde el cliente espera igual que antes.
+  const vistos = useRef<Set<string> | null>(null);
+  const [aviso, setAviso] = useState<ElementoCola | null>(null);
+  useEffect(() => {
+    const actual = cola.data;
+    if (!actual) return;
+    const referencias = new Set(actual.map((elemento) => elemento.context_ref));
+    if (vistos.current === null) {
+      // La primera carga no avisa: lo que ya estaba en la cola al abrir la consola no es
+      // una novedad, y avisar de todo de golpe enseña a ignorar el aviso.
+      vistos.current = referencias;
+      return;
+    }
+    const nuevo = actual.find((elemento) => !vistos.current!.has(elemento.context_ref));
+    vistos.current = referencias;
+    if (nuevo) setAviso(nuevo);
+  }, [cola.data]);
 
   const sala = useQuery({
     queryKey: ["sala", token, caso?.conversation_id],
@@ -116,6 +136,19 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
   }
 
   return <div className="workspace">
+    {/* El aviso se queda hasta que el asesor actúa: un mensaje que se desvanece solo es
+        un mensaje que no llegó si en ese momento no estabas mirando. */}
+    {aviso && <div className="asesor-aviso" role="alert">
+      <div>
+        <strong>Nuevo caso en la cola</strong>
+        <span>Cuenta {aviso.cuenta_id ?? "sin cuenta"} · {aviso.motivo_codigo ?? "sin motivo"}</span>
+      </div>
+      <div className="asesor-aviso-acciones">
+        <button onClick={() => { abrir.mutate(aviso); setAviso(null); }}>Atender ahora</button>
+        <button className="secundario" onClick={() => setAviso(null)}>Después</button>
+      </div>
+    </div>}
+
     <section className="panel asesor-cola">
       <div className="asesor-cabecera">
         <div><p className="eyebrow">Cola del 104</p><h2>Casos sin atender</h2></div>
@@ -153,7 +186,28 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
           </span>
         </div>
 
-        <p className="asesor-consulta">«{paquete.consulta_cliente || "sin consulta registrada"}»</p>
+        {/* Lo primero que necesita quien se sienta: QUÉ HA PASADO. Antes de las cifras y
+            antes del desglose. El asesor va a hablar con una persona que ya ha contado su
+            problema una vez; empezar por «¿en qué puedo ayudarle?» es hacérselo repetir. */}
+        <div className="asesor-resumen">
+          <strong>Qué ha pasado</strong>
+          <p>
+            El cliente escribió «{paquete.consulta_cliente || "sin consulta registrada"}» por
+            {" "}{paquete.canal === "APP" ? "la App Mi Movistar" : paquete.canal === "WHATSAPP" ? "WhatsApp" : paquete.canal}.
+            {paquete.ya_explicado.hubo_explicacion
+              ? ` Ya se le explicó el recibo (${paquete.ya_explicado.cifras.length} cifras entregadas, verificación ${paquete.ya_explicado.veredicto ?? "n/d"}), así que no hay que repetírselo.`
+              : " Todavía no se le ha entregado ninguna explicación: usted empieza la conversación, no la retoma."}
+            {/* Solo la primera letra: `toLowerCase()` sobre toda la frase convertía los
+                códigos de concepto (`FRTOCH_003`) en algo que no se puede buscar en el
+                catálogo, que es justo lo que el asesor va a tener que hacer con ellos. */}
+            {paquete.motivo_detalle
+              ? ` Llega a usted porque ${paquete.motivo_detalle[0].toLowerCase()}${paquete.motivo_detalle.slice(1)}.`
+              : ""}
+            {paquete.incertidumbres.length > 0
+              ? ` Quedan ${paquete.incertidumbres.length} punto(s) sin confirmar; están abajo.`
+              : " Todas las cifras están respaldadas."}
+          </p>
+        </div>
 
         {/* Lo que no se pudo confirmar va PRIMERO: es lo que evita que el asesor
             confirme al cliente una hipótesis del motor como si fuera un hecho. */}

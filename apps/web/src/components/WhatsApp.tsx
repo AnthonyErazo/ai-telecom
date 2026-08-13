@@ -22,31 +22,34 @@ import type { Block, Explanation } from "../api/types";
  *    Se muestra el contador de dígitos precisamente para que se pueda comprobar en vivo.
  */
 
-/** Aplana los bloques a texto corrido, que es lo único que viaja por WhatsApp. */
+/** El mensaje tal y como se lee en un móvil: la explicación, y nada más.
+ *
+ * Se quedan **solo los bloques narrativos**. El desglose en clave-valor y el gráfico de
+ * cascada son piezas de pantalla: convertidos a lista de viñetas triplicaban el largo del
+ * mensaje repitiendo cifras que la narración ya cuenta, y por WhatsApp eso no es
+ * información, es un muro que nadie lee. Tampoco se ponen títulos: en un chat, un
+ * encabezado en negrita a media conversación no orienta, interrumpe.
+ *
+ * No es una versión recortada de la verdad: la explicación completa está ahí. Lo que se
+ * quita es el andamiaje visual que este transporte no sabe pintar.
+ */
 function aTextoPlano(bloques: Block[]): string {
-  const partes: string[] = [];
-  for (const bloque of bloques) {
-    if (bloque.tipo === "texto" || bloque.tipo === "aviso") {
-      if (bloque.titulo) partes.push(`*${bloque.titulo}*`);
-      partes.push(bloque.texto);
-    } else if (bloque.tipo === "kv") {
-      if (bloque.titulo) partes.push(`*${bloque.titulo}*`);
-      partes.push(bloque.items.map((i) => `• ${i.clave}: ${i.valor}`).join("\n"));
-    } else if (bloque.tipo === "tabla") {
-      if (bloque.titulo) partes.push(`*${bloque.titulo}*`);
-      partes.push(bloque.filas.map((f) => `• ${f.join(" · ")}`).join("\n"));
-    } else {
-      // El puente es un gráfico: por WhatsApp se cuenta como lista, en el mismo orden.
-      if (bloque.titulo) partes.push(`*${bloque.titulo}*`);
-      partes.push(bloque.barras.map((b) => `• ${b.etiqueta}`).join("\n"));
-    }
-  }
-  return partes.filter(Boolean).join("\n\n");
+  return bloques
+    .filter((bloque) => bloque.tipo === "texto" || bloque.tipo === "aviso")
+    .map((bloque) => (bloque as { texto: string }).texto.trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 type Mensaje = { rol: "cliente" | "bot"; texto: string; explicacion?: Explanation };
 
-export function WhatsApp({ cuenta }: { cuenta: string }) {
+export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
+  // WhatsApp **no tiene sesión**, y esa es justamente la premisa del canal: a un cliente
+  // que escribe por WhatsApp lo identifica su número de teléfono, no un login. Exigirle
+  // entrar antes contradecía el motivo por el que este canal es LOA1. La cuenta se
+  // resuelve sola —la que la API declara servible— igual que una pasarela real resolvería
+  // el número entrante contra la planta de clientes.
+  const [cuenta, setCuenta] = useState(cuentaSugerida);
   const [token, setToken] = useState("");
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [borrador, setBorrador] = useState("¿por qué me llegó distinto el recibo?");
@@ -54,7 +57,19 @@ export function WhatsApp({ cuenta }: { cuenta: string }) {
   const [conversacion, setConversacion] = useState<string | undefined>();
   const fin = useRef<HTMLDivElement | null>(null);
 
+  // Si no llega cuenta sugerida —se entró directo a WhatsApp sin pasar por Mi Movistar—
+  // se pregunta a la API cuál puede atender. El usuario no tiene que hacer nada.
   useEffect(() => {
+    if (cuenta) return;
+    let vivo = true;
+    api.accounts()
+      .then((datos) => { if (vivo && datos.demo?.length) setCuenta(datos.demo[0]); })
+      .catch((causa) => { if (vivo) setError(mensajeDeError(causa)); });
+    return () => { vivo = false; };
+  }, [cuenta]);
+
+  useEffect(() => {
+    if (!cuenta) return;
     let vivo = true;
     api.tokenWhatsapp(cuenta)
       .then((t) => { if (vivo) { setToken(t.access_token); setError(""); } })
@@ -100,7 +115,7 @@ export function WhatsApp({ cuenta }: { cuenta: string }) {
         <span className="wa-avatar">M</span>
         <div>
           <strong>Movistar Perú</strong>
-          <small>{token ? "en línea · cuenta " + cuenta : "conectando…"}</small>
+          <small>{token ? "en línea" : "conectando…"}</small>
         </div>
       </header>
 

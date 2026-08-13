@@ -44,27 +44,32 @@ describe("login de cuenta", () => {
     });
   });
 
-  it("bloquea el asistente hasta obtener un token LOA2", async () => {
+  // La navegación pasó a tener una pestaña por CANAL —«Mi Movistar», «WhatsApp»,
+  // «Asesor 104»— y el login dejó de ser un destino propio: es un paso dentro de Mi
+  // Movistar. Lo que estas pruebas custodian no ha cambiado: sin token no se ve el
+  // asistente, y cerrar sesión devuelve a la pantalla de acceso.
+  it("no muestra el asistente hasta obtener un token LOA2", async () => {
     renderApp();
 
-    expect(screen.getByRole("button", { name: "Asistente" })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Ingrese a su cuenta" })).toBeInTheDocument();
+    expect(screen.queryByText("Cuenta autenticada")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ingresar" }));
 
     expect(await screen.findByText("Cuenta autenticada")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Asistente" })).toBeEnabled();
     expect(api.token).toHaveBeenCalledWith("C-DEMO-01");
     expect(api.facts).toHaveBeenCalledWith("jwt-loa2");
   });
 
-  it("cierra la sesión y vuelve a bloquear el asistente", async () => {
+  it("cierra la sesión y vuelve a pedir acceso", async () => {
     renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Ingresar" }));
     await screen.findByText("Cuenta autenticada");
 
-    fireEvent.click(screen.getByRole("button", { name: "Login" }));
     fireEvent.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Asistente" })).toBeDisabled());
-    expect(screen.getByRole("heading", { name: "Ingrese a su cuenta" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Ingrese a su cuenta" })).toBeInTheDocument()
+    );
+    expect(screen.queryByText("Cuenta autenticada")).not.toBeInTheDocument();
   });
 });

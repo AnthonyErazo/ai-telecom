@@ -152,7 +152,6 @@ export default function App() {
 
   const selectView = async (next: View) => {
     if (next === "assistant" && !token) return;
-    if (next === "whatsapp" && !account) return;
     // La voz pertenece a la vista de asistente: al salir de ella se corta, o seguiría
     // escuchando el micrófono desde una pantalla que ya no la ofrece.
     if (next !== "assistant") await stopLive();
@@ -217,17 +216,21 @@ export default function App() {
   return <div className="shell">
     <header className="topbar">
       <a className="brand" href="/ui/"><span>RC</span><div>recibo claro<small>IA financiera verificable</small></div></a>
+      {/* Un canal, una pestaña. Ni más. El login dejó de ser un destino: es un paso DENTRO
+          de Mi Movistar, que es donde el cliente se autentica de verdad. WhatsApp y la
+          consola del 104 no lo necesitan —uno identifica por teléfono y el otro por
+          credencial de asesor—, así que ninguna está bloqueada por una sesión ajena. */}
       <nav className="app-tabs" aria-label="Navegación principal">
-        <button type="button" className={view === "login" ? "active" : ""} aria-pressed={view === "login"} onClick={() => void selectView("login")}>Login</button>
-        <button type="button" className={view === "assistant" ? "active" : ""} aria-pressed={view === "assistant"} disabled={!token} onClick={() => void selectView("assistant")}>Asistente</button>
-        {/* Los otros dos canales de la ficha. WhatsApp necesita una cuenta —emite su
-            propio token LOA1—; la consola del asesor no, porque el asesor se identifica
-            él mismo y declara a nombre de quién actúa. */}
-        <button type="button" className={view === "whatsapp" ? "active" : ""} aria-pressed={view === "whatsapp"} disabled={!account} onClick={() => void selectView("whatsapp")}>WhatsApp</button>
+        <button type="button" className={view === "login" || view === "assistant" ? "active" : ""} aria-pressed={view === "assistant"} onClick={() => void selectView(token ? "assistant" : "login")}>Mi Movistar</button>
+        <button type="button" className={view === "whatsapp" ? "active" : ""} aria-pressed={view === "whatsapp"} onClick={() => void selectView("whatsapp")}>WhatsApp</button>
         <button type="button" className={view === "asesor" ? "active" : ""} aria-pressed={view === "asesor"} onClick={() => void selectView("asesor")}>Asesor 104</button>
       </nav>
       <div className="topbar-status">
+        {/* La sesión se cierra desde aquí, junto a la cuenta a la que pertenece. Antes
+            vivía dentro de la pestaña «Login»; al fundir esa pestaña con Mi Movistar,
+            quedó inalcanzable con la sesión abierta —el botón llevaba al asistente—. */}
         {account && <span className="signed-account">{account}</span>}
+        {account && <button type="button" className="salir-sesion" onClick={() => void logout()}>Cerrar sesión</button>}
         <div className={`service ${health.isSuccess ? "online" : "offline"}`}><i />{health.isSuccess ? "API operativa" : "API sin conexión"}</div>
       </div>
     </header>
@@ -236,7 +239,7 @@ export default function App() {
     {view === "login" ? <main className="login-main">
       <section className="login-panel" aria-labelledby="login-title">
         <div className="login-copy">
-          <p className="eyebrow">Acceso del cliente</p>
+          <p className="eyebrow">App Mi Movistar · Acceso del cliente</p>
           <h1 id="login-title">Ingrese a su cuenta</h1>
           <p>La sesión identifica el recibo que puede consultar y habilita la conexión segura con Gemini Live.</p>
         </div>
@@ -254,12 +257,12 @@ export default function App() {
       </section>
     </main> : view === "whatsapp" ? <main>
       <section className="hero"><p className="eyebrow">Canal WhatsApp · Identidad LOA1</p><h1>El mismo motor, sin un solo importe.</h1><p>La misma respuesta que la App, servida como texto y redactada por nivel de aseguramiento.</p></section>
-      <WhatsApp cuenta={account} />
+      <WhatsApp cuentaSugerida={account} />
     </main> : view === "asesor" ? <main>
       <section className="hero"><p className="eyebrow">Call center 104 · Canal ASESOR</p><h1>El asesor no empieza de cero.</h1><p>El expediente se reconstruye desde la bitácora encadenada, con lo que no se pudo confirmar por delante.</p></section>
       <Asesor cuentaSugerida={account || cuentaElegida} />
     </main> : <main>
-      <section className="hero"><p className="eyebrow">Explicación inteligente · Cero cifras inventadas</p><h1>Entiende qué cambió en tu recibo.</h1><p>El motor calcula; la IA explica; el verificador comprueba cada número antes de mostrarlo.</p></section>
+      <section className="hero"><p className="eyebrow">App Mi Movistar · Cero cifras inventadas</p><h1>Entiende qué cambió en tu recibo.</h1><p>El motor calcula; la IA explica; el verificador comprueba cada número antes de mostrarlo.</p></section>
       <div className="workspace">
         <section className="customer panel">
           <div className="controls">

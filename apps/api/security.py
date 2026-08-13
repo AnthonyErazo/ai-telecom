@@ -412,7 +412,36 @@ def redactar_para_nivel(
         return respuesta
 
     bloques: list[Bloque] = [BloqueAviso(severidad="info", texto=AVISO_LOA1)]
-    if factset is not None:
+    narrados: list[Bloque] = []
+    for bloque in respuesta.bloques:
+        if bloque.tipo in {"kv", "puente", "tabla"}:
+            continue
+        titulo = _sanear_texto(bloque.titulo) if bloque.titulo else None
+        if bloque.tipo == "aviso":
+            narrados.append(
+                BloqueAviso(
+                    titulo=titulo,
+                    severidad=bloque.severidad,
+                    texto=_sanear_texto(bloque.texto),
+                    fact_ids=[],
+                )
+            )
+        else:  # texto
+            narrados.append(
+                BloqueTexto(
+                    titulo=titulo,
+                    texto=_sanear_texto(bloque.texto),
+                    enfasis=bloque.enfasis,
+                    fact_ids=[],
+                )
+            )
+
+    # El resumen sintético es una RED DE SEGURIDAD, no un encabezado: garantiza que en
+    # LOA1 el cliente sepa al menos si su recibo subió o bajó y por qué, incluso si el
+    # saneado dejara la narración vacía. Añadirlo SIEMPRE hacía que el mensaje empezara
+    # tres veces —el aviso del canal, este resumen y el resumen del propio modelo— con la
+    # misma idea escrita distinto. Solo entra cuando no queda nada narrado.
+    if factset is not None and not any(b.tipo == "texto" for b in narrados):
         causa = factset.causa_dominante()
         motivo = f" El motivo principal es {causa.etiqueta_cliente}." if causa else ""
         bloques.append(
@@ -424,28 +453,7 @@ def redactar_para_nivel(
                 fact_ids=["factset:delta_total_cent"],
             )
         )
-    for bloque in respuesta.bloques:
-        if bloque.tipo in {"kv", "puente", "tabla"}:
-            continue
-        titulo = _sanear_texto(bloque.titulo) if bloque.titulo else None
-        if bloque.tipo == "aviso":
-            bloques.append(
-                BloqueAviso(
-                    titulo=titulo,
-                    severidad=bloque.severidad,
-                    texto=_sanear_texto(bloque.texto),
-                    fact_ids=[],
-                )
-            )
-        else:  # texto
-            bloques.append(
-                BloqueTexto(
-                    titulo=titulo,
-                    texto=_sanear_texto(bloque.texto),
-                    enfasis=bloque.enfasis,
-                    fact_ids=[],
-                )
-            )
+    bloques.extend(narrados)
 
     gobernanza = Gobernanza(
         **respuesta.gobernanza.model_dump(exclude={"citas", "aserciones"}),
