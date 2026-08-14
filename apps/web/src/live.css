@@ -49,9 +49,16 @@
   border-radius: 12px;
   background: #eef8fc;
   font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
 }
 
-.live-transcript p { margin: 4px 0; line-height: 1.45; }
+.live-msg { margin: 0; line-height: 1.45; padding: 8px 12px; border-radius: 10px; max-width: 85%; }
+.live-msg.user { background: #d3f0fb; align-self: flex-end; color: #019df4; }
+.live-msg.agent { background: #fff; border: 1px solid #cceaf5; align-self: flex-start; }
 
 @media (max-width: 720px) {
   .live-control { width: 100%; margin-left: 0; }

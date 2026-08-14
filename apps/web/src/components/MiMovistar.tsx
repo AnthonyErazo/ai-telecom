@@ -1,300 +1,893 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+/**
+ * MiMovistar — App Mi Movistar completa
+ *
+ * Flujo de 7 pantallas:
+ *   splash → selector → loginDNI/registroDNI → productos? → dashboard → recibo → chat
+ *
+ * La pantalla "chat" tiene DOS modos seleccionables:
+ *   ① Chat  — texto puro, sin audio. Incluye ReceiptDetailCard dentro
+ *              del flujo de mensajes.
+ *   ② BillSense Voz — interfaz dedicada al audio. Botón grande de
+ *              micrófono, transcriptos de la IA como burbujas de texto.
+ *              No hay campo de escritura.
+ *
+ * BillSense = marca de la IA (antes "Gemini Live"). El motor interno no
+ * cambia; solo la presentación al usuario.
+ */
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft, Bot, CreditCard, Headphones, Loader2, Send, ShieldCheck,
-  ShoppingBag, Smartphone, ThumbsDown, ThumbsUp, User as UserIcon,
+  ArrowLeft, Bot, CreditCard, Gift, Headphones, Home as HomeIcon,
+  Key, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
+  ShoppingBag, Smartphone, Star, ThumbsDown, ThumbsUp,
+  User as UserIcon, Phone, Wifi,
 } from "lucide-react";
 import MovistarLogo from "./MovistarLogo";
+import { ReceiptDetailCard } from "./ReceiptDetailCard";
 import { api, ApiError } from "../api/client";
 import type { Block, Explanation, FactSet } from "../api/types";
+import { GeminiLiveClient, type LiveStatus } from "../live/client";
+import { microphoneSupportError } from "../live/audio";
 
-/**
- * App Mi Movistar: la pantalla que ve el cliente.
- *
- * De dónde sale esta interfaz
- * ---------------------------
- * El diseño viene del prototipo `brainy-bill` —marco de móvil, marca Movistar, acceso
- * por documento, chat con preguntas sugeridas y feedback— porque es el que se parece a la
- * aplicación real. Lo que **no** se trajo es su origen de datos: allí los importes salían
- * de `mock_data.py`, inventados. Aquí cada cifra viene de `POST /v1/explicar`, calculada
- * por el motor y comprobada por el verificador numérico antes de pintarse.
- *
- * Esa es toda la diferencia, y es la del proyecto entero: la misma pantalla, sostenida.
- *
- * Las tres decisiones de producto que se conservan del prototipo
- * -------------------------------------------------------------
- * 1. **Feedback 👍/👎 antes de ofrecer nada.** El cross-selling no aparece por tiempo ni
- *    por scroll: aparece si el cliente dice que entendió. Y el 👎 no abre una encuesta,
- *    abre el paso a un asesor.
- * 2. **La oferta no lleva importes.** Es una acción (`VER_ALTERNATIVAS`) que el backend
- *    autoriza con doble condición; si trajera cifras tendrían que pasar el verificador y
- *    no están en el FactSet.
- * 3. **El hand-off es un botón, no un callejón.** Deriva con el contexto ya cargado.
- */
+// ── Helpers ───────────────────────────────────────────────────────────
+const soles = (c: number) =>
+  new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(c / 100);
 
-const soles = (centimos: number) =>
-  new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(centimos / 100);
-
-/** El texto que se lee en el chat: los bloques narrativos, sin el andamiaje de pantalla. */
-function narrativa(bloques: Block[]): string {
-  return bloques
+const narrativa = (bloques: Block[]) =>
+  bloques
     .filter((b) => b.tipo === "texto" || b.tipo === "aviso")
     .map((b) => (b as { texto: string }).texto.trim())
     .filter(Boolean)
     .join("\n\n");
-}
 
-type Pantalla = "acceso" | "recibo" | "chat";
-type Mensaje = { rol: "cliente" | "asistente"; texto: string };
+const liveLabel = (s: LiveStatus): string =>
+  ({
+    idle:       "Toca para hablar con BillSense",
+    connecting: "Conectando con BillSense…",
+    listening:  "BillSense te escucha…",
+    consulting: "Consultando tu recibo…",
+    speaking:   "BillSense está respondiendo…",
+    error:      "Error de conexión de voz",
+  })[s];
 
+const liveLabelShort = (s: LiveStatus): string =>
+  ({ idle:"Voz", connecting:"Conectando…", listening:"Escuchando…", consulting:"Consultando…", speaking:"Respondiendo…", error:"Error" })[s];
+
+// ── Types ─────────────────────────────────────────────────────────────
+type TipoDoc  = "DNI" | "CE" | "Pasaporte";
+type Pantalla = "splash"|"selector"|"loginDNI"|"registroDNI"|"productos"|"dashboard"|"recibo"|"chat";
+type ChatModo = "chat" | "voz";
+/** Un mensaje del historial del chat. esRecibo muestra la tarjeta de factura inline. */
+type Mensaje  = { rol: "cliente"|"asistente"; texto: string; esVoz?: boolean; esRecibo?: boolean };
+interface Producto { id: string; tipo: "movil"|"hogar"; etiqueta: string; numero: string }
+
+// ── Numpad grid ───────────────────────────────────────────────────────
+const PAD: string[][] = [
+  ["1","2","3"],
+  ["4","5","6"],
+  ["7","8","9"],
+  ["","0","⌫"],
+];
+
+// ═════════════════════════════════════════════════════════════════════
 export function MiMovistar({
   onSesion,
   onExplicacion,
 }: {
   onSesion: (cuenta: string, token: string) => void;
-  onExplicacion: (explicacion: Explanation) => void;
+  onExplicacion: (e: Explanation) => void;
 }) {
-  const [pantalla, setPantalla] = useState<Pantalla>("acceso");
+  // ── Pantalla / nav ──────────────────────────────────────────────
+  const [pantalla,      setPantalla]      = useState<Pantalla>("splash");
+  const [modoSoloMovil, setModoSoloMovil] = useState(false);
+  const [aceptaTC,      setAceptaTC]      = useState(false);
+  const [esRegistro,    setEsRegistro]    = useState(false);
+  const [bottomTab,     setBottomTab]     = useState("inicio");
+  const [chatModo,      setChatModo]      = useState<ChatModo>("chat");
+
+  // ── Auth ────────────────────────────────────────────────────────
+  const [tipoDoc,   setTipoDoc]   = useState<TipoDoc>("DNI");
   const [documento, setDocumento] = useState("");
-  const [cuenta, setCuenta] = useState("");
-  const [token, setToken] = useState("");
-  const [hechos, setHechos] = useState<FactSet | null>(null);
-  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
-  const [borrador, setBorrador] = useState("");
+  const [cuenta,    setCuenta]    = useState("");
+  const [token,     setToken]     = useState("");
+  const [hechos,    setHechos]    = useState<FactSet | null>(null);
+
+  // ── Chat ────────────────────────────────────────────────────────
+  const [mensajes,     setMensajes]     = useState<Mensaje[]>([]);
+  const [borrador,     setBorrador]     = useState("");
   const [conversacion, setConversacion] = useState<string | undefined>();
-  const [ultima, setUltima] = useState<Explanation | null>(null);
-  const [opinion, setOpinion] = useState<"arriba" | "abajo" | null>(null);
-  const [error, setError] = useState("");
-  const fin = useRef<HTMLDivElement | null>(null);
+  const [ultima,       setUltima]       = useState<Explanation | null>(null);
+  const [opinion,      setOpinion]      = useState<"arriba"|"abajo"|null>(null);
+  const [chatError,    setChatError]    = useState("");
 
-  const cuentas = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, retry: 1 });
+  // ── Productos ───────────────────────────────────────────────────
+  const [productosSim, setProductosSim] = useState<Producto[]>([]);
+
+  // ── BillSense Voz ───────────────────────────────────────────────
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
+  const [liveMsgs,   setLiveMsgs]   = useState<{role:"user"|"agent"; text:string}[]>([]);
+  const liveRef = useRef<GeminiLiveClient | null>(null);
+  const [detail]  = useState("CORTO");
+  const micIssue  = microphoneSupportError();
+
+  // ── Scroll ──────────────────────────────────────────────────────
+  const fin      = useRef<HTMLDivElement | null>(null);
+  const vozScroll= useRef<HTMLDivElement | null>(null);
+
+  // ── Demo accounts ───────────────────────────────────────────────
+  const cuentas  = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, retry: 1 });
   const sugerida = cuentas.data?.demo?.[0] ?? "";
-  // El documento se precarga con una cuenta que la API declara servible: la demo se hace
-  // de un clic y, sobre todo, nunca ofrece una cuenta que el motor no pueda explicar.
-  useEffect(() => { if (!documento && sugerida) setDocumento(sugerida); }, [sugerida, documento]);
-  // Un SOLO valor para el botón y para el envío. Calcularlos por separado deja el botón
-  // deshabilitado —o peor, habilitado y mudo— mientras `/dev/cuentas` está en vuelo.
-  const cuentaElegida = (documento || sugerida).trim();
-  useEffect(() => { fin.current?.scrollIntoView?.({ behavior: "smooth", block: "end" }); },
-    [mensajes, opinion]);
 
+  // ── Effects ─────────────────────────────────────────────────────
+  useEffect(() => () => { void liveRef.current?.close(); }, []);
+
+  useEffect(() => {
+    fin.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+  }, [mensajes, opinion, liveMsgs]);
+
+  useEffect(() => {
+    vozScroll.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+  }, [liveMsgs]);
+
+  // ── Derived ─────────────────────────────────────────────────────
+  const cuentaElegida = (documento || sugerida).trim();
+  const liveActivo    = Boolean(liveRef.current);
+  const liveIsVisible = liveActivo || ["connecting","listening","consulting","speaking"].includes(liveStatus);
+  const oferta        = ultima?.acciones.find((a) => a.id === "VER_ALTERNATIVAS");
+  const derivada      = ultima?.derivacion.requerida;
+  const sube          = (hechos?.delta_total_cent ?? 0) >= 0;
+  const nombreCliente = cuenta
+    ? cuenta.replace("C-DEMO-","Usuario ").replace("C-","Cliente ")
+    : "Cliente";
+
+  // ── Mutations ───────────────────────────────────────────────────
   const entrar = useMutation({
     mutationFn: async (id: string) => {
       const emitido = await api.token(id);
       const factset = await api.facts(emitido.access_token);
       return { id, token: emitido.access_token, factset };
     },
-    onSuccess: ({ id, token: emitido, factset }) => {
-      setCuenta(id); setToken(emitido); setHechos(factset); setError("");
-      setPantalla("recibo");
-      onSesion(id, emitido);
+    onSuccess: ({ id, token: tk, factset }) => {
+      setCuenta(id); setToken(tk); setHechos(factset); setChatError(""); onSesion(id, tk);
+      const todas = cuentas.data?.demo ?? [];
+      if (todas.length > 1 && pantalla === "registroDNI") {
+        setProductosSim(todas.slice(0, 3).map((c, i) => ({
+          id: c,
+          tipo: (i % 2 === 0 ? "movil" : "hogar") as "movil"|"hogar",
+          etiqueta: i % 2 === 0 ? `Línea móvil ${i+1}` : `Movistar Hogar ${i+1}`,
+          numero:   i % 2 === 0 ? `+51 9${c.slice(-8)}`  : `Jr. Los Olivos ${100+i}, Lima`,
+        })));
+        setPantalla("productos");
+      } else {
+        setPantalla("dashboard");
+      }
     },
-    onError: (causa) => setError(mensajeDeError(causa)),
+    onError: (e) => setChatError(err(e)),
   });
 
   const explicar = useMutation({
-    mutationFn: (texto: string) => api.explain(token, {
-      conversation_id: conversacion, cuenta_id: cuenta, verbosidad: "CORTO", utterance: texto,
-    }),
-    onSuccess: (respuesta) => {
-      setConversacion(respuesta.conversation_id);
-      setUltima(respuesta);
-      setOpinion(null);
-      setMensajes((previos) => [...previos, { rol: "asistente", texto: narrativa(respuesta.bloques) }]);
-      onExplicacion(respuesta);
+    mutationFn: (texto: string) =>
+      api.explain(token, { conversation_id: conversacion, cuenta_id: cuenta, verbosidad: detail, utterance: texto }),
+    onSuccess: (res) => {
+      setConversacion(res.conversation_id);
+      setUltima(res); setOpinion(null);
+      setMensajes((p) => [...p, { rol: "asistente", texto: narrativa(res.bloques) }]);
+      onExplicacion(res);
     },
-    onError: (causa) => setError(mensajeDeError(causa)),
+    onError: (e) => setChatError(err(e)),
   });
 
+  // ── Handlers ────────────────────────────────────────────────────
   const preguntar = (texto: string) => {
-    const limpio = texto.trim();
-    if (!limpio || explicar.isPending) return;
-    setMensajes((previos) => [...previos, { rol: "cliente", texto: limpio }]);
+    const t = texto.trim();
+    if (!t || explicar.isPending || !token) return;
+    setMensajes((p) => [...p, { rol: "cliente", texto: t }]);
     setBorrador("");
-    explicar.mutate(limpio);
+    explicar.mutate(t);
   };
 
-  const enviar = (evento: FormEvent) => { evento.preventDefault(); preguntar(borrador); };
+  const enviar = (e: FormEvent) => { e.preventDefault(); preguntar(borrador); };
 
-  // La oferta solo existe si el backend la autorizó: doble condición (consulta resuelta y
-  // regla de negocio explícita). La pantalla no decide vender.
-  const oferta = ultima?.acciones.find((a) => a.id === "VER_ALTERNATIVAS");
-  const derivada = ultima?.derivacion.requerida;
+  /** Muestra la tarjeta de desglose de factura como mensaje inline */
+  const mostrarDetalleRecibo = () => {
+    setMensajes((p) => [...p, { rol: "asistente", texto: "", esRecibo: true }]);
+  };
 
-  const marco = "flex flex-col max-w-md mx-auto w-full bg-gray-50 min-h-[720px] shadow-2xl border-x border-gray-100 overflow-hidden";
-  const cabecera = (titulo: string, atras?: () => void) => (
-    <div className="bg-white px-5 pt-6 pb-4 flex items-center justify-between border-b border-gray-100">
-      {atras
-        ? <button onClick={atras} className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600" aria-label="Volver"><ArrowLeft size={20} /></button>
-        : <div className="w-8" />}
-      <div className="flex items-center gap-2">
-        <MovistarLogo className="h-6 w-auto" />
-        {/* Encabezado de verdad, no un `span` con aspecto de título: es el nombre de la
-            pantalla, y un lector de pantalla tiene que poder saltar a él. */}
-        <h1 className="font-bold text-lg text-gray-800 tracking-tight m-0">{titulo}</h1>
+  const abrirChat = (q?: string, modo: ChatModo = "chat") => {
+    setPantalla("chat");
+    setChatModo(modo);
+    setBottomTab("billsense");
+    if (!mensajes.length) preguntar(q ?? "¿Por qué me vino más caro este mes?");
+  };
+
+  const pad = (key: string) => {
+    if (key === "⌫") setDocumento((p) => p.slice(0, -1));
+    else if (key) setDocumento((p) => p + key);
+  };
+
+  const stopLive = async () => {
+    if (!liveRef.current) return;
+    const c = liveRef.current; liveRef.current = null; await c.close();
+  };
+
+  const toggleLive = async () => {
+    if (liveRef.current) { await stopLive(); setLiveStatus("idle"); return; }
+    if (!token || !cuenta) return;
+    setLiveMsgs([]); setChatError("");
+    const client = new GeminiLiveClient(
+      { authToken: token, accountId: cuenta, conversationId: conversacion, detail },
+      {
+        onStatus: setLiveStatus,
+        onInputTranscript: (t) => setLiveMsgs((cur) => {
+          const last = cur[cur.length - 1];
+          if (last?.role === "user") return [...cur.slice(0,-1), { role:"user" as const, text:`${last.text} ${t}`.trim() }];
+          return [...cur, { role:"user" as const, text:t.trim() }];
+        }),
+        onOutputTranscript: (t) => setLiveMsgs((cur) => {
+          const last = cur[cur.length - 1];
+          if (last?.role === "agent") return [...cur.slice(0,-1), { role:"agent" as const, text:`${last.text} ${t}`.trim() }];
+          return [...cur, { role:"agent" as const, text:t.trim() }];
+        }),
+        onExplanation: (res) => {
+          setUltima(res); setOpinion(null);
+          setMensajes((p) => [...p, { rol:"asistente", texto:narrativa(res.bloques), esVoz:true }]);
+          setLiveMsgs([]);
+          onExplicacion(res);
+        },
+        onError: setChatError,
+      }
+    );
+    liveRef.current = client;
+    try { await client.connect(); }
+    catch (e) { liveRef.current = null; setChatError(err(e)); await client.close(); setLiveStatus("error"); }
+  };
+
+  const navTo = (tab: string) => {
+    setBottomTab(tab);
+    if      (tab === "inicio")     setPantalla("dashboard");
+    else if (tab === "recibo")     setPantalla("recibo");
+    else if (tab === "billsense")  abrirChat("¿En qué te puedo ayudar hoy?", "chat");
+    else if (tab === "tienda")     abrirChat("¿Qué ofertas y planes tiene Movistar disponibles?", "chat");
+    else if (tab === "beneficios") abrirChat("¿Cuáles son mis beneficios como cliente Movistar?", "chat");
+  };
+
+  /** Genera un PDF imprimible del recibo en una ventana nueva */
+  const generarPDF = () => {
+    if (!hechos) return;
+    const base = Math.round(hechos.total_actual_cent / 1.18);
+    const igv  = hechos.total_actual_cent - base;
+    const saldoAnt  = (hechos.deuda_anterior_cent as number|undefined) ?? 0;
+    const prorrateo = (hechos.prorrateo_cent      as number|undefined) ?? 0;
+    const reconexion= (hechos.reconexion_cent     as number|undefined) ?? 0;
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Factura Movistar ${hechos.periodo_actual}</title>
+<style>
+  body{font-family:Arial,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#172033}
+  .top{background:#019DF4;color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px}
+  .top h1{margin:0;font-size:22px} .top p{margin:4px 0 0;font-size:13px;opacity:.8}
+  .hero{background:#e4f7fd;border:1.5px solid #b3e0f7;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px}
+  .hero .amt{font-size:36px;font-weight:900;color:#019DF4;margin:8px 0}
+  .hero .due{color:#cc4c3d;font-size:12px;font-weight:700}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  td{padding:10px 8px;border-bottom:1px solid #edf0f4;font-size:13px}
+  td:last-child{text-align:right;font-weight:600}
+  .tax td{background:#f8fafc;color:#68768a}
+  .total td{background:#e4f7fd;font-weight:800;font-size:15px}
+  .footer{font-size:11px;color:#9fb1c4;text-align:center;margin-top:20px}
+  @media print{.no-print{display:none}}
+</style></head><body>
+<div class="top"><h1>App Mi Movistar</h1><p>Detalle de Facturación — ${hechos.periodo_actual}</p></div>
+<div class="hero">
+  <p style="margin:0;font-size:12px;color:#68768a;text-transform:uppercase;letter-spacing:.1em">Total a Pagar</p>
+  <p class="amt">${soles(hechos.total_actual_cent)}</p>
+  ${hechos.fecha_vencimiento ? `<p class="due">⚠ Vence: ${String(hechos.fecha_vencimiento)}</p>` : ""}
+</div>
+<table>
+  <tr><td>Saldo mes anterior</td><td>${soles(saldoAnt)}</td></tr>
+  <tr><td>Servicios del mes actual (base imponible)</td><td>${soles(base)}</td></tr>
+  <tr class="tax"><td>IGV 18%</td><td>${soles(igv)}</td></tr>
+  ${prorrateo ? `<tr><td>Prorrateo</td><td>${soles(prorrateo)}</td></tr>` : ""}
+  ${reconexion ? `<tr><td>Cargo por reconexión</td><td style="color:#cc4c3d">${soles(reconexion)}</td></tr>` : ""}
+  <tr class="total"><td>Total a pagar servicio</td><td>${soles(hechos.total_actual_cent)}</td></tr>
+</table>
+<table>
+  <tr><td>Mes anterior</td><td>${soles(hechos.total_previo_cent)}</td></tr>
+  <tr><td>Modalidad</td><td>${hechos.modalidad_renta}</td></tr>
+</table>
+<p class="footer">Movistar Perú · Cuenta ${cuenta} · Generado: ${new Date().toLocaleDateString("es-PE")}</p>
+<button class="no-print" onclick="window.print()" style="margin-top:16px;width:100%;padding:12px;background:#019DF4;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button>
+</body></html>`;
+    const w = window.open("","_blank","width=680,height=860");
+    if (w) { w.document.write(html); w.document.close(); }
+  };
+
+  // ── Shared header ────────────────────────────────────────────────
+  const hdr = (title: string, back?: () => void, extra?: ReactNode) => (
+    <div className="mm-header">
+      {back
+        ? <button onClick={back} className="mm-back-btn" aria-label="Volver"><ArrowLeft size={20} /></button>
+        : <div style={{ width:32 }} />}
+      <div className="mm-header-title">
+        <MovistarLogo className="h-5 w-auto" />
+        <h1 className="mm-title">{title}</h1>
       </div>
-      <div className="w-8" />
+      <div style={{ width:32, display:"flex", justifyContent:"flex-end" }}>{extra}</div>
     </div>
   );
 
-  // ------------------------------------------------------------------ acceso
-  if (pantalla === "acceso") {
-    return <div className={marco}>
-      {cabecera("Mi Movistar")}
-      <form className="flex-1 flex flex-col px-6 pt-8 pb-10 justify-between" onSubmit={(e) => { e.preventDefault(); if (cuentaElegida) entrar.mutate(cuentaElegida); }}>
-        <div>
-          <div className="text-center space-y-4">
-            <div className="bg-sky-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto shadow-inner">
-              <MovistarLogo className="h-12 w-auto" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">¡Bienvenido a Mi Movistar!</h2>
-            <p className="text-sm text-gray-500 max-w-xs mx-auto">
-              Consulta tu recibo y resuelve tus dudas al instante.
-            </p>
-          </div>
-          <div className="mt-8 space-y-2">
-            <label htmlFor="documento" className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Número de cuenta
-            </label>
-            <input id="documento" list="cuentas-servibles" value={documento} autoFocus
-                   onChange={(e) => setDocumento(e.target.value)}
-                   className="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#019DF4]" />
-            <datalist id="cuentas-servibles">
-              {(cuentas.data?.demo ?? []).map((id) => <option key={id} value={id} />)}
-            </datalist>
-            <p className="flex items-center gap-1.5 text-[11px] text-gray-400 pt-1">
-              <ShieldCheck size={13} className="text-[#5BC500]" />
-              Acceso de demostración con <code>/dev/token</code>. No solicita contraseña.
-            </p>
-            {error && <p className="text-xs text-rose-600">{error}</p>}
+  const F = "mm-frame";
+
+  // ════════════════════════════════════════════════════════════════
+  // SPLASH
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "splash") return (
+    <div className={F}>
+      <div className="mm-splash">
+        <div className="mm-splash-wave" />
+        <div className="mm-splash-content">
+          <div className="mm-splash-logo-wrap"><MovistarLogo className="h-16 w-auto" /></div>
+          <h1 className="mm-splash-title">App Mi Movistar</h1>
+          <p className="mm-splash-sub">Gestiona servicios, consulta recibos y conversa con BillSense, tu asistente IA.</p>
+          <div className="mm-splash-chips">
+            <span className="mm-chip"><Wifi size={13} /> Consumos</span>
+            <span className="mm-chip"><CreditCard size={13} /> Recibos</span>
+            <span className="mm-chip"><Bot size={13} /> BillSense</span>
           </div>
         </div>
-        <div className="space-y-4 mt-8">
-          <button type="submit" disabled={!cuentaElegida || entrar.isPending}
-                  className="w-full bg-[#019DF4] hover:bg-[#0089d8] disabled:opacity-60 text-white font-semibold py-4 rounded-2xl shadow-md transition-all active:scale-[0.99]">
-            {entrar.isPending ? "Validando…" : "Iniciar sesión"}
+        <div className="mm-splash-actions">
+          <button className="mm-btn-primary" onClick={() => { setEsRegistro(false); setPantalla("selector"); }}>Iniciar sesión</button>
+          <button className="mm-btn-outline" onClick={() => { setEsRegistro(true); setAceptaTC(false); setPantalla("selector"); }}>
+            Registrarme
           </button>
-          <div className="grid grid-cols-3 gap-3 text-center pt-6 border-t border-gray-100">
-            <div className="p-3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center">
-              <CreditCard size={20} className="text-[#019DF4] mb-1" />
-              <span className="text-[11px] font-medium text-gray-600">Ver Recibos</span>
-            </div>
-            <div className="p-3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center">
-              <Smartphone size={20} className="text-[#019DF4] mb-1" />
-              <span className="text-[11px] font-medium text-gray-600">Mi Plan</span>
-            </div>
-            <div className="p-3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center">
-              <ShieldCheck size={20} className="text-[#019DF4] mb-1" />
-              <span className="text-[11px] font-medium text-gray-600">Soporte</span>
-            </div>
+        </div>
+        <p className="mm-splash-footer">
+          Al ingresar aceptas los <span className="mm-link">Términos y condiciones</span> de Movistar Perú.
+        </p>
+      </div>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // SELECTOR — Vista 1 (dos tarjetas)
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "selector") return (
+    <div className={F}>
+      {hdr("Iniciar sesión", () => setPantalla("splash"))}
+      <div className="mm-selector-body">
+        <div className="mm-selector-hero">
+          <div className="mm-selector-hero-icon">
+            <div className="mm-selector-phone-shadow" />
+            <div className="mm-selector-phone-body"><Smartphone size={40} className="text-white" /></div>
           </div>
         </div>
-      </form>
-    </div>;
+        <h2 className="mm-selector-titulo">Elige tu forma de ingreso</h2>
+        <p className="mm-selector-sub">Selecciona cómo deseas gestionar tus servicios Movistar</p>
+        <div className="mm-selector-cards">
+          <button id="btn-todos-productos" className="mm-selector-card"
+            onClick={() => { setModoSoloMovil(false); setDocumento(""); setChatError(""); setPantalla(esRegistro ? "registroDNI" : "loginDNI"); }}>
+            <div className="mm-sc-icon" style={{ background:"#e4f7fd" }}><Key size={24} className="text-[#019DF4]" /></div>
+            <div className="mm-sc-body">
+              <strong>{esRegistro ? "Soy titular" : "Todos mis productos"}</strong>
+              <span>Gestiona todos tus productos y beneficios como titular</span>
+            </div>
+            <span className="mm-sc-arrow">›</span>
+          </button>
+          <button id="btn-solo-movil" className="mm-selector-card"
+            onClick={() => { setModoSoloMovil(true); setDocumento(""); setChatError(""); setPantalla(esRegistro ? "registroDNI" : "loginDNI"); }}>
+            <div className="mm-sc-icon" style={{ background:"#edfae1" }}><Smartphone size={24} className="text-[#5BC500]" /></div>
+            <div className="mm-sc-body">
+              <strong>Solo con mi móvil</strong>
+              <span>Podrás ver y gestionar solo una línea móvil</span>
+            </div>
+            <span className="mm-sc-arrow">›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // LOGIN DNI (Vista 2) / REGISTRO DNI (Vista 4)
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "loginDNI" || pantalla === "registroDNI") {
+    const esReg = pantalla === "registroDNI";
+    const puede = cuentaElegida.length > 0 && (!esReg || aceptaTC);
+    return (
+      <div className={F}>
+        {hdr(esReg ? "Registrarme" : "Iniciar sesión",
+             () => setPantalla(esReg ? "splash" : "selector"))}
+        <div className="mm-dni-body">
+          <div className="mm-dni-illustration">
+            <div className="mm-dni-ilu-circle"><UserIcon size={38} className="text-[#019DF4]" /></div>
+            {esReg && <div className="mm-dni-ilu-badge"><ShieldCheck size={14} className="text-white" /></div>}
+          </div>
+          <h2 className="mm-dni-titulo">¡Genial!</h2>
+          <p className="mm-dni-sub">Solo ingresa tu documento de identidad</p>
+          <div className="mm-dni-form">
+            <select className="mm-dni-select" value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value as TipoDoc)}>
+              <option value="DNI">DNI</option>
+              <option value="CE">Carnet Ext.</option>
+              <option value="Pasaporte">Pasaporte</option>
+            </select>
+            <div className="mm-dni-display" aria-label="Número de documento">
+              {documento
+                ? <span className="mm-dni-number">{documento}</span>
+                : <span className="mm-dni-placeholder">{sugerida || "N° de documento"}</span>}
+            </div>
+          </div>
+          {chatError && <p className="mm-error-msg">{chatError}</p>}
+          {esReg && (
+            <label className="mm-tc-label">
+              <input type="checkbox" checked={aceptaTC} onChange={(e) => setAceptaTC(e.target.checked)} className="mm-tc-check" />
+              <span>He leído la <span className="mm-link">política de privacidad</span> y acepto los{" "}
+                <span className="mm-link">términos y condiciones</span></span>
+            </label>
+          )}
+          <button id={esReg?"btn-soy-titular":"btn-continuar"} className="mm-btn-primary"
+            disabled={!puede || entrar.isPending} onClick={() => entrar.mutate(cuentaElegida)}>
+            {entrar.isPending
+              ? <><Loader2 size={18} className="animate-spin" /> Verificando…</>
+              : esReg ? <><ShieldCheck size={18} /> Registrarme</> : "Continuar"}
+          </button>
+        </div>
+        <div className="mm-numpad">
+          {PAD.map((row, ri) => (
+            <div key={ri} className="mm-numpad-row">
+              {row.map((k, ki) => (
+                <button key={ki} className={`mm-numpad-btn${k===""?" empty":""}${k==="⌫"?" del":""}`}
+                  onClick={() => pad(k)} disabled={k===""} aria-label={k==="⌫"?"Borrar":k||undefined}>
+                  {k}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
-  // ------------------------------------------------------------------ recibo
-  if (pantalla === "recibo") {
-    const sube = (hechos?.delta_total_cent ?? 0) >= 0;
-    return <div className={marco}>
-      {cabecera("Mi Recibo", () => setPantalla("acceso"))}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4 chat-scroll">
-        <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Periodo {hechos?.periodo_actual}</p>
-          <p className="text-4xl font-bold text-gray-800 mt-1">{soles(hechos?.total_actual_cent ?? 0)}</p>
-          <p className={`text-sm font-semibold mt-2 ${sube ? "text-rose-600" : "text-emerald-600"}`}>
-            {sube ? "▲" : "▼"} {soles(Math.abs(hechos?.delta_total_cent ?? 0))} respecto del mes anterior
-          </p>
+  // ════════════════════════════════════════════════════════════════
+  // PRODUCTOS
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "productos") return (
+    <div className={F}>
+      {hdr("Mis Productos", () => setPantalla("registroDNI"))}
+      <div className="mm-productos-body">
+        <p className="mm-productos-intro">
+          Tienes <strong>{productosSim.length} productos</strong> a tu nombre. Selecciona el que deseas gestionar:
+        </p>
+        <div className="mm-productos-lista">
+          {productosSim.map((p) => (
+            <button key={p.id} className="mm-producto-item"
+              onClick={() => p.id !== cuenta ? entrar.mutate(p.id) : setPantalla("dashboard")}>
+              <div className={`mm-producto-icon ${p.tipo}`}>
+                {p.tipo === "movil" ? <Smartphone size={22} /> : <HomeIcon size={22} />}
+              </div>
+              <div className="mm-producto-info"><strong>{p.etiqueta}</strong><span>{p.numero}</span></div>
+              <div className="mm-producto-arrow">›</div>
+            </button>
+          ))}
         </div>
-        <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-5 space-y-3">
-          <div className="flex justify-between text-sm"><span className="text-gray-500">Mes anterior</span><span className="font-semibold text-gray-800">{soles(hechos?.total_previo_cent ?? 0)}</span></div>
-          <div className="flex justify-between text-sm"><span className="text-gray-500">Este mes</span><span className="font-semibold text-gray-800">{soles(hechos?.total_actual_cent ?? 0)}</span></div>
-          <div className="flex justify-between text-sm border-t border-gray-100 pt-3"><span className="text-gray-500">Modalidad</span><span className="font-semibold text-gray-800">{hechos?.modalidad_renta}</span></div>
+      </div>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // DASHBOARD — Vista 3 (con bottom nav)
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "dashboard") return (
+    <div className={F}>
+      <div className="mm-dash-hdr">
+        <div>
+          <p className="mm-dash-greeting">¡Hola,</p>
+          <h1 className="mm-dash-name">{nombreCliente}!</h1>
         </div>
-        <button onClick={() => { setPantalla("chat"); if (!mensajes.length) preguntar("¿Por qué me vino más caro este mes?"); }}
-                className="w-full bg-[#019DF4] hover:bg-[#0089d8] text-white font-semibold py-4 rounded-2xl shadow-md flex items-center justify-center gap-2 active:scale-[0.99]">
-          <Bot size={18} /> Explícame este recibo
+        <button className="mm-dash-line-pill" onClick={() => navTo("recibo")}>
+          <Smartphone size={13} />
+          <span>{modoSoloMovil ? "Solo móvil" : hechos?.modalidad_renta ?? "Mi Plan"}</span>
         </button>
       </div>
-    </div>;
-  }
-
-  // ------------------------------------------------------------------ chat
-  return <div className={marco}>
-    {cabecera("Asistente", () => setPantalla("recibo"))}
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll">
-      {mensajes.map((m, i) => {
-        const esAsistente = m.rol === "asistente";
-        return <div key={i} className={`flex items-start gap-2.5 ${esAsistente ? "justify-start" : "justify-end"}`}>
-          {esAsistente && <div className="w-8 h-8 rounded-full bg-[#019DF4] text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5"><Bot size={18} /></div>}
-          <div className={`max-w-[85%] p-4 text-sm leading-relaxed whitespace-pre-wrap ${esAsistente
-            ? "bg-white text-gray-800 rounded-2xl rounded-tl-sm shadow-md border border-gray-100"
-            : "bg-[#019DF4] text-white font-medium rounded-2xl rounded-tr-sm shadow-md"}`}>{m.texto}</div>
-          {!esAsistente && <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center shrink-0 shadow-sm mt-0.5"><UserIcon size={18} /></div>}
-        </div>;
-      })}
-
-      {explicar.isPending && <div className="flex items-center gap-2 text-gray-400 text-xs pl-10">
-        <Loader2 size={16} className="animate-spin text-[#019DF4]" />
-        <span>Consultando su recibo y verificando cada cifra…</span>
-      </div>}
-
-      {mensajes.length === 1 && !explicar.isPending && <div className="pl-10 space-y-2 pt-1">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Preguntas frecuentes:</p>
-        {["¿Por qué subió el monto de este mes?", "¿El próximo mes me cobrarán lo mismo?"].map((p) => (
-          <button key={p} onClick={() => preguntar(p)}
-                  className="block text-xs font-semibold text-[#019DF4] bg-sky-50 hover:bg-sky-100 px-3.5 py-2 rounded-xl text-left border border-sky-100">{p}</button>
-        ))}
-      </div>}
-
-      {/* El feedback abre las dos ramas del producto: la oferta o la persona. */}
-      {ultima && !explicar.isPending && !opinion && <div className="pl-10 pt-2">
-        <div className="bg-white rounded-2xl p-3.5 shadow-md border border-gray-100 space-y-2">
-          <p className="text-xs font-semibold text-gray-600">¿Te sirvió esta explicación?</p>
-          <div className="flex gap-2">
-            <button onClick={() => setOpinion("arriba")} className="flex-1 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-emerald-100"><ThumbsUp size={14} /> Sí, entendí</button>
-            <button onClick={() => { setOpinion("abajo"); preguntar("No entiendo, quiero hablar con un asesor"); }}
-                    className="flex-1 py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-rose-100"><ThumbsDown size={14} /> No comprendo</button>
-          </div>
-        </div>
-      </div>}
-
-      {opinion === "arriba" && oferta && <div className="pl-10 pt-2">
-        <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 shadow-md border border-sky-200 space-y-2">
-          <div className="flex items-center gap-2 text-[#019DF4]"><ShoppingBag size={18} /><span className="text-xs font-bold uppercase tracking-wider">Oferta exclusiva</span></div>
-          <h4 className="font-bold text-gray-800 text-sm">{oferta.etiqueta}</h4>
-          <p className="text-xs text-gray-600">Sin importes: el detalle se confirma con un asesor antes de contratar.</p>
-        </div>
-      </div>}
-
-      {derivada && <div className="pl-10 pt-2">
-        <div className="bg-amber-50 rounded-2xl p-4 shadow-md border border-amber-200 flex items-start gap-2.5">
-          <Headphones size={18} className="text-amber-600 shrink-0 mt-0.5" />
+      <div className="mm-dash-scroll">
+        {/* Banner */}
+        <div className="mm-dash-banner">
           <div>
-            <p className="text-xs font-bold text-amber-800">Le pasamos con un asesor</p>
-            <p className="text-xs text-amber-700 mt-1">{ultima?.derivacion.motivo}</p>
-            <p className="text-[11px] text-amber-600 mt-1">Su caso ya está en la cola con todo el contexto cargado: no tendrá que repetir nada.</p>
+            <p className="mm-dash-banner-kicker">🎉 Oferta exclusiva</p>
+            <p className="mm-dash-banner-text">¡Disfruta de <strong>35 GB</strong> + velocidad máxima!</p>
+          </div>
+          <button className="mm-dash-banner-btn"
+            onClick={() => abrirChat("¿Qué ofertas de datos tiene Movistar disponibles?")}>Ver</button>
+        </div>
+        {/* Mejorar plan */}
+        <div className="mm-dash-card">
+          <div className="mm-dash-card-icon" style={{ background:"#f3eeff", color:"#7c3aed" }}><Star size={22} /></div>
+          <div className="mm-dash-card-info">
+            <strong>Mejorar mi plan</strong><span>Encuentra el plan perfecto para ti</span>
+          </div>
+          <button className="mm-dash-card-cta"
+            onClick={() => abrirChat("¿Cuáles son los planes disponibles para mejorar mi servicio?")}>
+            Ver opciones
+          </button>
+        </div>
+        {/* MI RECIBO */}
+        <div className="mm-recibo-card">
+          <div className="mm-recibo-card-top">
+            <div className="mm-recibo-card-icon"><CreditCard size={22} /></div>
+            <div className="mm-recibo-card-info">
+              <p className="mm-recibo-card-label">Mi recibo</p>
+              <p className="mm-recibo-card-sub">Paga tu plan aquí</p>
+            </div>
+            <div className="mm-recibo-card-amount">
+              <strong>{soles(hechos?.total_actual_cent ?? 0)}</strong>
+              <span>{hechos?.periodo_actual ?? "—"}</span>
+            </div>
+          </div>
+          <div className="mm-recibo-card-btns">
+            <button id="btn-ver-recibo" className="mm-rc-btn" onClick={() => setPantalla("recibo")}>Ver recibo</button>
+            <button id="btn-detalle-factura" className="mm-rc-btn primary"
+              onClick={() => abrirChat("Explícame mi recibo de este mes detalladamente")}>
+              Detalle de mi factura
+            </button>
           </div>
         </div>
-      </div>}
-
-      {error && <p className="text-xs text-rose-600 pl-10">{error}</p>}
-      <div ref={fin} />
+        {/* Consumos */}
+        <p className="mm-dash-section-title">Mis consumos</p>
+        <div className="mm-consumos">
+          {[
+            { icon:<Wifi size={18}/>,  label:"Bono datos", val:"35 GB", pct:42,  color:"#019DF4", bg:"#e4f7fd" },
+            { icon:<Phone size={18}/>, label:"Minutos",    val:"Ilim.", pct:100, color:"#5BC500", bg:"#edfae1" },
+            { icon:<Bot size={18}/>,   label:"BillSense",  val:"Activo",pct:100, color:"#d99b1c", bg:"#fff8e8" },
+          ].map((c) => (
+            <div key={c.label} className="mm-consumo">
+              <div className="mm-consumo-icon" style={{ background:c.bg, color:c.color }}>{c.icon}</div>
+              <div className="mm-consumo-body">
+                <div className="mm-consumo-row"><span>{c.label}</span><strong>{c.val}</strong></div>
+                <div className="mm-consumo-track">
+                  <div className="mm-consumo-fill" style={{ width:`${c.pct}%`, background:c.color }} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ height:80 }} />
+      </div>
+      {/* Bottom nav */}
+      <nav className="mm-bottom-nav" aria-label="Navegación inferior">
+        {[
+          { tab:"inicio",     icon:<HomeIcon size={22}/>,    label:"Inicio" },
+          { tab:"recibo",     icon:<CreditCard size={22}/>,  label:"Recibo" },
+          { tab:"billsense",  icon:<Bot size={22}/>,         label:"BillSense" },
+          { tab:"tienda",     icon:<ShoppingBag size={22}/>, label:"Tienda" },
+          { tab:"beneficios", icon:<Gift size={22}/>,        label:"Beneficios" },
+        ].map(({ tab, icon, label }) => (
+          <button key={tab} className={`mm-nav-item${bottomTab===tab?" active":""}`}
+            onClick={() => navTo(tab)} aria-label={label}>
+            {icon}<span>{label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
+  );
 
-    <form onSubmit={enviar} className="border-t border-gray-100 bg-white p-3 flex items-center gap-2">
-      <input aria-label="Consulta" value={borrador} maxLength={2000} placeholder="Escribe tu consulta sobre el recibo…"
-             onChange={(e) => setBorrador(e.target.value)}
-             className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#019DF4]" />
-      <button disabled={!borrador.trim() || explicar.isPending} aria-label="Enviar"
-              className="w-11 h-11 rounded-full bg-[#019DF4] text-white flex items-center justify-center disabled:opacity-50 shadow-md">
-        <Send size={18} />
-      </button>
-    </form>
-  </div>;
+  // ════════════════════════════════════════════════════════════════
+  // RECIBO — Detalle completo
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "recibo") return (
+    <div className={F}>
+      {hdr("Mi Recibo", () => setPantalla("dashboard"))}
+      <div className="mm-recibo-body">
+        <div className="mm-recibo-hero">
+          <p className="mm-recibo-period">Período {hechos?.periodo_actual}</p>
+          <p className="mm-recibo-amount">{soles(hechos?.total_actual_cent ?? 0)}</p>
+          <p className={`mm-recibo-delta ${sube?"up":"down"}`}>
+            {sube?"▲":"▼"} {soles(Math.abs(hechos?.delta_total_cent ?? 0))} respecto del mes anterior
+          </p>
+        </div>
+        <div className="mm-recibo-detail">
+          {[
+            ["Mes anterior", soles(hechos?.total_previo_cent ?? 0)],
+            ["Este mes",     soles(hechos?.total_actual_cent ?? 0), true],
+            ["Modalidad",    hechos?.modalidad_renta ?? "—"],
+            hechos?.prorrateo_cent  ? ["Prorrateo",      soles(Number(hechos.prorrateo_cent))]  : null,
+            hechos?.reconexion_cent ? ["Reconexión",     soles(Number(hechos.reconexion_cent))]  : null,
+            hechos?.deuda_anterior_cent ? ["⚠️ Deuda ant.", soles(hechos.deuda_anterior_cent as number), false, true] : null,
+            hechos?.fecha_vencimiento   ? ["Vencimiento",  String(hechos.fecha_vencimiento)]     : null,
+          ].filter(Boolean).map(([k,v,bold,danger],i) => (
+            <div key={i} className={`mm-recibo-row${danger?" danger":""}`}>
+              <span>{k as string}</span>
+              <span style={{ fontWeight:bold?700:undefined, color:danger?"#cc4c3d":undefined }}>{v as string}</span>
+            </div>
+          ))}
+        </div>
+        {hechos && (
+          <div style={{ marginBottom:12 }}>
+            <ReceiptDetailCard hechos={hechos} onDownload={generarPDF} />
+          </div>
+        )}
+        <button className="mm-btn-primary" onClick={() => abrirChat("Explícame mi recibo detalladamente")}>
+          <Bot size={18} /> Explícame este recibo con BillSense
+        </button>
+        <button className="mm-btn-outline" style={{ marginTop:12 }} onClick={() => setPantalla("dashboard")}>
+          Volver al inicio
+        </button>
+      </div>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // CHAT / BILLSENSE — pantalla principal IA
+  // Dos modos: "chat" (texto) y "voz" (audio)
+  // ════════════════════════════════════════════════════════════════
+  return (
+    <div className={F}>
+      {/* Header común */}
+      {hdr(
+        "BillSense",
+        () => { setPantalla("dashboard"); setBottomTab("inicio"); },
+        <div className={`mm-live-badge${liveIsVisible?" active":""}`}>
+          {liveIsVisible ? <><Mic size={11}/> {liveLabelShort(liveStatus)}</> : <><Bot size={11}/> IA</>}
+        </div>
+      )}
+
+      {/* ── Selector de modo: Chat | BillSense Voz ─────────────── */}
+      <div className="mm-mode-tabs">
+        <button
+          id="tab-chat"
+          className={`mm-mode-tab${chatModo==="chat"?" active":""}`}
+          onClick={() => setChatModo("chat")}
+        >
+          <MessageSquare size={14} /> Chat
+        </button>
+        <button
+          id="tab-voz"
+          className={`mm-mode-tab${chatModo==="voz"?" active":""}`}
+          onClick={() => setChatModo("voz")}
+        >
+          <Mic size={14} /> BillSense Voz
+        </button>
+      </div>
+
+      {/* ════════════════════════════════════════════
+          MODO CHAT — texto sin audio
+          ════════════════════════════════════════════ */}
+      {chatModo === "chat" && (
+        <>
+          {/* Strip de métricas */}
+          {hechos && (
+            <div className="mm-bill-strip">
+              <div className="mm-bill-strip-item">
+                <span>Recibo actual</span><strong>{soles(hechos.total_actual_cent)}</strong>
+              </div>
+              <div className="mm-bill-strip-sep" />
+              <div className="mm-bill-strip-item">
+                <span>Período</span><strong>{hechos.periodo_actual}</strong>
+              </div>
+              <div className="mm-bill-strip-sep" />
+              <div className={`mm-bill-strip-item ${sube?"up":"down"}`}>
+                <span>Variación</span>
+                <strong style={{ color:sube?"#cc4c3d":"#5BC500" }}>{sube?"+":""}{soles(hechos.delta_total_cent)}</strong>
+              </div>
+              {hechos.fecha_vencimiento && <>
+                <div className="mm-bill-strip-sep"/>
+                <div className="mm-bill-strip-item">
+                  <span>Vence</span><strong>{String(hechos.fecha_vencimiento)}</strong>
+                </div>
+              </>}
+            </div>
+          )}
+
+          {/* Conversación */}
+          <div className="mm-chat-scroll">
+            {/* Bienvenida */}
+            {mensajes.length === 0 && !explicar.isPending && (
+              <div className="mm-chat-welcome">
+                <div className="mm-chat-welcome-avatar"><Bot size={28} /></div>
+                <div className="mm-chat-welcome-bubble">
+                  <strong>¡Hola! Soy BillSense 👋</strong>
+                  <p>Puedo explicarte tu recibo en detalle, analizar consumos y responder tus dudas de facturación.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Mensajes */}
+            {mensajes.map((m, i) => {
+              if (m.esRecibo && hechos) {
+                return (
+                  <div key={i} className="mm-chat-turn assistant">
+                    <div className="mm-chat-avatar-bot"><Bot size={16} /></div>
+                    <ReceiptDetailCard hechos={hechos} onDownload={generarPDF} />
+                  </div>
+                );
+              }
+              const esAsi = m.rol === "asistente";
+              return (
+                <div key={i} className={`mm-chat-turn ${esAsi?"assistant":"client"}`}>
+                  {esAsi && (
+                    <div className={`mm-chat-avatar-bot${m.esVoz?" voz":""}`}>
+                      {m.esVoz ? <Mic size={14}/> : <Bot size={16}/>}
+                    </div>
+                  )}
+                  <div className={`mm-chat-bubble ${esAsi?"assistant":"client"}`}>{m.texto}</div>
+                  {!esAsi && <div className="mm-chat-avatar-user"><UserIcon size={16}/></div>}
+                </div>
+              );
+            })}
+
+            {/* Cargando */}
+            {explicar.isPending && (
+              <div className="mm-chat-turn assistant">
+                <div className="mm-chat-avatar-bot"><Bot size={16}/></div>
+                <div className="mm-chat-typing">
+                  <Loader2 size={14} className="animate-spin" style={{ color:"#019DF4" }} />
+                  <span>BillSense está verificando cifras…</span>
+                </div>
+              </div>
+            )}
+
+            {/* Sugerencias rápidas (incluye desglose de factura) */}
+            {mensajes.filter(m=>!m.esRecibo).length <= 1 && !explicar.isPending && (
+              <div className="mm-chat-suggestions">
+                <p className="mm-suggest-label">Acciones rápidas:</p>
+                <button className="mm-suggest-btn mm-suggest-featured" onClick={mostrarDetalleRecibo}>
+                  📄 Ver detalle de factura (PDF)
+                </button>
+                {[
+                  "¿Por qué subió el monto de este mes?",
+                  "¿El próximo mes me cobrarán lo mismo?",
+                  "¿Qué incluye mi plan actual?",
+                ].map((p) => (
+                  <button key={p} onClick={() => preguntar(p)} className="mm-suggest-btn">{p}</button>
+                ))}
+              </div>
+            )}
+
+            {/* Feedback */}
+            {ultima && !explicar.isPending && !opinion && (
+              <div className="mm-chat-feedback">
+                <p>¿Te sirvió esta explicación?</p>
+                <div className="mm-feedback-btns">
+                  <button onClick={() => setOpinion("arriba")} className="mm-feedback-yes">
+                    <ThumbsUp size={14}/> Sí, entendí
+                  </button>
+                  <button onClick={() => { setOpinion("abajo"); preguntar("No entiendo, quiero hablar con un asesor"); }} className="mm-feedback-no">
+                    <ThumbsDown size={14}/> No comprendo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Oferta */}
+            {opinion==="arriba" && oferta && (
+              <div className="mm-chat-turn assistant">
+                <div className="mm-chat-avatar-bot"><Bot size={16}/></div>
+                <div className="mm-offer-card">
+                  <div className="mm-offer-header"><ShoppingBag size={16}/><span>Oferta exclusiva para ti</span></div>
+                  <p className="mm-offer-title">{oferta.etiqueta}</p>
+                  <p className="mm-offer-note">El detalle lo confirma un asesor antes de contratar.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Derivación */}
+            {derivada && (
+              <div className="mm-chat-turn assistant">
+                <div className="mm-chat-avatar-bot"><Bot size={16}/></div>
+                <div className="mm-handoff-card">
+                  <Headphones size={18} className="text-amber-600"/>
+                  <div>
+                    <p style={{ fontWeight:800, color:"#92400e", margin:0 }}>Te conectamos con un asesor</p>
+                    <p style={{ margin:"4px 0 0", fontSize:12 }}>{ultima?.derivacion.motivo}</p>
+                    <p className="mm-handoff-note">Tu caso ya está en la cola: no tendrás que repetir nada.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {chatError && <p className="mm-chat-error">{chatError}</p>}
+            <div ref={fin} />
+          </div>
+
+          {/* Input — solo texto, sin micrófono */}
+          <form onSubmit={enviar} className="mm-chat-form">
+            <input
+              aria-label="Consulta a BillSense"
+              value={borrador}
+              maxLength={2000}
+              placeholder="Escribe tu consulta a BillSense…"
+              onChange={(e) => setBorrador(e.target.value)}
+              className="mm-chat-input"
+            />
+            <button type="submit" id="btn-enviar-chat"
+              disabled={!borrador.trim() || explicar.isPending}
+              aria-label="Enviar" className="mm-chat-send">
+              <Send size={18}/>
+            </button>
+          </form>
+        </>
+      )}
+
+      {/* ════════════════════════════════════════════
+          MODO VOZ — interfaz dedicada al audio
+          ════════════════════════════════════════════ */}
+      {chatModo === "voz" && (
+        <div className="mm-voz-container">
+
+          {/* Avatar animado */}
+          <div className="mm-voz-avatar-wrap">
+            {/* Anillos de onda cuando está activo */}
+            {liveIsVisible && <>
+              <div className="mm-voz-ring ring1" />
+              <div className="mm-voz-ring ring2" />
+              <div className="mm-voz-ring ring3" />
+            </>}
+            <div className={`mm-voz-avatar${liveIsVisible?" active":""}`}>
+              <Bot size={44} />
+            </div>
+          </div>
+
+          {/* Estado de BillSense */}
+          <p className={`mm-voz-status${liveIsVisible?" active":""}`}>
+            {liveLabel(liveStatus)}
+          </p>
+
+          {/* Transcripts de la sesión de voz (burbujas) */}
+          <div className="mm-voz-transcripts">
+            {/* Mensajes de voz anteriores (de sesiones pasadas) */}
+            {mensajes.filter(m => m.esVoz).map((m, i) => {
+              const esAsi = m.rol === "asistente";
+              return (
+                <div key={`prev-${i}`} className={`mm-voz-bubble ${esAsi?"agent":"user"}`}>
+                  {esAsi ? <Bot size={14}/> : <Mic size={14}/>}
+                  <span>{m.texto}</span>
+                </div>
+              );
+            })}
+            {/* Mensajes de la sesión en curso */}
+            {liveMsgs.map((msg, i) => (
+              <div key={`live-${i}`} className={`mm-voz-bubble ${msg.role} live`}>
+                {msg.role === "agent" ? <Bot size={14}/> : <Mic size={14}/>}
+                <span>{msg.text}</span>
+              </div>
+            ))}
+            <div ref={vozScroll} />
+          </div>
+
+          {/* Botón grande de micrófono */}
+          <div className="mm-voz-btn-wrap">
+            <button
+              id="btn-billsense-voz-main"
+              className={`mm-voz-btn${liveIsVisible?" active":""}`}
+              onClick={() => void toggleLive()}
+              disabled={!token || Boolean(micIssue)}
+              title={micIssue ?? liveLabel(liveStatus)}
+              aria-label={liveIsVisible?"Detener BillSense Voz":"Iniciar BillSense Voz"}
+            >
+              {liveStatus === "connecting"
+                ? <Loader2 size={36} className="animate-spin"/>
+                : liveIsVisible
+                ? <MicOff size={36}/>
+                : <Mic size={36}/>}
+            </button>
+            <p className="mm-voz-hint">
+              {micIssue
+                ? <span style={{ color:"#cc4c3d" }}>{micIssue}</span>
+                : liveIsVisible
+                ? "Toca para detener"
+                : "Toca para hablar con BillSense"}
+            </p>
+          </div>
+
+          {chatError && <p className="mm-chat-error" style={{ margin:"0 20px 16px" }}>{chatError}</p>}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function mensajeDeError(causa: unknown) {
-  return causa instanceof ApiError ? `${causa.code}: ${causa.message}`
-    : causa instanceof Error ? causa.message : "Ocurrió un error inesperado";
+// ── Error helper ──────────────────────────────────────────────────────
+function err(causa: unknown) {
+  return causa instanceof ApiError
+    ? `${causa.code}: ${causa.message}`
+    : causa instanceof Error
+    ? causa.message
+    : "Ocurrió un error inesperado";
 }
