@@ -1,11 +1,23 @@
 export type Block =
-  | { tipo: "texto"; titulo?: string | null; texto: string; enfasis?: boolean }
+  | { tipo: "texto"; titulo?: string | null; texto: string; enfasis?: boolean; fact_ids?: string[] }
   | { tipo: "kv"; titulo?: string | null; items: Array<{ clave: string; valor: string; fact_id?: string | null }> }
   | { tipo: "puente"; titulo?: string | null; barras: Array<{ etiqueta: string; monto_cent: number; tipo: string; fact_id?: string | null }> }
   | { tipo: "tabla"; titulo?: string | null; columnas: string[]; filas: string[][]; nota?: string | null }
-  | { tipo: "aviso"; titulo?: string | null; texto: string; severidad: string };
+  | { tipo: "aviso"; titulo?: string | null; texto: string; severidad: string; fact_ids?: string[] };
+
+/** Una línea del recibo, tal como la devuelve `GET /v1/hechos`. */
+export interface LineaFactSet {
+  concepto_id: string;
+  nombre_comercial: string;
+  clase: string;
+  monto_actual_cent: number;
+  monto_previo_cent: number;
+  delta_cent: number;
+  causa?: string | null;
+}
 
 export interface FactSet {
+  lineas?: LineaFactSet[];
   periodo_actual: string;
   total_previo_cent: number;
   total_actual_cent: number;

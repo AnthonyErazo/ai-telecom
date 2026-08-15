@@ -6,6 +6,7 @@ import { Blocks, money } from "./components/Blocks";
 import { WhatsApp } from "./components/WhatsApp";
 import { Asesor } from "./components/Asesor";
 import { MiMovistar } from "./components/MiMovistar";
+import { ReciboGuiado } from "./components/ReciboGuiado";
 import { GeminiLiveClient, type LiveStatus } from "./live/client";
 import { microphoneSupportError } from "./live/audio";
 
@@ -15,7 +16,7 @@ import { microphoneSupportError } from "./live/audio";
 // —hacerlo dejaba «C-DEMO-01» escrito de entrada y, contra el dataset real, entrar sin
 // tocar nada fallaba con «la cuenta no existe»—.
 const fallback = ["C-DEMO-01", "C-DEMO-02", "C-DEMO-03"];
-type View = "whatsapp" | "mimovistar" | "conversacional";
+type View = "whatsapp" | "mimovistar" | "guiado" | "conversacional";
 
 /** Un turno de la conversación, tal y como se pinta.
  *
@@ -232,6 +233,7 @@ export default function App() {
       <nav className="app-tabs" aria-label="Navegación principal">
         <button type="button" className={view === "whatsapp" ? "active" : ""} aria-pressed={view === "whatsapp"} onClick={() => void selectView("whatsapp")}>WhatsApp</button>
         <button type="button" className={view === "mimovistar" ? "active" : ""} aria-pressed={view === "mimovistar"} onClick={() => void selectView("mimovistar")}>Mi Movistar</button>
+        <button type="button" className={view === "guiado" ? "active" : ""} aria-pressed={view === "guiado"} onClick={() => void selectView("guiado")}>Recibo guiado</button>
         <button type="button" className={view === "conversacional" ? "active" : ""} aria-pressed={view === "conversacional"} onClick={() => void selectView("conversacional")}>IA conversacional</button>
       </nav>
       <div className="topbar-status">
@@ -257,6 +259,13 @@ export default function App() {
           setExplanation(resultado);
           try { setAudit(await api.audit(token || "", resultado.trace_id)); } catch { setAudit(null); }
         }}
+      />
+    </main> : view === "guiado" ? <main className="canal-completo">
+      {/* Misma app, con el recibo delante: cada frase enciende la línea de la que habla.
+          La pantalla no interpreta el texto, lee los `fact_ids` que el motor ya puso. */}
+      <ReciboGuiado
+        key={sesionesCerradas}
+        onSesion={(cuentaEntrada, tokenEmitido) => { setAccount(cuentaEntrada); setToken(tokenEmitido); }}
       />
     </main> : !token ? <main className="canal-completo">
       {/* Sin sesión esta vista era un callejón: el chat no podía preguntar y el botón de

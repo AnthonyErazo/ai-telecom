@@ -317,13 +317,22 @@ def componer_bloques(
         )
         bloques.append(BloquePuente(titulo="De un mes a otro", barras=barras))
 
-    frases = [f for f in (sin_preambulo(c.frase) for c in explicacion.causas) if f]
-    if frases:
+    # Una causa, un bloque. Antes se unían todas las frases en un solo `BloqueTexto` con
+    # los `fact_ids` de todas las líneas juntos, y ahí se perdía el emparejamiento: el
+    # texto decía tres cosas y las anclas eran tres, pero nadie sabía cuál iba con cuál.
+    # Separadas, cada frase viaja con la línea del recibo de la que habla, que es lo que
+    # permite señalar en el recibo lo que se está explicando. El texto que se lee no
+    # cambia —los canales concatenan los bloques—; lo que cambia es que ahora se sabe a
+    # qué apunta cada frase.
+    for indice, causa in enumerate(explicacion.causas):
+        frase = sin_preambulo(causa.frase)
+        if not frase:
+            continue
         bloques.append(
             BloqueTexto(
-                titulo="Qué cambió",
-                texto=" ".join(frases),
-                fact_ids=[f"linea:{causa.concepto_id}.delta_cent" for causa in explicacion.causas],
+                titulo="Qué cambió" if indice == 0 else "",
+                texto=frase,
+                fact_ids=[f"linea:{causa.concepto_id}.delta_cent"],
             )
         )
 
