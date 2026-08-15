@@ -38,7 +38,11 @@ function aTextoPlano(bloques: Block[]): string {
     .filter((bloque) => bloque.tipo === "texto" || bloque.tipo === "aviso")
     .map((bloque) => (bloque as { texto: string }).texto.trim())
     .filter(Boolean)
-    .join("\n\n");
+    // Un espacio, no un salto de párrafo: en WhatsApp cada salto es una burbuja más alta,
+    // y desde que cada causa viaja en su propio bloque —para poder señalarla en el recibo
+    // guiado— el mismo texto ocupaba el triple. Se lee de un vistazo, que es lo que pide
+    // el canal.
+    .join(" ");
 }
 
 type Mensaje = { rol: "cliente" | "bot"; texto: string; explicacion?: Explanation };

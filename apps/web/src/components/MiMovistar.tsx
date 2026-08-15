@@ -45,7 +45,12 @@ function narrativa(bloques: Block[]): string {
     .filter((b) => b.tipo === "texto" || b.tipo === "aviso")
     .map((b) => (b as { texto: string }).texto.trim())
     .filter(Boolean)
-    .join("\n\n");
+    // Un espacio, no un salto de párrafo. Desde que cada causa viaja en su propio bloque
+    // —para poder señalarla en el recibo— el chat pintaba cuatro párrafos donde antes
+    // había uno: el mismo texto, con el triple de alto en pantalla y con pinta de
+    // informe. Aquí se lee de un vistazo; la separación por bloques sigue existiendo
+    // donde sirve, que es la vista guiada.
+    .join(" ");
 }
 
 type Pantalla = "acceso" | "recibo" | "chat";

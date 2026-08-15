@@ -230,11 +230,16 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
                   } ${apagada ? "opacity-35" : "opacity-100"}`}
                 >
                   <span className="text-sm text-gray-700">{linea.nombre_comercial}</span>
-                  <span className="text-right shrink-0">
-                    <span className="block text-sm font-semibold text-gray-800">
-                      {soles(linea.monto_actual_cent)}
+                  <span className="flex flex-col items-end shrink-0">
+                    {/* Un concepto que desapareció vale S/ 0,00 este mes, y escribirlo así
+                        es correcto y se lee fatal: parece que le cobraron cero. Lo que el
+                        cliente necesita saber es que ya no se le cobra y cuánto era. */}
+                    <span className="text-sm font-semibold text-gray-800">
+                      {linea.monto_actual_cent === 0 && linea.monto_previo_cent !== 0
+                        ? "Ya no se cobra"
+                        : soles(linea.monto_actual_cent)}
                     </span>
-                    <span className={`block text-xs ${linea.delta_cent > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                    <span className={`text-xs ${linea.delta_cent > 0 ? "text-rose-600" : "text-emerald-600"}`}>
                       {linea.delta_cent > 0 ? "+" : "−"}{soles(Math.abs(linea.delta_cent))}
                     </span>
                   </span>
