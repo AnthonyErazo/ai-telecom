@@ -22,21 +22,25 @@ from decimal import Decimal
 from fractions import Fraction
 
 from packages.core_domain.dinero import Centimos, prorratear, redondear_banca, repartir_mayor_resto
-from packages.core_domain.enums import ConvencionProrrateo, EstadoServicio
+from packages.core_domain.enums import ConvencionProrrateo, EstadoServicio, ModalidadRenta
 from packages.core_domain.esquemas.movimiento import CuotaFinanciamiento, PlanFinanciamiento
 from packages.core_domain.esquemas.recibo import Tramo
 
 __all__ = [
+    "DIAS_DESCUENTO_ALTA",
     "AjusteRetroactivo",
+    "ReciboConDescuentoAlta",
     "ajuste_por_suspension",
     "ajuste_retroactivo",
     "ajuste_retroactivo_desde_tramos",
+    "cargo_fijo_con_descuento_alta",
     "cronograma_frances",
     "cuota_equipo_financiado",
     "denominador_ciclo",
     "dias_30_360",
     "dias_para_prorrateo",
     "distribuir_renta_por_tramos",
+    "recibos_de_alta",
     "renta_del_ciclo",
     "total_adelantada",
     "total_vencida",
@@ -373,6 +377,221 @@ def total_adelantada(
         + cargos_cent
         - creditos_cent
     )
+
+
+# --------------------------------------------------------------------------- #
+# 4.5 — Descuento por alta nueva o portabilidad (la fórmula del vídeo de Planta)
+# --------------------------------------------------------------------------- #
+#: Duración nominal de la promoción de alta, en días. El vídeo dice «3 meses» y a la vez
+#: «90 días aproximadamente», y ese *aproximadamente* no es un descuido: la promoción se
+#: agota por DÍAS, no por recibos, y por eso el cuarto recibo sale partido. Es el dato que
+#: convierte «me subió el recibo sin avisar» en una explicación de una línea.
+DIAS_DESCUENTO_ALTA = 90
+
+
+@dataclass(frozen=True)
+class ReciboConDescuentoAlta:
+    """Lo que el descuento de alta hace en UN recibo, y qué deja para los siguientes.
+
+    Solo describe el **cargo fijo del plan**. Los paquetes, los servicios adicionales y
+    la cuota del equipo financiado no entran aquí porque el descuento no los toca: esa es
+    la regla que más consultas genera en el 104, y está escrita en el tipo a propósito
+    —quien quiera descontar un paquete tiene que hacerlo fuera de esta función.
+    """
+
+    dias_con_descuento: int
+    dias_sin_descuento: int
+    cargo_con_descuento_cent: Centimos
+    cargo_sin_descuento_cent: Centimos
+    dias_restantes_promocion: int
+
+    @property
+    def cargo_fijo_cent(self) -> Centimos:
+        """Lo que se cobra por el cargo fijo en este recibo."""
+        return self.cargo_con_descuento_cent + self.cargo_sin_descuento_cent
+
+    @property
+    def es_mixto(self) -> bool:
+        """El recibo en que se acaba la promoción a mitad de ciclo.
+
+        Es el que dispara la llamada: el cliente venía pagando la mitad, no cambió nada y
+        el recibo le sube sin que ninguna línea nueva aparezca. Detectarlo permite
+        explicarlo antes de que pregunte.
+        """
+        return self.dias_con_descuento > 0 and self.dias_sin_descuento > 0
+
+
+def cargo_fijo_con_descuento_alta(
+    *,
+    cargo_fijo_cent: Centimos,
+    dias_facturados: int,
+    dias_ciclo: int,
+    dias_restantes_promocion: int,
+    tasa_descuento: Fraction = Fraction(1, 2),
+) -> ReciboConDescuentoAlta:
+    """Cargo fijo de un recibo cuando queda saldo de promoción de alta.
+
+    La promoción es una **bolsa de días**, no un porcentaje sobre el recibo. De los
+    ``dias_facturados`` de este ciclo, los primeros que todavía tengan saldo se cobran con
+    la tasa promocional y el resto a tarifa plena::
+
+        cargo = P·(d_con/D)·(1 − tasa)  +  P·(d_sin/D)
+
+    donde ``d_con = min(dias_facturados, dias_restantes_promocion)``.
+
+    Que la bolsa se lleve en días y no en meses es justo lo que produce el recibo mixto:
+    con 90 días de promoción y un primer recibo de 3 días, quedan 87, que no son tres
+    ciclos completos. El cuarto recibo cobra una parte con descuento y otra sin él, y el
+    cliente ve subir el recibo sin haber contratado nada.
+
+    Args:
+        cargo_fijo_cent: cargo fijo mensual del plan (S/ 60,00 = ``6000``). **Solo** el
+            cargo fijo: el descuento no aplica a paquetes, servicios adicionales ni al
+            financiamiento del equipo.
+        dias_facturados: días de plan que cobra este recibo (el ciclo completo, o los
+            días prorrateados si es el recibo del alta).
+        dias_ciclo: días del ciclo de facturación, el denominador del prorrateo.
+        dias_restantes_promocion: saldo de la bolsa al empezar este recibo.
+        tasa_descuento: fracción exacta que se descuenta. ``Fraction(1, 2)`` es el 50 %
+            del ejemplo; se pasa como ``Fraction`` y no como ``float`` porque toda la
+            aritmética monetaria del módulo es exacta.
+
+    Raises:
+        ValueError: si los días son negativos, si el ciclo no es positivo o si la tasa
+            se sale de ``[0, 1]``.
+    """
+    if dias_facturados < 0 or dias_restantes_promocion < 0:
+        raise ValueError(
+            f"días negativos: facturados={dias_facturados}, "
+            f"promoción={dias_restantes_promocion}"
+        )
+    if dias_ciclo <= 0:
+        raise ValueError(f"días de ciclo inválidos: {dias_ciclo}")
+    if not (0 <= tasa_descuento <= 1):
+        raise ValueError(f"tasa de descuento fuera de [0, 1]: {tasa_descuento}")
+
+    dias_con = min(dias_facturados, dias_restantes_promocion)
+    dias_sin = dias_facturados - dias_con
+
+    bruto_con = prorratear(cargo_fijo_cent, dias_con, dias_ciclo)
+    # El descuento se calcula sobre la porción ya prorrateada y se resta, en vez de
+    # multiplicar por (1 − tasa): así el importe descontado es un entero exacto que puede
+    # imprimirse como línea propia del recibo, que es como lo ve el cliente.
+    descuento = redondear_banca(
+        int(bruto_con) * tasa_descuento.numerator, tasa_descuento.denominator
+    )
+    return ReciboConDescuentoAlta(
+        dias_con_descuento=dias_con,
+        dias_sin_descuento=dias_sin,
+        cargo_con_descuento_cent=bruto_con - descuento,
+        cargo_sin_descuento_cent=prorratear(cargo_fijo_cent, dias_sin, dias_ciclo),
+        dias_restantes_promocion=dias_restantes_promocion - dias_con,
+    )
+
+
+def recibos_de_alta(
+    *,
+    cargo_fijo_cent: Centimos,
+    dias_hasta_cierre: int,
+    modalidad: ModalidadRenta,
+    dias_ciclo: int = 30,
+    dias_promocion: int = DIAS_DESCUENTO_ALTA,
+    tasa_descuento: Fraction = Fraction(1, 2),
+    recibos: int = 4,
+) -> list[ReciboConDescuentoAlta]:
+    """La secuencia de recibos de un alta nueva o una portabilidad con promoción.
+
+    Es la fórmula del vídeo, y la modalidad de renta la cambia entera:
+
+    **Renta VENCIDA** — el cliente disfruta y luego paga. El primer recibo cobra solo los
+    días que alcanzó a consumir antes del cierre, y esos días **sí llevan descuento**::
+
+        alta el 12, ciclo 15, plan S/ 60 -> recibo 1: 3 días = S/ 6, con 50 % -> S/ 3
+        recibos 2 y 3: mes completo al 50 %                                  -> S/ 30
+        recibo 4: se agotó la bolsa a mitad de ciclo -> parte con y parte sin
+
+    **Renta ADELANTADA** — se factura antes de disfrutar. El primer recibo lleva dos
+    cosas: los días que restan hasta el cierre, **sin descuento**, y por adelantado el mes
+    siguiente completo, **con descuento**::
+
+        portabilidad el 12, ciclo 15 -> 3 días sin descuento  S/ 6
+                                     +  mes completo al 50 %  S/ 30
+                                     =  primer recibo         S/ 36
+
+    Por qué esos días no llevan descuento: la promoción arranca con el ciclo que se
+    factura, y ese tramo pertenece al ciclo en curso, que ya estaba facturado. Es la
+    imagen del vídeo —el pedazo de queque que queda «solo con vainilla»— y explica que dos
+    clientes con el mismo plan y el mismo día de alta paguen distinto en el primer recibo.
+
+    Returns:
+        Un elemento por recibo. En renta adelantada, el primero acumula el tramo sin
+        descuento y el mes adelantado con él, que es como llega al cliente: una sola cifra.
+
+    Raises:
+        ValueError: si ``recibos`` no es positivo o si ``dias_hasta_cierre`` no cabe en
+            el ciclo.
+    """
+    if recibos <= 0:
+        raise ValueError(f"número de recibos inválido: {recibos}")
+    if not (0 <= dias_hasta_cierre <= dias_ciclo):
+        raise ValueError(
+            f"días hasta el cierre fuera del ciclo: {dias_hasta_cierre} de {dias_ciclo}"
+        )
+
+    saldo = dias_promocion
+    serie: list[ReciboConDescuentoAlta] = []
+
+    if modalidad is ModalidadRenta.ADELANTADA:
+        # Tramo del ciclo en curso: sin descuento y sin tocar la bolsa. Se modela pasando
+        # saldo cero, para que la fórmula sea una sola y no dos ramas paralelas.
+        parcial = cargo_fijo_con_descuento_alta(
+            cargo_fijo_cent=cargo_fijo_cent,
+            dias_facturados=dias_hasta_cierre,
+            dias_ciclo=dias_ciclo,
+            dias_restantes_promocion=0,
+            tasa_descuento=tasa_descuento,
+        )
+        adelantado = cargo_fijo_con_descuento_alta(
+            cargo_fijo_cent=cargo_fijo_cent,
+            dias_facturados=dias_ciclo,
+            dias_ciclo=dias_ciclo,
+            dias_restantes_promocion=saldo,
+            tasa_descuento=tasa_descuento,
+        )
+        saldo = adelantado.dias_restantes_promocion
+        serie.append(
+            ReciboConDescuentoAlta(
+                dias_con_descuento=adelantado.dias_con_descuento,
+                dias_sin_descuento=parcial.dias_sin_descuento + adelantado.dias_sin_descuento,
+                cargo_con_descuento_cent=adelantado.cargo_con_descuento_cent,
+                cargo_sin_descuento_cent=(
+                    parcial.cargo_sin_descuento_cent + adelantado.cargo_sin_descuento_cent
+                ),
+                dias_restantes_promocion=saldo,
+            )
+        )
+    else:
+        primero = cargo_fijo_con_descuento_alta(
+            cargo_fijo_cent=cargo_fijo_cent,
+            dias_facturados=dias_hasta_cierre,
+            dias_ciclo=dias_ciclo,
+            dias_restantes_promocion=saldo,
+            tasa_descuento=tasa_descuento,
+        )
+        saldo = primero.dias_restantes_promocion
+        serie.append(primero)
+
+    while len(serie) < recibos:
+        siguiente = cargo_fijo_con_descuento_alta(
+            cargo_fijo_cent=cargo_fijo_cent,
+            dias_facturados=dias_ciclo,
+            dias_ciclo=dias_ciclo,
+            dias_restantes_promocion=saldo,
+            tasa_descuento=tasa_descuento,
+        )
+        saldo = siguiente.dias_restantes_promocion
+        serie.append(siguiente)
+    return serie
 
 
 # --------------------------------------------------------------------------- #

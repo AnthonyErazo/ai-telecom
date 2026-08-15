@@ -917,17 +917,14 @@ def _explicar_directo(
 
     # --- 10. Acciones y respuesta ------------------------------------------ #
     acciones = list(resultado.acciones)
-    # Derivar (el sistema pasa la conversación) y ofrecer (el cliente decide si quiere el
-    # motivo documentado) son cosas distintas, y la segunda es la que evita que la laguna
-    # del CRM se cobre en hand-offs.
-    if (incomprension.derivar or incomprension.ofrecer_asesor) and all(
+    # Derivar y decírselo al cliente son cosas distintas. La derivación ocurre igual y en
+    # silencio —el caso entra en la cola con su expediente—; el botón solo se pinta si el
+    # asesor lo pidió el cliente o si hay un reclamo formal de por medio.
+    if incomprension.asesor_a_la_vista and all(
         accion.id is not AccionSiguiente.DERIVAR_ASESOR for accion in acciones
     ):
         etiqueta, riesgo = ETIQUETAS_ACCION[AccionSiguiente.DERIVAR_ASESOR]
-        acciones.insert(
-            0 if incomprension.derivar else len(acciones),
-            Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo),
-        )  # type: ignore[arg-type]
+        acciones.insert(0, Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo))  # type: ignore[arg-type]
     oferta = evaluar_cross_selling(
         factset,
         reglas,

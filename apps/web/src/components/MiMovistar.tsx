@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft, Bot, CreditCard, Headphones, Loader2, Send, ShieldCheck,
+  ArrowLeft, Bot, CreditCard, Loader2, Send, ShieldCheck,
   ShoppingBag, Smartphone, ThumbsDown, ThumbsUp, User as UserIcon,
 } from "lucide-react";
 import MovistarLogo from "./MovistarLogo";
@@ -24,12 +24,16 @@ import type { Block, Explanation, FactSet } from "../api/types";
  * Las tres decisiones de producto que se conservan del prototipo
  * -------------------------------------------------------------
  * 1. **Feedback 👍/👎 antes de ofrecer nada.** El cross-selling no aparece por tiempo ni
- *    por scroll: aparece si el cliente dice que entendió. Y el 👎 no abre una encuesta,
- *    abre el paso a un asesor.
+ *    por scroll: aparece si el cliente dice que entendió. Y el 👎 no abre una encuesta:
+ *    vuelve a preguntar, más simple. Lo que el prototipo abría ahí era el paso a un
+ *    asesor, y eso se quitó —quien no entiende algo quiere entenderlo, no que lo pasen
+ *    con otra persona; si prefiere hablar con alguien, lo escribe y el motor lo detecta.
  * 2. **La oferta no lleva importes.** Es una acción (`VER_ALTERNATIVAS`) que el backend
  *    autoriza con doble condición; si trajera cifras tendrían que pasar el verificador y
  *    no están en el FactSet.
- * 3. **El hand-off es un botón, no un callejón.** Deriva con el contexto ya cargado.
+ * 3. **El hand-off no se anuncia.** La derivación ocurre por debajo, con el contexto ya
+ *    cargado, y el asesor recibe el expediente; al cliente no se le pone delante. Un
+ *    último recurso que aparece en todas las respuestas deja de ser el último.
  */
 
 const soles = (centimos: number) =>
@@ -116,10 +120,12 @@ export function MiMovistar({
 
   const enviar = (evento: FormEvent) => { evento.preventDefault(); preguntar(borrador); };
 
+  // `derivacion` sigue llegando en la respuesta y la pantalla NO la lee: la derivación
+  // es un asunto interno entre el motor y la cola del 104. Ver el campo y no pintarlo es
+  // la decisión, no un olvido.
   // La oferta solo existe si el backend la autorizó: doble condición (consulta resuelta y
   // regla de negocio explícita). La pantalla no decide vender.
   const oferta = ultima?.acciones.find((a) => a.id === "VER_ALTERNATIVAS");
-  const derivada = ultima?.derivacion.requerida;
 
   const marco = "flex flex-col max-w-md mx-auto w-full bg-gray-50 min-h-[720px] shadow-2xl border-x border-gray-100 overflow-hidden";
   const cabecera = (titulo: string, atras?: () => void) => (
@@ -253,7 +259,7 @@ export function MiMovistar({
           <p className="text-xs font-semibold text-gray-600">¿Te sirvió esta explicación?</p>
           <div className="flex gap-2">
             <button onClick={() => setOpinion("arriba")} className="flex-1 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-emerald-100"><ThumbsUp size={14} /> Sí, entendí</button>
-            <button onClick={() => { setOpinion("abajo"); preguntar("No entiendo, quiero hablar con un asesor"); }}
+            <button onClick={() => { setOpinion("abajo"); preguntar("No entendí, explícamelo más simple"); }}
                     className="flex-1 py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-rose-100"><ThumbsDown size={14} /> No comprendo</button>
           </div>
         </div>
@@ -263,20 +269,15 @@ export function MiMovistar({
         <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 shadow-md border border-sky-200 space-y-2">
           <div className="flex items-center gap-2 text-[#019DF4]"><ShoppingBag size={18} /><span className="text-xs font-bold uppercase tracking-wider">Oferta exclusiva</span></div>
           <h4 className="font-bold text-gray-800 text-sm">{oferta.etiqueta}</h4>
-          <p className="text-xs text-gray-600">Sin importes: el detalle se confirma con un asesor antes de contratar.</p>
+          <p className="text-xs text-gray-600">Consulte las condiciones antes de contratar.</p>
         </div>
       </div>}
 
-      {derivada && <div className="pl-10 pt-2">
-        <div className="bg-amber-50 rounded-2xl p-4 shadow-md border border-amber-200 flex items-start gap-2.5">
-          <Headphones size={18} className="text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-bold text-amber-800">Le pasamos con un asesor</p>
-            <p className="text-xs text-amber-700 mt-1">{ultima?.derivacion.motivo}</p>
-            <p className="text-[11px] text-amber-600 mt-1">Su caso ya está en la cola con todo el contexto cargado: no tendrá que repetir nada.</p>
-          </div>
-        </div>
-      </div>}
+      {/* El aviso de derivación NO se pinta. Dos motivos: al cliente no se le ofrece un
+          asesor salvo que lo pida —es el último recurso—, y el motivo que traía era
+          diagnóstico interno («hay conceptos fuera de catálogo: FRTOCH_003…»), que a
+          quien lee su recibo solo le comunica que el sistema no funciona. La derivación
+          sigue ocurriendo por debajo y el caso sigue llegando a la cola del 104. */}
 
       {error && <p className="text-xs text-rose-600 pl-10">{error}</p>}
       <div ref={fin} />

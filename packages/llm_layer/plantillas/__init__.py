@@ -121,6 +121,12 @@ class DatosPlantilla:
     causa_principal: dict[str, Any] | None = None
     linea_principal: dict[str, Any] | None = None
     tramos: list[dict[str, Any]] = field(default_factory=list)
+    #: El ciclo se cobró a DOS tarifas distintas: la promoción murió a mitad de mes.
+    #: Es el caso que el vídeo de Planta explica y el que más llamadas genera, porque el
+    #: cliente ve subir el recibo sin haber contratado nada y sin línea nueva alguna.
+    #: Sale de los propios tramos —dos tarifas facturables distintas en el mismo ciclo—,
+    #: así que no hace falta conocer el calendario de la promoción para detectarlo.
+    descuento_mixto: bool = False
     cuota: dict[str, Any] | None = None
     plantilla: str = "generico"
     factset_id: str = ""
@@ -302,6 +308,11 @@ def construir_datos(
         lineas[0] if lineas else None,
     )
     con_tramos = next((linea for linea in lineas if linea["tramos"]), None)
+    tramos_linea = (con_tramos or {}).get("tramos", [])
+    # Dos tarifas distintas dentro del mismo ciclo, sin contar los tramos suspendidos
+    # —que no se cobran y tienen tarifa cero por otro motivo—. Cuando eso pasa junto a un
+    # fin de descuento, el recibo va partido: una parte rebajada y otra a precio entero.
+    tarifas_facturadas = {t["tarifa_cent"] for t in tramos_linea if not t["suspendido"]}
     con_cuota = next((linea for linea in lineas if linea["cuota"]), None)
 
     datos = DatosPlantilla(
@@ -347,7 +358,8 @@ def construir_datos(
             linea["exige_causa"] and not linea["causa_confirmada"] for linea in lineas
         ),
         linea_principal=linea_principal,
-        tramos=(con_tramos or {}).get("tramos", []),
+        tramos=tramos_linea,
+        descuento_mixto=len(tarifas_facturadas) > 1,
         cuota=(
             {
                 "texto": str(con_cuota["cuota"]),

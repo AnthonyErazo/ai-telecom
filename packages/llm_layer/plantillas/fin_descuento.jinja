@@ -16,8 +16,17 @@
 {%- endmacro %}
 
 {% macro frase(d, c) -%}
-{% if c.causa == "FIN_DESCUENTO" %}
-Se le terminó un descuento de {{ c.monto }}: la promoción llegó a su última mensualidad y ya no figura en este recibo.
+{# El recibo mixto es el que de verdad genera la llamada, y hasta ahora no se nombraba.
+   La promoción de alta se agota por DÍAS —unos 90—, no por recibos, así que casi nunca
+   muere en el corte del ciclo: muere a mitad, y ese recibo cobra unos días a mitad de
+   precio y el resto a precio entero. Al cliente le sube sin haber contratado nada y sin
+   que ninguna línea nueva aparezca, que es el peor de los casos para él. Decirle «se le
+   acabó a mitad de mes» lo explica de una vez; decirle «llegó a su última mensualidad»
+   es falso, porque su último mes fue justo el anterior y este viene partido. #}
+{% if c.causa == "FIN_DESCUENTO" and d.descuento_mixto %}
+Se le acabó el descuento a mitad del mes: parte de este recibo va con el precio rebajado y el resto ya al precio normal, {{ c.monto }} más.
+{% elif c.causa == "FIN_DESCUENTO" %}
+Se le acabó el descuento y el plan volvió a su precio normal: {{ c.monto }} más.
 {% elif c.causa == "CAMBIO_PLAN" and not c.sube %}
 A la vez, cambió a un plan más barato, lo que le ahorró {{ c.monto }} entre la renta del mes que viene y el ajuste de los días ya cobrados.
 {% elif c.causa == "CAMBIO_PLAN" %}
@@ -31,8 +40,11 @@ El cambio de plan explica {{ c.monto }} más: se juntan el ajuste de los días d
 {{ frase_residual_std(d) }}
 {%- endmacro %}
 
+{# Tres frases largas se quedaron en una. Decían lo mismo tres veces —que la promoción
+   tenía plazo, que al acabarse vuelve el precio de lista y que el cliente no contrató
+   nada— y esto se lee en un móvil: el que llega al final ya no recuerda la cifra. #}
 {% macro detalle(d) -%}
-Las promociones se contratan por un tiempo pactado. Cuando ese tiempo se acaba, el descuento deja de aplicarse y el plan vuelve a cobrarse a su precio de lista. Usted no contrató nada nuevo ni le cobraron nada de más: lo que pasó es que se le venció el beneficio. {{ contraste(d) }} {{ lista_lineas(d) }} {{ totales(d) }}
+El descuento tenía fecha de fin y se cumplió, así que el plan volvió a su precio de siempre. {{ contraste(d) }} {{ lista_lineas(d) }} {{ totales(d) }}
 {%- endmacro %}
 
 {% macro cierre(d) -%}

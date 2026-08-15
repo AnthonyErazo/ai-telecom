@@ -211,14 +211,53 @@ class ResultadoIncomprension(BaseModel):
 
     @property
     def ofrecer_asesor(self) -> bool:
-        """Si conviene **ofrecer** un asesor sin derivar todavía.
+        """Retirado: el asesor **no se ofrece nunca** por iniciativa del sistema.
 
-        Es el término medio que faltaba: la explicación sale, con su desglose completo y
-        su laguna declarada, y además se le ofrece al cliente la puerta a una persona por
-        si quiere el porqué documentado. Derivar es entonces una decisión suya, no una
-        rendición del sistema, y el hand-off vuelve a ser el último recurso.
+        La idea original era un término medio —explicar igual y dejar abierta la puerta a
+        una persona por si el cliente quería el porqué documentado—, y sobre el papel
+        parecía el último recurso. En la práctica no lo era.
+
+        Con los datos reales, ``causa_confirmada`` es ``False`` en la mayoría de los
+        recibos: el CRM no registra una orden por cada línea que se mueve. La condición
+        se cumplía casi siempre, así que la puerta al asesor aparecía casi siempre, y una
+        puerta que se abre en todas las respuestas deja de ser el último recurso para ser
+        el primero. El cliente que lee «¿quiere hablar con un asesor?» al final de cada
+        explicación entiende una sola cosa: que la explicación no bastaba.
+
+        Ahora la puerta la abre él. Si pide una persona, la intención lo detecta y el
+        motivo es ``PETICION_HUMANO``; hasta entonces no se menciona.
+
+        Se conserva la propiedad, en ``False``, en vez de borrarla: la leen la telemetría
+        y la bitácora (``asesor_ofrecido``), y el valor sigue siendo la respuesta correcta
+        a la pregunta que hacen —ya no se ofrece—. Lo que sí se conserva vivo es
+        ``causa_confirmada``, que es el dato honesto y sigue viajando al expediente.
         """
-        return not self.derivar and not self.causa_confirmada
+        return False
+
+    @property
+    def asesor_a_la_vista(self) -> bool:
+        """Si el botón «Hablar con un asesor» puede aparecerle al cliente.
+
+        Derivar y *decírselo al cliente* son cosas distintas, y confundirlas fue el error
+        anterior. La derivación es interna: el caso entra en la cola del 104 con su
+        expediente y su ``context_ref`` pase lo que pase. Lo que esta propiedad decide es
+        otra cosa —si además se le pone al cliente un botón delante—, y solo hay dos
+        situaciones en las que eso no es el sistema rindiéndose en voz alta:
+
+        · ``PETICION_HUMANO``: la pidió él. Es la puerta que abre el cliente.
+        · ``INTENCION_REGULATORIA``: un reclamo formal tiene un trámite con plazos y
+          derechos; ahí llevarlo a una persona no es una excusa, es el procedimiento.
+
+        Los demás motivos —concepto fuera de catálogo, invariante roto, verificación
+        fallida, umbral de incomprensión— son diagnósticos **nuestros**. Al cliente no le
+        dicen nada útil: «hay conceptos fuera de catálogo: FRTOCH_003, FRTOPL_002» le
+        comunica, y solo, que el sistema no funciona. El caso se deriva igual, en
+        silencio, y el asesor lo recibe con todo el contexto cargado.
+        """
+        return self.motivo in (
+            MotivoDerivacion.PETICION_HUMANO,
+            MotivoDerivacion.INTENCION_REGULATORIA,
+        )
 
     def a_derivacion(
         self, *, context_ref: str | None = None, resumen_asesor: str | None = None

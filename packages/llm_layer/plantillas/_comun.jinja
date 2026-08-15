@@ -58,34 +58,28 @@ A la vez, {{ d.causa_que_ahorra.etiqueta }} jugó a su favor y le ahorró {{ d.c
 {% endif %}
 {%- endmacro %}
 
-{# La honestidad no consiste en callarse lo que no se sabe: consiste en nombrarlo.
-   Cuando el recibo cuadra al céntimo pero ningún sistema registra la orden que movió la
-   línea, el asistente sabe CUÁNTO varió y EN QUÉ LÍNEA —eso sale del propio recibo— y no
-   sabe POR QUÉ. Decirlo así, con el límite nombrado y el porqué del límite, es lo que
-   permite responder en vez de derivar: el cliente se lleva su respuesta y decide él si
-   quiere además el motivo documentado. Callarlo sería insinuar una causa que no consta;
-   derivar por ello convertiría el hand-off en el caso normal.
-   Sin una sola cifra nueva: aquí no se imprime ningún importe. #}
-{# Una frase, no tres. La versión anterior decía lo mismo tres veces —que detalla el
-   cuánto, que no consta el motivo, y que puede pasar con un asesor— y el cierre volvía a
-   ofrecer el asesor en la frase siguiente. El resultado era un párrafo más largo que la
-   propia explicación y con el ofrecimiento duplicado en dos frases seguidas: la salvedad
-   dejaba de leerse como honestidad y pasaba a leerse como excusa.
-   Lo que se dice sigue siendo exactamente lo mismo, y sigue sin llevar ni una cifra. #}
-{% macro salvedad_causal(d) -%}
-{% if d.causa_sin_confirmar and not d.sin_variacion %}
-El motivo exacto no me consta en el sistema.
-{% endif %}
-{%- endmacro %}
+{# La salvedad causal se retiró del cierre.
 
-{# El asesor NO se ofrece. Es el último recurso, y ofrecerlo en cada respuesta lo
-   convierte en el primero: al cliente que lee «¿le paso con un asesor?» al final de cada
-   explicación se le está diciendo que la explicación no bastaba. Si quiere una persona,
-   la pide él —hay una intención que lo detecta— y entonces sí se deriva. La acción
-   `DERIVAR_ASESOR` sigue disponible en la interfaz para quien la busque; lo que
-   desaparece es la invitación no pedida. #}
+   El argumento para tenerla era bueno: cuando el recibo cuadra al céntimo pero ningún
+   sistema registra la orden que movió la línea, sabemos el CUÁNTO y no el POR QUÉ, y
+   nombrar ese límite es más honesto que callarlo.
+
+   Lo que falla es la frase, no el argumento. «El motivo exacto no me consta en el
+   sistema» está escrita desde dentro del sistema: habla de lo que la operadora tiene
+   registrado, no de lo que al cliente le pasó. Quien acaba de leer cuánto le subió el
+   recibo y por qué línea, y entonces lee que a la empresa no le consta el motivo,
+   no se lleva una salvedad: se lleva la sensación de que nadie sabe qué le cobraron.
+   El cliente no distingue —ni tiene por qué— entre "no me consta la orden" y "no sé
+   qué es esto". Cuesta más confianza de la que salva.
+
+   Dónde vive ahora la honestidad, que no se ha perdido:
+     · La explicación sigue sin inventar la causa. La prohibición de insinuar un motivo
+       plausible sigue en pie en el prompt, y es la que de verdad protege al cliente.
+     · `causa_confirmada` sigue viajando en el FactSet y sigue quedando en la bitácora,
+       que es donde importa para auditar y para el 104.
+   Es decir: se calla una frase, no se afirma nada que no conste. #}
 {% macro cierre_estandar(d) -%}
-{{ deuda_frase(d) }} {{ salvedad_causal(d) }} {{ efervescente(d) }}
+{{ deuda_frase(d) }} {{ efervescente(d) }}
 {%- endmacro %}
 
 {% macro frase_generica(d, c) -%}

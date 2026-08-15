@@ -698,14 +698,11 @@ def verificar_y_armar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[
     # Igual que en la vía directa: derivar (el sistema pasa la conversación) y ofrecer
     # (el cliente decide si quiere el motivo documentado) son cosas distintas, y la
     # segunda es la que evita que la laguna del CRM se cobre en hand-offs.
-    if (incomprension.derivar or incomprension.ofrecer_asesor) and all(
+    if incomprension.asesor_a_la_vista and all(
         accion.id is not AccionSiguiente.DERIVAR_ASESOR for accion in acciones
     ):
         etiqueta, riesgo = ETIQUETAS_ACCION[AccionSiguiente.DERIVAR_ASESOR]
-        acciones.insert(
-            0 if incomprension.derivar else len(acciones),
-            Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo),
-        )  # type: ignore[arg-type]
+        acciones.insert(0, Accion(id=AccionSiguiente.DERIVAR_ASESOR, etiqueta=etiqueta, riesgo=riesgo))  # type: ignore[arg-type]
     oferta = explicar.evaluar_cross_selling(
         factset,
         servicios.reglas,

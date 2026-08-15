@@ -21,6 +21,7 @@ aprovecha la prosa, y esa prosa se audita cifra a cifra antes de salir.
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from collections.abc import Sequence
@@ -98,10 +99,12 @@ ETIQUETAS_ACCION: dict[AccionSiguiente, tuple[str, str]] = {
     AccionSiguiente.DERIVAR_ASESOR: ("Hablar con un asesor", "INFORMATIVA"),
 }
 
-#: Texto de bloqueo. No contiene ni una sola cifra, a propósito.
+#: Texto de bloqueo. No contiene ni una sola cifra, a propósito, y tampoco nombra al
+#: asesor: la derivación se dispara igual por debajo, pero anunciarla aquí convierte el
+#: único caso en que el motor se planta en una despedida. Basta con no dar la cifra.
 TEXTO_BLOQUEADO = (
-    "Prefiero no darle una cifra que no pueda sustentar. Reviso su recibo con un asesor "
-    "y le confirmamos el detalle exacto en unos minutos."
+    "Prefiero no darle una cifra que no pueda sustentar. Estoy revisando su recibo para "
+    "confirmarle el detalle exacto."
 )
 
 
@@ -166,6 +169,53 @@ class ResultadoGeneracion(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Preámbulo: la frase que anuncia la explicación en vez de darla
+# --------------------------------------------------------------------------- #
+#: Aperturas que no informan de nada. El modelo las produce porque suenan corteses, y en
+#: un `resumen` de UNA frase se comen la respuesta entera: el cliente lee «Le explicamos
+#: por qué su recibo vino de esta manera», que es exactamente lo que ya sabía —lo
+#: preguntó él—, y tiene que seguir leyendo para enterarse de algo. Además suena a
+#: locución de central telefónica, no a persona.
+#: Sin `\b` a propósito: todas las alternativas van ancladas en `^`, así que basta con
+#: reconocer el ARRANQUE de la frase; exigir además final de palabra no cambiaría ninguna
+#: decisión y complica un patrón que ya es largo.
+_PREAMBULO = re.compile(
+    r"^\s*(?:"
+    r"(?:le|te)\s+(?:explic|detall|coment|indic|inform|resum|cuent|aclar)\w*"
+    r"|(?:aqu[íi]|ac[áa])\s"
+    r"|a\s+continuaci[óo]n"
+    r"|permítame|perm[íi]tame"
+    r"|(?:paso|procedo)\s+a\s"
+    r"|(?:claro|por\s+supuesto|entendido|con\s+gusto)[,.\s]"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def sin_preambulo(texto: str) -> str:
+    """Quita las frases iniciales que anuncian la explicación en lugar de darla.
+
+    El prompt ya lo prohíbe, pero una regla de estilo en un prompt es una petición, no
+    una garantía: el modelo la cumple casi siempre y falla justo en las respuestas más
+    largas, que son las que peor se leen. Esto es el cinturón determinista.
+
+    Corta **frases completas** desde el principio y solo mientras coincidan con el
+    patrón; en cuanto una frase dice algo, para. Así «Le explicamos por qué su recibo
+    vino de esta manera. Se le cobró la reactivación.» se queda en la segunda, que es la
+    que responde. Nunca toca cifras: opera sobre el texto ya escrito por el modelo y solo
+    puede quitar frases enteras, de modo que no puede desanclar un importe —o la cifra
+    estaba en la frase que se va, y se va entera, o no se toca.
+
+    Si TODO el texto era preámbulo devuelve cadena vacía: quien llama omite el bloque, y
+    la respuesta empieza por el hecho, que es lo que se quería.
+    """
+    frases = re.split(r"(?<=[.!?])\s+", texto.strip())
+    while frases and _PREAMBULO.match(frases[0]):
+        frases.pop(0)
+    return " ".join(frases).strip()
+
+
+# --------------------------------------------------------------------------- #
 # Composición de bloques — aquí es donde se ponen las cifras
 # --------------------------------------------------------------------------- #
 def componer_bloques(
@@ -185,10 +235,11 @@ def componer_bloques(
     detalle = str(verbosidad) == str(Verbosidad.DETALLE)
     bloques: list[Bloque] = []
 
-    if explicacion.resumen.strip():
+    resumen = sin_preambulo(explicacion.resumen)
+    if resumen:
         bloques.append(
             BloqueTexto(
-                texto=explicacion.resumen.strip(),
+                texto=resumen,
                 fact_ids=["factset:delta_total_cent", "factset:total_actual_cent"],
             )
         )
@@ -266,7 +317,7 @@ def componer_bloques(
         )
         bloques.append(BloquePuente(titulo="De un mes a otro", barras=barras))
 
-    frases = [causa.frase.strip() for causa in explicacion.causas if causa.frase.strip()]
+    frases = [f for f in (sin_preambulo(c.frase) for c in explicacion.causas) if f]
     if frases:
         bloques.append(
             BloqueTexto(
@@ -343,10 +394,15 @@ def _acciones(explicacion: ExplicacionLLM, *, derivar: bool) -> list[Accion]:
     if derivar:
         principal = AccionSiguiente.DERIVAR_ASESOR
 
+    # La acción de escape es REGISTRAR_CONSULTA, no DERIVAR_ASESOR. Antes se añadían las
+    # dos y el botón «Hablar con un asesor» aparecía debajo de TODAS las respuestas,
+    # incluidas las que el sistema había explicado bien: el hand-off dejaba de ser el
+    # último recurso y pasaba a ser una sugerencia permanente de que la explicación no
+    # servía. Cuando la derivación sí procede, `derivar` la pone como acción principal
+    # dos líneas más arriba; y si el cliente pide una persona, su intención lo detecta.
     ordenadas: list[AccionSiguiente] = [principal]
-    for candidata in (AccionSiguiente.REGISTRAR_CONSULTA, AccionSiguiente.DERIVAR_ASESOR):
-        if candidata not in ordenadas:
-            ordenadas.append(candidata)
+    if AccionSiguiente.REGISTRAR_CONSULTA not in ordenadas:
+        ordenadas.append(AccionSiguiente.REGISTRAR_CONSULTA)
 
     acciones: list[Accion] = []
     for identificador in ordenadas:

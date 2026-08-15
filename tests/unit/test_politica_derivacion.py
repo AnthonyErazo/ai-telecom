@@ -7,7 +7,10 @@ distinción que la hace excepcional sin bajar un solo umbral:
 * **(a) "no sé cuánto varió ni en qué línea"** → derivar. El recibo no se puede explicar.
   Su vía es la regla dura ``INVARIANTE_ROTO``, no el score.
 * **(b) "sé exactamente cuánto y en qué líneas, pero no puedo CONFIRMAR la causa"** → NO
-  derivar. Se explica lo que consta, se nombra la laguna y se OFRECE un asesor.
+  derivar. Se explica lo que consta y no se inventa el motivo. Tampoco se ofrece un
+  asesor: con datos reales la causa casi nunca consta, así que ofrecerlo aquí sería
+  ofrecerlo siempre, y un último recurso que aparece en todas las respuestas es el
+  primero.
 * **(c) el cliente pide una persona** → derivar siempre, sin regatear.
 
 Con el dataset del desafío, que no trae órdenes de CRM, (b) es el caso corriente: las
@@ -178,30 +181,43 @@ class TestDesglosarNoEsConfirmar:
         assert sin_causa.cobertura_causal == 0.0
         assert con_causa.cobertura_causal == 1.0
 
-    def test_se_ofrece_asesor_sin_derivar(self, reglas) -> None:
-        """Sin causa confirmada se OFRECE una persona; con ella, ni se menciona.
+    def test_no_se_ofrece_asesor_por_falta_de_causa(self, reglas) -> None:
+        """Que no conste la causa NO es motivo para ponerle un asesor delante.
 
-        Ofrecer no es derivar: la explicación sale igual y el cliente decide. Ese es el
-        término medio que convierte el hand-off en último recurso en vez de en el
-        primero.
+        Antes sí lo era, y ese era el problema. Con datos reales la causa no consta en la
+        mayoría de los recibos —el CRM no registra una orden por cada línea que se
+        mueve—, así que la puerta al asesor se abría casi siempre. Una puerta que se abre
+        en todas las respuestas no es el último recurso: es el primero, y le dice al
+        cliente que la explicación que acaba de leer no bastaba.
+
+        Lo que sí se conserva es el dato honesto: ``causa_confirmada`` sigue siendo
+        ``False`` y sigue viajando al expediente. Lo que se calla es el ofrecimiento.
         """
         sin_causa = evaluar_incomprension(recibo(linea()), [], "no me cuadra", reglas=reglas)
-        assert sin_causa.ofrecer_asesor is True
         assert sin_causa.causa_confirmada is False
+        assert sin_causa.ofrecer_asesor is False
+        assert sin_causa.derivar is False
+        assert sin_causa.asesor_a_la_vista is False
 
-        con_causa = evaluar_incomprension(
-            recibo(
-                linea(
-                    causa=TipoMovimiento.CAMBIO_PLAN,
-                    causa_oficial=CausaOficial.CAMBIO_DE_PLAN,
-                    confianza=0.98,
-                )
-            ),
-            [],
-            "no me cuadra",
-            reglas=reglas,
+    def test_el_asesor_se_ve_solo_si_lo_pide_el_cliente(self, reglas) -> None:
+        """El botón lo abre el cliente, no el diagnóstico interno.
+
+        Un concepto fuera de catálogo deriva —regla dura— pero es un diagnóstico nuestro:
+        al cliente «FRTOCH_003 no está en el catálogo» solo le comunica que el sistema no
+        funciona. El caso llega igual a la cola del asesor, en silencio. En cambio, si la
+        persona la pide él, el botón aparece.
+        """
+        pedido = evaluar_incomprension(
+            recibo(linea()), [], "quiero hablar con un asesor", reglas=reglas
         )
-        assert con_causa.ofrecer_asesor is False
+        assert pedido.motivo is MotivoDerivacion.PETICION_HUMANO
+        assert pedido.asesor_a_la_vista is True
+
+        interno = evaluar_incomprension(
+            recibo(linea(concepto_id="CONCEPTO_QUE_NO_EXISTE")), [], "no me cuadra", reglas=reglas
+        )
+        assert interno.derivar is True, "la derivación interna se mantiene"
+        assert interno.asesor_a_la_vista is False, "pero al cliente no se le anuncia"
 
     def test_una_linea_sin_nombre_si_baja_el_desglose(self, reglas) -> None:
         """Lo que ``s1`` sí penaliza: no poder nombrar ni citar la línea.
