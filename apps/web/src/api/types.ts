@@ -23,6 +23,8 @@ export interface FactSet {
   total_actual_cent: number;
   delta_total_cent: number;
   modalidad_renta: string;
+  dias_ciclo?: number;
+  periodo_previo?: string;
   deuda_anterior_cent?: number;
   fecha_vencimiento?: string;
   sha256: string;
