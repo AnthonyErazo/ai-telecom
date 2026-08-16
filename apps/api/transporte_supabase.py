@@ -44,13 +44,8 @@ import logging
 import os
 from collections import defaultdict
 from collections.abc import Mapping
-<<<<<<< HEAD
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-=======
-from datetime import date, timedelta
-from decimal import Decimal
->>>>>>> main
 from typing import Any
 
 from apps.api.acl import CuentaNoEncontradaExterna, ErrorSistemaExterno
@@ -139,7 +134,6 @@ def _fecha(valor: str | None) -> str | None:
     return f"{valor[:4]}-{valor[4:6]}-{valor[6:]}"
 
 
-<<<<<<< HEAD
 def _fecha_nota(valor: Any) -> date | None:
     """Fecha ISO del export de notas, que puede traer siete decimales de segundo."""
     if valor is None or valor == "":
@@ -236,7 +230,8 @@ def _agrupar_notas(filas: list[tuple[Any, ...]]) -> dict[str, list[dict[str, Any
             }
         )
     return dict(por_ciclo)
-=======
+
+
 def _apoyo_de_promocion(promocion: dict[str, Any] | None, grupo: str | None) -> dict[str, Any]:
     """Campos de promoción/cuota que le corresponden a ESTA línea, según su grupo.
 
@@ -266,7 +261,6 @@ def _apoyo_de_promocion(promocion: dict[str, Any] | None, grupo: str | None) -> 
         if promocion.get("meses_promocion") is not None:
             apoyo["cuotas_totales"] = promocion["meses_promocion"]
     return apoyo
->>>>>>> main
 
 
 class TransporteSupabase:
@@ -721,24 +715,19 @@ class TransporteSupabase:
 
         # Los `ciclos` más recientes, el más nuevo primero: es el contrato de BrainyBill.
         recientes = sorted(por_ciclo, reverse=True)[:ciclos]
-<<<<<<< HEAD
+        # La promoción aplica a toda la cuenta; las notas se asignan al ciclo al que
+        # pertenecen. Ambas capacidades viajan juntas al construir cada recibo.
+        promocion = self.promocion(cuenta_id)
         recibos = [
             self._recibo(
                 cuenta_id,
                 c,
                 por_ciclo[c],
                 modalidad,
+                promocion=promocion,
                 notas=notas_por_ciclo.get(c, []),
             )
             for c in recientes
-=======
-        # Una sola consulta de promoción para todo el documento: es la misma para toda
-        # la cuenta, y pedirla dentro del bucle multiplicaría por ciclo un viaje que ya
-        # está indexado pero que no es gratis.
-        promocion = self.promocion(cuenta_id)
-        recibos = [
-            self._recibo(cuenta_id, c, por_ciclo[c], modalidad, promocion) for c in recientes
->>>>>>> main
         ]
         planta = self._planta(cuenta_id)
 
@@ -804,12 +793,9 @@ class TransporteSupabase:
         ciclo: str,
         filas: list[tuple],
         modalidad: str,
-<<<<<<< HEAD
         *,
-        notas: list[dict[str, Any]] | None = None,
-=======
         promocion: dict[str, Any] | None = None,
->>>>>>> main
+        notas: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Un recibo con su cabecera y sus líneas, en la forma que espera el adaptador."""
         cierre = date(int(ciclo[:4]), int(ciclo[4:6]), int(ciclo[6:]))
