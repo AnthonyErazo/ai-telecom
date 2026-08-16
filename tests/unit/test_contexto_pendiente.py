@@ -9,6 +9,7 @@ from packages.facts_engine.intencion import (
     resolver_intencion_contextual,
 )
 from packages.llm_layer.generador import enfocar_resumen_consulta
+from packages.llm_layer.conversacional import generar_respuesta_conversacional
 from packages.llm_layer.providers.base import ExplicacionLLM
 
 
@@ -112,6 +113,42 @@ def test_respuesta_aplicada_tambien_recupera_el_concepto() -> None:
 
     assert resultado.intencion.patron == "contexto pendiente:nota de crédito"
     assert "nota de crédito" in resultado.utterance_efectiva
+
+
+def test_general_explica_el_prorrateo_sin_perder_el_contexto() -> None:
+    historial = [
+        Turno(utterance="prorrateo", rol="cliente"),
+        Turno(utterance="¿En general o aplicado a su recibo?", rol="asistente"),
+    ]
+
+    resultado = resolver_intencion_contextual("general", historial)
+
+    assert resultado.intencion.intencion is Intencion.CONSULTA_CONCEPTO
+    assert resultado.intencion.patron == "contexto general:prorrateo"
+    assert resultado.utterance_efectiva == "Explique en general qué significa prorrateo."
+    assert resultado.contexto_aplicado is True
+
+    respuesta = generar_respuesta_conversacional(
+        resultado.intencion.intencion,
+        resultado.utterance_efectiva,
+        proveedor=None,
+    )
+    assert respuesta.texto.startswith("El prorrateo es el cobro proporcional")
+    assert "aparece en su recibo" in respuesta.texto
+
+
+def test_que_es_menor_abono_responde_la_definicion_sin_salir_del_dominio() -> None:
+    resultado = resolver_intencion_contextual("¿qué es menor abono?", [])
+
+    assert resultado.intencion.intencion is Intencion.CONSULTA_CONCEPTO
+
+    respuesta = generar_respuesta_conversacional(
+        resultado.intencion.intencion,
+        resultado.utterance_efectiva,
+        proveedor=None,
+    )
+    assert respuesta.texto.startswith("Menor abono significa")
+    assert "No es una nota de débito" in respuesta.texto
 
 
 def test_plantilla_responde_que_no_hay_prorrateo_si_el_factset_no_lo_contiene() -> None:

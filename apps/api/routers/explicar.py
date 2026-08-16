@@ -167,12 +167,11 @@ AVISO_VERIFICACION = (
 # Bloque puente
 # --------------------------------------------------------------------------- #
 def construir_bloque_puente(factset: FactSet) -> BloquePuente | None:
-    """Gráfico de cascada del recibo previo al actual, causa a causa.
+    """Resumen visual de las causas que forman la diferencia mensual.
 
-    Es la pieza que responde "¿por qué me vino más caro?" de un vistazo: barra de
-    entrada con el recibo anterior, una barra por **causa agregada** (en el vocabulario
-    de la ficha: *cambio de plan*, *prorrateos*, *reconexiones*…) y barra de total con
-    el recibo actual.
+    Los totales y la diferencia ya aparecen en el bloque KV anterior. Repetirlos aquí
+    hacía más larga la respuesta sin añadir información; este bloque conserva solo una
+    barra por **causa agregada**.
 
     Todas las barras llevan importes enteros que ya están en el FactSet, de modo que el
     bloque es anclado por construcción y no puede introducir una cifra nueva.
@@ -182,14 +181,7 @@ def construir_bloque_puente(factset: FactSet) -> BloquePuente | None:
     """
     if not factset.causas_agregadas:
         return None
-    barras = [
-        BarraPuente(
-            etiqueta=f"Recibo de {factset.periodo_previo}",
-            monto_cent=factset.total_previo_cent,
-            tipo="entrada",
-            fact_id="factset:total_previo_cent",
-        )
-    ]
+    barras = []
     for causa in factset.causas_agregadas:
         clave = causa.causa or causa.causa_oficial or "SIN_CAUSA"
         barras.append(
@@ -200,18 +192,9 @@ def construir_bloque_puente(factset: FactSet) -> BloquePuente | None:
                 fact_id=f"causa:{clave}.monto_cent",
             )
         )
-    barras.append(
-        BarraPuente(
-            etiqueta=f"Recibo de {factset.periodo_actual}",
-            monto_cent=factset.total_actual_cent,
-            tipo="total",
-            fact_id="factset:total_actual_cent",
-        )
-    )
     return BloquePuente(
-        titulo="De un mes a otro",
+        titulo="Qué produjo la diferencia",
         barras=barras,
-        fact_ids=["factset:total_previo_cent", "factset:total_actual_cent"],
     )
 
 

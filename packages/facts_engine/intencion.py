@@ -172,6 +172,10 @@ _AFIRMACIONES: frozenset[str] = frozenset({
 _CONCEPTOS_FACTURACION: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("nota de crédito", ("nota de credito",)),
     ("nota de débito", ("nota de debito",)),
+    ("menor abono", ("menor abono", "menos abono")),
+    ("mayor abono", ("mayor abono", "mas abono")),
+    ("mayor cargo", ("mayor cargo", "mas cargo")),
+    ("menor cargo", ("menor cargo", "menos cargo")),
     ("renta adelantada", ("renta adelantada",)),
     ("renta vencida", ("renta vencida",)),
     ("cuota del equipo", ("cuota del equipo", "equipo financiado")),
@@ -205,6 +209,16 @@ _PATRONES_APLICAR_PENDIENTE: tuple[str, ...] = (
     "en mi recibo",
     "mi ultimo recibo",
     "revisar mi recibo",
+)
+
+#: Respuestas que eligen la explicación conceptual después de que el asistente
+#: preguntó «¿en general o aplicado a su recibo?». Sin esta rama, un «general»
+#: quedaba clasificado como fuera de dominio y se perdía el tema pendiente.
+_PATRONES_EXPLICAR_GENERAL: tuple[str, ...] = (
+    "general",
+    "en general",
+    "explicacion general",
+    "solo el concepto",
 )
 
 #: Peticiones que requieren abrir el recibo y mostrar TODAS sus líneas actuales, no
@@ -409,6 +423,14 @@ PATRONES: dict[Intencion, tuple[str, ...]] = {
         "reconexion",
         "nota de credito",
         "nota de debito",
+        "menor abono",
+        "menos abono",
+        "mayor abono",
+        "mas abono",
+        "mayor cargo",
+        "mas cargo",
+        "menor cargo",
+        "menos cargo",
         "renta adelantada",
         "renta vencida",
         "cuota del equipo",
@@ -715,6 +737,19 @@ def resolver_intencion_contextual(
     original = (utterance or "").strip()
     intencion = clasificar_intencion(original)
     concepto = _ultimo_concepto_pendiente(historial)
+    pide_general = any(
+        coincide_patron(patron, original) for patron in _PATRONES_EXPLICAR_GENERAL
+    )
+    if concepto is not None and pide_general:
+        efectiva = f"Explique en general qué significa {concepto}."
+        resuelta = ResultadoIntencion(
+            intencion=Intencion.CONSULTA_CONCEPTO,
+            patron=f"contexto general:{concepto}",
+            motivo_derivacion=None,
+            explica_recibo=False,
+        )
+        return ResolucionContextual(resuelta, original, efectiva, concepto)
+
     acepta_pendiente = intencion.patron == "afirmación" or any(
         coincide_patron(patron, original) for patron in _PATRONES_APLICAR_PENDIENTE
     )

@@ -335,14 +335,32 @@ export function MiMovistar({
     if (!fs) return;
     const deudaAnterior = fs.deuda_anterior_cent ?? 0;
     const totalAPagar = fs.total_a_pagar_cent ?? (fs.total_actual_cent + deudaAnterior);
-    // Mismo agrupamiento que la tarjeta en pantalla (`ReceiptDetailCard`): cada fila
-    // es una suma real de líneas del FactSet, nunca un cálculo inventado en el
-    // navegador (ni IGV al 18%, ni ningún otro porcentaje).
-    const filas = agruparLineas(fs.lineas)
-      .map((g) => `<tr><td>${g.etiqueta}</td><td${g.aFavor ? ' style="color:#5BC500"' : ""}>${g.aFavor ? "− " : ""}${soles(Math.abs(g.monto_cent))}</td></tr>`)
-      .join("");
+    const vencimiento = fs.fecha_vencimiento ? String(fs.fecha_vencimiento) : null;
+    const vencido = Boolean(vencimiento && vencimiento < new Date().toISOString().slice(0, 10));
+    const subio = fs.delta_total_cent >= 0;
+    const escapar = (valor: unknown) => String(valor ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+    // El PDF imprime siempre tanto el total de cada categoría como cada cargo
+    // facturado que la tarjeta permite desplegar. Todos los importes vienen del
+    // mismo FactSet usado por `ReceiptDetailCard`.
+    const filas = agruparLineas(fs.lineas).map((grupo) => `
+      <tr class="grupo">
+        <td>${escapar(grupo.etiqueta)}</td>
+        <td class="${grupo.aFavor ? "credito" : ""}">${grupo.aFavor ? "− " : ""}${escapar(soles(Math.abs(grupo.monto_cent)))}</td>
+      </tr>
+      ${grupo.lineas.map((linea) => `
+        <tr class="detalle">
+          <td><strong>${escapar(linea.nombre_comercial)}</strong><small>${escapar(linea.concepto_id)}</small></td>
+          <td>${escapar(soles(linea.monto_actual_cent))}</td>
+        </tr>`).join("")}
+    `).join("");
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Factura Movistar ${fs.periodo_actual}</title>
+<title>Factura Movistar ${escapar(fs.periodo_actual)}</title>
 <style>
   body{font-family:Arial,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#172033}
   .top{background:#019DF4;color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px}
@@ -350,31 +368,51 @@ export function MiMovistar({
   .hero{background:#e4f7fd;border:1.5px solid #b3e0f7;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px}
   .hero .amt{font-size:36px;font-weight:900;color:#019DF4;margin:8px 0}
   .hero .due{color:#cc4c3d;font-size:12px;font-weight:700}
+  h2{font-size:12px;color:#68768a;text-transform:uppercase;letter-spacing:.09em;margin:22px 0 8px}
   table{width:100%;border-collapse:collapse;margin-bottom:16px}
   td{padding:10px 8px;border-bottom:1px solid #edf0f4;font-size:13px}
   td:last-child{text-align:right;font-weight:600}
+  .grupo td{font-weight:800;background:#f7f9fb;border-top:1px solid #dce4ec}
+  .detalle td{padding-top:7px;padding-bottom:7px;color:#526174}
+  .detalle td:first-child{padding-left:22px}.detalle strong{display:block;font-weight:600}
+  .detalle small{display:block;color:#9aaabd;font-size:10px;margin-top:2px}
+  .credito{color:#3a7a10!important}
   .alert td{background:#fff2f2;color:#cc4c3d}
   .total td{background:#e4f7fd;font-weight:800;font-size:15px}
+  .estado-vencido{color:#cc4c3d}.estado-vigente{color:#3a7a10}
   .footer{font-size:11px;color:#9fb1c4;text-align:center;margin-top:20px}
   @media print{.no-print{display:none}}
 </style></head><body>
-<div class="top"><h1>App Mi Movistar</h1><p>Detalle de Facturación — ${fs.periodo_actual}</p></div>
+<div class="top">
+  <h1>Detalle de Facturación</h1>
+  <p>Ciclo: ${escapar(fs.periodo_actual)} · Variación: ${subio ? "+" : "−"}${escapar(soles(Math.abs(fs.delta_total_cent)))}</p>
+</div>
 <div class="hero">
   <p style="margin:0;font-size:12px;color:#68768a;text-transform:uppercase;letter-spacing:.1em">Total a Pagar</p>
-  <p class="amt">${soles(totalAPagar)}</p>
-  ${fs.fecha_vencimiento ? `<p class="due">⚠ Vence: ${String(fs.fecha_vencimiento)}</p>` : ""}
+  <p class="amt">${escapar(soles(totalAPagar))}</p>
+  ${vencimiento ? `<p class="due">⚠ ${vencido ? "Venció el" : "Vence"}: ${escapar(vencimiento)}</p>` : ""}
 </div>
+<h2>Detalle de cargos facturados</h2>
 <table>
   ${filas}
-  ${deudaAnterior > 0 ? `<tr class="alert"><td>Deuda pasada</td><td>${soles(deudaAnterior)}</td></tr>` : ""}
-  <tr class="total"><td>Total a pagar</td><td>${soles(totalAPagar)}</td></tr>
+  ${deudaAnterior > 0 ? `<tr class="alert"><td>⚠ Deuda pasada</td><td>${escapar(soles(deudaAnterior))}</td></tr>` : ""}
+  <tr class="total"><td>Total a pagar</td><td>${escapar(soles(totalAPagar))}</td></tr>
 </table>
+<h2>Resumen de mi cuenta</h2>
 <table>
-  <tr><td>Mes anterior</td><td>${soles(fs.total_previo_cent)}</td></tr>
-  <tr><td>Modalidad</td><td>${fs.modalidad_renta}</td></tr>
-  <tr><td>Código de pago</td><td>${cuenta}</td></tr>
+  <tr><td>Estado</td><td class="${vencido ? "estado-vencido" : "estado-vigente"}">${vencido ? "Vencido" : "Vigente"}</td></tr>
+  <tr><td>Vencimiento</td><td>${escapar(vencimiento ?? "—")}</td></tr>
+  <tr><td>Código de pago</td><td>${escapar(cuenta)}</td></tr>
+  <tr><td>Total</td><td>${escapar(soles(totalAPagar))}</td></tr>
+  <tr><td>Modalidad</td><td>${escapar(fs.modalidad_renta)}</td></tr>
 </table>
-<p class="footer">Movistar Perú · Cuenta ${cuenta} · Generado: ${new Date().toLocaleDateString("es-PE")}</p>
+<h2>Comparativa con el mes anterior</h2>
+<table>
+  <tr><td>Mes anterior</td><td>${escapar(soles(fs.total_previo_cent))}</td></tr>
+  <tr><td>Este mes</td><td>${escapar(soles(fs.total_actual_cent))}</td></tr>
+  <tr><td>Variación</td><td>${subio ? "+" : "−"}${escapar(soles(Math.abs(fs.delta_total_cent)))}</td></tr>
+</table>
+<p class="footer">Movistar Perú · Cuenta ${escapar(cuenta)} · Generado: ${escapar(new Date().toLocaleDateString("es-PE"))}</p>
 <button class="no-print" onclick="window.print()" style="margin-top:16px;width:100%;padding:12px;background:#019DF4;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button>
 </body></html>`;
     const w = window.open("","_blank","width=680,height=860");
@@ -444,11 +482,22 @@ export function MiMovistar({
           <h2 className="mm-dni-titulo">Ingresa a tu cuenta</h2>
           <p className="mm-dni-sub">Escribe tu cuenta cliente asociada a tus recibos</p>
           <div className="mm-dni-form">
-            <div className="mm-dni-display" aria-label="Cuenta cliente">
-              {cuentaEntrada
-                ? <span className="mm-dni-number">{cuentaEntrada}</span>
-                : <span className="mm-dni-placeholder">{sugerida || "N.º de cuenta cliente"}</span>}
-            </div>
+            <input
+              className="mm-dni-display"
+              aria-label="Cuenta cliente"
+              type="text"
+              inputMode="numeric"
+              autoComplete="username"
+              spellCheck={false}
+              value={cuentaEntrada}
+              placeholder={sugerida || "N.º de cuenta cliente"}
+              onChange={(e) => setCuentaEntrada(e.target.value.trim())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && puede && !entrar.isPending) {
+                  entrar.mutate(cuentaElegida);
+                }
+              }}
+            />
           </div>
           {chatError && <p className="mm-error-msg">{chatError}</p>}
           {esReg && (
@@ -497,6 +546,38 @@ export function MiMovistar({
         </button>
       </div>
       <div className="mm-dash-scroll">
+        {/* MI RECIBO — primer bloque del inicio */}
+        <div className="mm-recibo-card">
+          <div
+            className="mm-recibo-card-top clicable"
+            role="button"
+            tabIndex={0}
+            aria-label="Ver detalle de mi recibo"
+            onClick={() => setPantalla("recibo")}
+            onKeyDown={(e) => {
+              if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                setPantalla("recibo");
+              }
+            }}
+          >
+            <div className="mm-recibo-card-icon"><CreditCard size={22} /></div>
+            <div className="mm-recibo-card-info">
+              <p className="mm-recibo-card-label">Mi recibo</p>
+              <p className="mm-recibo-card-sub">Paga tu plan aquí</p>
+            </div>
+            <div className="mm-recibo-card-amount">
+              <strong>{soles(hechos?.total_actual_cent ?? 0)}</strong>
+              <span>{hechos?.periodo_actual ?? "—"}</span>
+            </div>
+          </div>
+          <div className="mm-recibo-card-btns">
+            <button id="btn-ver-recibo" className="mm-rc-btn" onClick={() => setPantalla("recibo")}>Ver recibo</button>
+            <button id="btn-detalle-factura" className="mm-rc-btn primary"
+              onClick={() => abrirChat("Consulta sobre tu recibo", "chat")}>
+              Consulta sobre tu recibo
+            </button>
+          </div>
+        </div>
         {/* Mi situación — con datos reales del recibo, no genéricos */}
         {hechos && (
           <div className="mm-situacion-card">
@@ -564,27 +645,6 @@ export function MiMovistar({
           <button className="mm-dash-card-cta" onClick={abrirMejorarPlan}>
             Ver opciones
           </button>
-        </div>
-        {/* MI RECIBO */}
-        <div className="mm-recibo-card">
-          <div className="mm-recibo-card-top">
-            <div className="mm-recibo-card-icon"><CreditCard size={22} /></div>
-            <div className="mm-recibo-card-info">
-              <p className="mm-recibo-card-label">Mi recibo</p>
-              <p className="mm-recibo-card-sub">Paga tu plan aquí</p>
-            </div>
-            <div className="mm-recibo-card-amount">
-              <strong>{soles(hechos?.total_actual_cent ?? 0)}</strong>
-              <span>{hechos?.periodo_actual ?? "—"}</span>
-            </div>
-          </div>
-          <div className="mm-recibo-card-btns">
-            <button id="btn-ver-recibo" className="mm-rc-btn" onClick={() => setPantalla("recibo")}>Ver recibo</button>
-            <button id="btn-detalle-factura" className="mm-rc-btn primary"
-              onClick={() => abrirChat("Consulta sobre tu recibo", "chat")}>
-              Consulta sobre tu recibo
-            </button>
-          </div>
         </div>
         {/* PAGOS — apartado propio en el inicio, con su código de pago y pasos, sin
             derivar a ningún canal externo. */}
@@ -662,7 +722,23 @@ export function MiMovistar({
   // ════════════════════════════════════════════════════════════════
   if (pantalla === "recibo") return (
     <div className={F}>
-      {hdr("Mi Recibo", () => setPantalla("dashboard"))}
+      {hdr(
+        "Mi Recibo",
+        () => setPantalla("dashboard"),
+        <button
+          type="button"
+          className="mm-back-btn"
+          aria-label="Ver historial de recibos"
+          title="Historial de recibos"
+          onClick={() => {
+            setHechosPeriodo(null);
+            setErrorPeriodo("");
+            setPantalla("historial");
+          }}
+        >
+          <Clock size={19} />
+        </button>,
+      )}
       <div className="mm-recibo-body">
         <div className="mm-recibo-hero">
           <p className="mm-recibo-period">Período {hechos?.periodo_actual}</p>
@@ -673,14 +749,16 @@ export function MiMovistar({
         </div>
         {hechos && (
           <div style={{ marginBottom:12 }}>
-            <ReceiptDetailCard hechos={hechos} cuentaId={cuenta} onDownload={() => generarPDF()} />
+            <ReceiptDetailCard
+              hechos={hechos}
+              cuentaId={cuenta}
+              onDownload={() => generarPDF()}
+              mostrarDetalleCargos
+            />
           </div>
         )}
         <button className="mm-btn-outline" onClick={() => setPantalla("comoFunciona")}>
           <Layers size={18} /> ¿Cómo se calculó mi recibo?
-        </button>
-        <button className="mm-btn-outline" style={{ marginTop:12 }} onClick={() => { setHechosPeriodo(null); setErrorPeriodo(""); setPantalla("historial"); }}>
-          <Clock size={18} /> Ver mis recibos anteriores
         </button>
         <button className="mm-btn-primary" style={{ marginTop:12 }} onClick={() => abrirChat("Explícame mi recibo detalladamente")}>
           <Bot size={18} /> Explícame este recibo con BillSense
@@ -697,7 +775,7 @@ export function MiMovistar({
   // ════════════════════════════════════════════════════════════════
   if (pantalla === "historial") return (
     <div className={F}>
-      {hdr("Recibos anteriores", () => setPantalla("recibo"))}
+      {hdr("Recibos anteriores", () => setPantalla("dashboard"))}
       <div className="mm-historial-body">
         {!hechosPeriodo && !errorPeriodo && !cargandoPeriodo && (
           <>
@@ -732,7 +810,12 @@ export function MiMovistar({
         {hechosPeriodo && !cargandoPeriodo && (
           <>
             <button className="mm-btn-outline" style={{ marginBottom:12 }} onClick={() => setHechosPeriodo(null)}>‹ Volver a la lista</button>
-            <ReceiptDetailCard hechos={hechosPeriodo} cuentaId={cuenta} onDownload={() => generarPDF(hechosPeriodo)} />
+            <ReceiptDetailCard
+              hechos={hechosPeriodo}
+              cuentaId={cuenta}
+              onDownload={() => generarPDF(hechosPeriodo)}
+              mostrarDetalleCargos
+            />
             <button className="mm-btn-primary" style={{ marginTop:12 }} onClick={() => {
               setPeriodoActivo(hechosPeriodo.periodo_actual);
               abrirChat(`Explícame mi recibo de ${hechosPeriodo.periodo_actual}`);

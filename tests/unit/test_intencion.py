@@ -195,6 +195,7 @@ NO_REGRESION: tuple[tuple[str, Intencion], ...] = (
     ("gracias, chau", Intencion.SALUDO),
     ("que significa nota de credito", Intencion.CONSULTA_CONCEPTO),
     ("que es una renta adelantada", Intencion.CONSULTA_CONCEPTO),
+    ("que es menor abono", Intencion.CONSULTA_CONCEPTO),
 )
 
 

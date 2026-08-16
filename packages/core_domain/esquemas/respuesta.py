@@ -117,10 +117,10 @@ class BarraPuente(BaseModel):
 
 
 class BloquePuente(_BloqueBase):
-    """Gráfico de cascada que reconstruye el recibo previo hasta el actual.
+    """Resumen visual de los componentes que explican una variación.
 
-    Es la pieza visual que responde "¿por qué me vino más caro?": barra de entrada
-    (recibo previo), una barra por causa (incremento/decremento) y barra de total.
+    Puede representar una cascada completa o, cuando los totales ya aparecen en otro
+    bloque, únicamente sus incrementos y decrementos para evitar redundancia.
     """
 
     tipo: Literal["puente"] = "puente"

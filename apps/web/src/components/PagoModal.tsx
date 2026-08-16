@@ -75,7 +75,7 @@ export function PagoModal({ hechos, cuentaId, onClose }: { hechos: FactSet; cuen
           </div>
         </div>
 
-        <button className="mm-btn-primary" style={{ margin: "0 20px 20px" }} onClick={onClose}>Cerrar</button>
+        <button className="mm-btn-primary mm-modal-submit" onClick={onClose}>Cerrar</button>
       </div>
     </div>
   );

@@ -143,7 +143,15 @@ def agregar_causas(
     for linea in lineas:
         if not linea.se_explica:
             continue
-        clave = (linea.causa_oficial, linea.causa)
+        causa = linea.causa
+        # El concepto canónico también identifica de forma inequívoca el tipo de
+        # nota. Esto conserva la separación incluso si una fuente trae el documento
+        # pero no adjunta el movimiento causal por separado.
+        if causa is None and linea.concepto_id == "NOTA_CREDITO":
+            causa = TipoMovimiento.NOTA_CREDITO
+        elif causa is None and linea.concepto_id == "NOTA_DEBITO":
+            causa = TipoMovimiento.NOTA_DEBITO
+        clave = (linea.causa_oficial, causa)
         grupo = grupos.setdefault(
             clave,
             {
@@ -174,6 +182,22 @@ def agregar_causas(
         datos = grupos[clave]
         confianzas = datos["confianzas"]
         etiqueta = etiqueta_causa_oficial(causa_oficial or causa)
+        # La ficha agrupa ambas notas en una causa oficial, pero el documento
+        # contable que viene de facturación sigue siendo distinto. El signo aquí
+        # describe la VARIACIÓN contra el mes anterior, no cambia una nota de
+        # crédito en débito ni al revés.
+        if causa is TipoMovimiento.NOTA_CREDITO:
+            etiqueta = "nota de crédito"
+            if datos["monto"] > 0:
+                etiqueta += " (menor abono)"
+            elif datos["monto"] < 0:
+                etiqueta += " (mayor abono)"
+        elif causa is TipoMovimiento.NOTA_DEBITO:
+            etiqueta = "nota de débito"
+            if datos["monto"] > 0:
+                etiqueta += " (mayor cargo)"
+            elif datos["monto"] < 0:
+                etiqueta += " (menor cargo)"
         if causa_oficial is None and causa is None:
             # Sin causa (IGV, redondeo): se nombra el propio concepto, que sí significa
             # algo para el cliente, en lugar del genérico "otros cargos".

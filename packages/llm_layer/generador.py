@@ -296,6 +296,30 @@ def _concepto_aparece_en_factset(factset: FactSet, concepto: str) -> bool:
             "NOTA_DEBITO" in identificador or causa == "NOTA_DEBITO"
         ):
             return True
+        if concepto == "menor abono" and (
+            ("NOTA_CREDITO" in identificador or causa == "NOTA_CREDITO")
+            and linea.delta_cent > 0
+            and linea.monto_previo_cent < 0
+        ):
+            return True
+        if concepto == "mayor abono" and (
+            ("NOTA_CREDITO" in identificador or causa == "NOTA_CREDITO")
+            and linea.delta_cent < 0
+            and linea.monto_actual_cent < 0
+        ):
+            return True
+        if concepto == "mayor cargo" and (
+            ("NOTA_DEBITO" in identificador or causa == "NOTA_DEBITO")
+            and linea.delta_cent > 0
+            and linea.monto_actual_cent > 0
+        ):
+            return True
+        if concepto == "menor cargo" and (
+            ("NOTA_DEBITO" in identificador or causa == "NOTA_DEBITO")
+            and linea.delta_cent < 0
+            and linea.monto_previo_cent > 0
+        ):
+            return True
         if concepto == "cuota del equipo" and (
             linea.cuota_numero is not None or linea.cuotas_totales is not None
         ):
@@ -402,14 +426,10 @@ def componer_bloques(
     )
 
     if factset.causas_agregadas:
-        barras = [
-            BarraPuente(
-                etiqueta=f"Recibo de {datos.mes_previo}",
-                monto_cent=factset.total_previo_cent,
-                tipo="entrada",
-                fact_id="factset:total_previo_cent",
-            )
-        ]
+        # Los totales anterior/actual y la diferencia ya aparecen justo arriba en
+        # «Su recibo en números». Aquí se muestran solo las causas para no repetir
+        # tres importes dentro de la misma respuesta.
+        barras = []
         for causa in factset.causas_agregadas:
             barras.append(
                 BarraPuente(
@@ -419,15 +439,7 @@ def componer_bloques(
                     fact_id=f"causa:{causa.causa or causa.causa_oficial or 'SIN_CAUSA'}.monto_cent",
                 )
             )
-        barras.append(
-            BarraPuente(
-                etiqueta=f"Recibo de {datos.mes_actual}",
-                monto_cent=factset.total_actual_cent,
-                tipo="total",
-                fact_id="factset:total_actual_cent",
-            )
-        )
-        bloques.append(BloquePuente(titulo="De un mes a otro", barras=barras))
+        bloques.append(BloquePuente(titulo="Qué produjo la diferencia", barras=barras))
 
     # Una causa, un bloque. Antes se unían todas las frases en un solo `BloqueTexto` con
     # los `fact_ids` de todas las líneas juntos, y ahí se perdía el emparejamiento: el

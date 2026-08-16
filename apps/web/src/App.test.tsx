@@ -27,7 +27,10 @@ function renderApp() {
 }
 
 describe("login de cuenta", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -40,6 +43,40 @@ describe("login de cuenta", () => {
       total_actual_cent: 8290,
       delta_total_cent: 290,
       modalidad_renta: "ADELANTADA",
+      fecha_vencimiento: "2020-01-01",
+      deuda_anterior_cent: 0,
+      total_a_pagar_cent: 8290,
+      lineas: [
+        {
+          concepto_id: "PLAN-BASE",
+          nombre_comercial: "Plan Movistar mensual",
+          clase: "CARGO",
+          monto_actual_cent: 8990,
+          monto_previo_cent: 8000,
+          delta_cent: 990,
+          familia: "RECURRENTE",
+        },
+        {
+          concepto_id: "NC-FACTURACION",
+          nombre_comercial: "Nota de crédito por facturación",
+          clase: "ABONO",
+          monto_actual_cent: -900,
+          monto_previo_cent: 0,
+          delta_cent: -900,
+          causa: "NOTA_CREDITO",
+          familia: "CREDITO",
+        },
+        {
+          concepto_id: "NOTA_DEBITO",
+          nombre_comercial: "Nota de débito por regularización",
+          clase: "CARGO",
+          monto_actual_cent: 200,
+          monto_previo_cent: 0,
+          delta_cent: 200,
+          causa: "NOTA_DEBITO",
+          familia: "AJUSTE",
+        },
+      ],
       sha256: "prueba",
     });
   });
@@ -88,6 +125,9 @@ describe("login de cuenta", () => {
     await waitFor(() => expect(api.token).toHaveBeenCalledWith("C-DEMO-01"));
     expect(api.facts).toHaveBeenCalledWith("jwt-loa2");
     expect((await screen.findAllByText("ADELANTADA")).length).toBeGreaterThan(0);
+    const miRecibo = screen.getByText("Mi recibo");
+    const reciboVencido = screen.getByText("Recibo vencido");
+    expect(miRecibo.compareDocumentPosition(reciboVencido) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("no abre BillSense con un prompt automático ni con un saludo preescrito", async () => {
@@ -98,5 +138,36 @@ describe("login de cuenta", () => {
     expect(screen.queryByText("¿En qué te puedo ayudar hoy?")).toBeNull();
     expect(screen.queryByText("Tu conversación está lista.")).toBeNull();
     expect(screen.queryByText("¡Hola! Soy BillSense 👋")).toBeNull();
+  });
+
+  it("incluye en el PDF todas las secciones y cargos mostrados en el recibo", async () => {
+    const write = vi.fn();
+    const close = vi.fn();
+    vi.spyOn(window, "open").mockReturnValue({ document: { write, close } } as unknown as Window);
+
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
+    await screen.findByRole("heading", { name: "App Mi Movistar" });
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
+    await screen.findByRole("heading", { name: "Ingresa a tu cuenta" });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await screen.findByText("Mi recibo");
+    fireEvent.click(screen.getByRole("button", { name: "Ver recibo" }));
+    await screen.findByText("Detalle de Facturación");
+    expect(screen.getByText("Notas de crédito")).toBeInTheDocument();
+    expect(screen.getByText("Notas de débito")).toBeInTheDocument();
+    expect(screen.queryByText("Notas de crédito/débito")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Descargar PDF detallado" }));
+
+    const pdf = String(write.mock.calls[0]?.[0] ?? "");
+    expect(pdf).toContain("Detalle de cargos facturados");
+    expect(pdf).toContain("Plan Movistar mensual");
+    expect(pdf).toContain("Nota de crédito por facturación");
+    expect(pdf).toContain("Nota de débito por regularización");
+    expect(pdf).toContain("Resumen de mi cuenta");
+    expect(pdf).toContain("Comparativa con el mes anterior");
+    expect(pdf).toContain("Vencido");
+    expect(close).toHaveBeenCalled();
   });
 });

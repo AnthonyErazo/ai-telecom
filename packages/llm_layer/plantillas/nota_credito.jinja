@@ -48,7 +48,14 @@ La variación de la nota de débito movió su recibo en {{ c.monto }}.
 {%- endmacro %}
 
 {% macro detalle(d) -%}
-Una nota de crédito o de débito es un documento que corrige un recibo ya emitido. Un recibo anterior no se puede borrar, así que la corrección se aplica en el siguiente. Por eso el ajuste le aparece en este recibo y no en el mes al que corresponde. {{ lista_lineas(d) }} {{ totales(d) }}
+{% if d.causa_principal and d.causa_principal.causa == "NOTA_CREDITO" %}
+Una nota de crédito es un abono que reduce lo que corresponde pagar por una corrección sobre un recibo ya emitido. Si el abono es menor que el del mes anterior, la diferencia hace que el recibo actual aumente, pero el documento sigue siendo una nota de crédito.
+{% elif d.causa_principal and d.causa_principal.causa == "NOTA_DEBITO" %}
+Una nota de débito incorpora o regulariza un cargo sobre un recibo ya emitido y aumenta lo que corresponde pagar. Si el cargo disminuye frente al mes anterior, la variación baja, pero el documento sigue siendo una nota de débito.
+{% else %}
+Las notas de crédito son abonos y las notas de débito son cargos. Ambas corrigen recibos ya emitidos, pero tienen efectos contables diferentes.
+{% endif %}
+Un recibo anterior no se borra, por eso la corrección aparece en el siguiente. {{ lista_lineas(d) }} {{ totales(d) }}
 {%- endmacro %}
 
 {% macro cierre(d) -%}

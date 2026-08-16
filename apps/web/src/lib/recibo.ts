@@ -1,7 +1,7 @@
 /**
  * Agrupación de líneas del recibo en las categorías con las que Movistar presenta
  * un recibo al cliente (Cargos Mensuales, Cargos Adicionales, Descuentos y
- * Bonificaciones, Redondeo, Devoluciones, Débitos). Cada línea ya trae `familia`,
+ * Bonificaciones, Redondeo, Notas de crédito y Notas de débito). Cada línea ya trae `familia`,
  * `causa` y `concepto_id` desde el `FactSet` — esto solo las clasifica, no calcula
  * ningún importe nuevo: cada grupo es la suma de `monto_actual_cent` reales.
  *
@@ -17,8 +17,8 @@ export const ETIQUETA_GRUPO: Record<GrupoRecibo, string> = {
   adicionales: "Cargos Adicionales",
   descuentos: "Descuentos y Bonificaciones",
   redondeo: "Redondeo",
-  devoluciones: "Devoluciones",
-  debitos: "Débitos",
+  devoluciones: "Notas de crédito",
+  debitos: "Notas de débito",
 };
 
 const ORDEN_GRUPOS: GrupoRecibo[] = ["mensuales", "adicionales", "descuentos", "redondeo", "devoluciones", "debitos"];

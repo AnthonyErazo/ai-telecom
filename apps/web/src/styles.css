@@ -1190,10 +1190,12 @@
   flex: 1; padding: 14px 12px;
   font-size: 17px; font-weight: 700; color: #172033;
   letter-spacing: 0.08em; min-height: 52px;
-  display: flex; align-items: center;
+  width: 100%; border: 0; outline: none; background: transparent;
+  font-family: inherit;
 }
-.mm-dni-number { color: #0b2739; }
-.mm-dni-placeholder { color: #b0bec9; font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.mm-dni-display::placeholder {
+  color: #b0bec9; font-size: 14px; font-weight: 500; letter-spacing: 0;
+}
 
 /* Checkbox T&C */
 .mm-tc-label {
@@ -1387,6 +1389,10 @@
 }
 .mm-recibo-card-top {
   display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.mm-recibo-card-top.clicable { cursor: pointer; border-radius: 12px; }
+.mm-recibo-card-top.clicable:focus-visible {
+  outline: 2px solid #019DF4; outline-offset: 4px;
 }
 .mm-recibo-card-icon {
   width: 46px; height: 46px; border-radius: 14px;
@@ -1748,10 +1754,17 @@
   border-bottom: 1px solid #f8fafc;
 }
 .mm-rdc-bk-subrow {
-  display: flex; justify-content: space-between; gap: 10px;
-  font-size: 11px; color: #9fb1c4;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  padding: 3px 0; font-size: 11px; color: #68768a;
 }
 .mm-rdc-bk-subrow span:last-child { color: #68768a; font-weight: 600; }
+.mm-rdc-bk-concepto {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.mm-rdc-bk-concepto strong {
+  color: #52677d; font-size: 11px; font-weight: 600;
+}
+.mm-rdc-bk-concepto small { color: #9fb1c4; font-size: 10px; }
 
 .mm-rdc-due.vencido { color: #cc4c3d; font-weight: 800; }
 
@@ -2276,16 +2289,17 @@
   backdrop-filter: blur(2px);
 }
 .mm-modal {
-  width: 100%; max-height: 88%; overflow-y: auto;
+  width: 100%; max-height: calc(100% - 8px); overflow: hidden;
   background: #fff; border-radius: 22px 22px 0 0;
   box-shadow: 0 -10px 30px rgba(7,17,31,0.25);
   animation: mm-modal-up 0.22s ease-out;
+  display: flex; flex-direction: column;
 }
 @keyframes mm-modal-up { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .mm-modal-header {
   display: flex; align-items: center; gap: 10px;
-  padding: 18px 16px 14px 20px; border-bottom: 1px solid #edf0f4;
-  position: sticky; top: 0; background: #fff;
+  padding: 14px 16px 12px 20px; border-bottom: 1px solid #edf0f4;
+  background: #fff; flex-shrink: 0;
 }
 .mm-modal-header-icon {
   width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
@@ -2298,10 +2312,10 @@
   width: 30px; height: 30px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
 }
-.mm-modal-body { padding: 18px 20px 4px; }
+.mm-modal-body { padding: 12px 20px 2px; }
 .mm-modal-total {
   background: linear-gradient(135deg, #0b2739, #1a4a6e); color: #fff;
-  border-radius: 16px; padding: 16px 18px; margin-bottom: 14px;
+  border-radius: 16px; padding: 12px 18px; margin-bottom: 10px;
   display: flex; flex-direction: column; gap: 2px;
 }
 .mm-modal-total span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.75; }
@@ -2310,7 +2324,7 @@
 .mm-modal-codigo {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: #f0f9ff; border: 1.5px dashed #b3e0f7; border-radius: 14px;
-  padding: 12px 14px; margin-bottom: 16px;
+  padding: 10px 14px; margin-bottom: 12px;
 }
 .mm-modal-codigo small { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: #5b8fad; text-transform: uppercase; letter-spacing: 0.05em; }
 .mm-modal-codigo strong { display: block; margin-top: 3px; font-size: 18px; letter-spacing: 0.03em; color: #0b2739; }
@@ -2320,9 +2334,9 @@
   padding: 9px 14px; font-size: 12.5px; font-weight: 800; cursor: pointer;
 }
 .mm-modal-copiar.copiado { background: #5BC500; }
-.mm-modal-pasos-title { margin: 4px 0 10px; font-size: 12.5px; font-weight: 800; color: #172033; }
-.mm-modal-pasos { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.mm-modal-pasos li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #28405a; line-height: 1.5; }
+.mm-modal-pasos-title { margin: 2px 0 8px; font-size: 12.5px; font-weight: 800; color: #172033; }
+.mm-modal-pasos { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.mm-modal-pasos li { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; color: #28405a; line-height: 1.35; }
 .mm-modal-paso-num {
   flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
   background: #e4f7fd; color: #019DF4; font-size: 11px; font-weight: 800;
@@ -2330,10 +2344,11 @@
 }
 .mm-modal-nota {
   display: flex; align-items: flex-start; gap: 8px;
-  background: #f5f6f8; border-radius: 12px; padding: 12px 14px;
-  font-size: 11.5px; color: #68768a; line-height: 1.5; margin-bottom: 4px;
+  background: #f5f6f8; border-radius: 12px; padding: 9px 12px;
+  font-size: 11px; color: #68768a; line-height: 1.35; margin-bottom: 2px;
 }
 .mm-modal-nota svg { color: #5BC500; flex-shrink: 0; margin-top: 1px; }
+.mm-modal-submit { margin: 6px 20px 14px; flex-shrink: 0; }
 
 /* CTA de pago dentro del chat */
 .mm-pagar-cta {
