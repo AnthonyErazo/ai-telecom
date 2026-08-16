@@ -35,6 +35,10 @@ export class GeminiLiveClient {
   private readonly microphone = new MicrophoneStream();
   private readonly player = new PcmAudioPlayer();
   private closed = false;
+  // Gemini Live a veces entrega el mismo `toolCall` más de una vez (reintento de
+  // transporte). Sin esta guarda, `executeTool` volvía a llamar a `/v1/explicar` y
+  // duplicaba en el chat la pregunta y la respuesta ya mostradas.
+  private readonly llamadasProcesadas = new Set<string>();
 
   constructor(private readonly context: LiveContext, private readonly events: LiveEvents) {}
 
@@ -90,6 +94,10 @@ export class GeminiLiveClient {
 
   private async executeTool(id: string | undefined, name: string | undefined, args: Record<string, unknown>): Promise<void> {
     if (!this.session || name !== "explicar_recibo") return;
+    if (id) {
+      if (this.llamadasProcesadas.has(id)) return;
+      this.llamadasProcesadas.add(id);
+    }
     this.events.onStatus("consulting");
     try {
       const explanation = await api.explain(this.context.authToken, {

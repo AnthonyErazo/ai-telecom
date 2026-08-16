@@ -26,7 +26,7 @@ import re
 import time
 import uuid
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,10 +37,12 @@ from packages.core_domain.enums import (
     Canal,
     ModoGeneracion,
     MotivoDerivacion,
+    TipoMovimiento,
     Verbosidad,
     VeredictoVerificacion,
 )
 from packages.core_domain.esquemas.factset import FactSet
+from packages.core_domain.esquemas.recibo import Tramo
 from packages.core_domain.esquemas.respuesta import (
     Accion,
     BarraPuente,
@@ -59,8 +61,9 @@ from packages.core_domain.esquemas.respuesta import (
     HitoCiclo,
     ItemKV,
     RespuestaCanalAgnostica,
+    SegmentoParcial,
 )
-from packages.facts_engine.intencion import concepto_facturacion, pide_detalle_cargos
+from packages.facts_engine.intencion import coincide_patron, concepto_facturacion, pide_detalle_cargos
 from packages.llm_layer.plantillas import (
     DatosPlantilla,
     datos_de_factset,
@@ -365,6 +368,8 @@ def componer_bloques(
     *,
     verbosidad: Verbosidad | str = Verbosidad.CORTO,
     mostrar_ciclos: bool = False,
+    es_mas_reciente: bool = True,
+    mostrar_como_se_calculo: bool = False,
 ) -> list[Bloque]:
     """Construye los bloques de la respuesta.
 
@@ -372,6 +377,16 @@ def componer_bloques(
     importes que se muestran salen de ``formatear_soles`` sobre enteros del FactSet,
     de manera que el bloque ``kv``, el ``puente`` y la ``tabla`` son anclados por
     construcción.
+
+    ``es_mas_reciente`` distingue si el ``FactSet`` describe el recibo que hoy ve el
+    cliente en Mi Recibo o un par de ciclos que está revisando desde su historial: el
+    componente visual es el mismo en los dos casos, pero solo en el primero corresponde
+    marcar el ciclo explicado como "más reciente".
+
+    ``mostrar_como_se_calculo`` es independiente de ``verbosidad``: el bloque "Cómo se
+    calculó" (prosa + tabla de tramos) solo se agrega cuando el cliente lo pidió con
+    esas palabras, no cada vez que la respuesta va en modo ``DETALLE`` por haber pedido
+    el desglose de cargos.
     """
     detalle = str(verbosidad) == str(Verbosidad.DETALLE)
     bloques: list[Bloque] = []
@@ -386,7 +401,7 @@ def componer_bloques(
         )
 
     if mostrar_ciclos:
-        bloques.append(_bloque_ciclos(factset))
+        bloques.append(_bloque_ciclos(factset, es_mas_reciente=es_mas_reciente))
 
     items = [
         ItemKV(
@@ -471,6 +486,8 @@ def componer_bloques(
 
     if detalle:
         bloques.append(_tabla_cargos_actuales(factset))
+
+    if mostrar_como_se_calculo:
         cuerpo = renderizar_texto_libre(datos, "detalle")
         if cuerpo:
             bloques.append(BloqueTexto(titulo="Cómo se calculó", texto=cuerpo))
@@ -509,6 +526,29 @@ def componer_bloques(
     return bloques
 
 
+#: Frases explícitas. Deliberadamente MÁS estricto que ``pide_detalle_cargos``: ese
+#: helper también dispara con "mis cargos" o "qué me cobraron", que piden el
+#: desglose de conceptos, no el método de cálculo. Mezclarlos hacía que "Cómo se
+#: calculó" apareciera cada vez que el cliente pedía el detalle de sus cargos, aunque
+#: no hubiera preguntado por el cálculo.
+_PATRONES_COMO_SE_CALCULO: tuple[str, ...] = (
+    "como se calculo",
+    "como se calcula",
+    "como calculan",
+    "como se hizo el calculo",
+    "como llegaron a este monto",
+    "como obtuvieron este monto",
+    "como sacaron este monto",
+    "explicame el calculo",
+    "como funciona el prorrateo",
+)
+
+
+def _pide_como_se_calculo(utterance: str) -> bool:
+    """Si el cliente pide, con todas sus letras, el método de cálculo del recibo."""
+    return any(coincide_patron(patron, utterance) for patron in _PATRONES_COMO_SE_CALCULO)
+
+
 def _pide_visual_ciclos(utterance: str) -> bool:
     normalizada = utterance.lower()
     return any(
@@ -520,35 +560,175 @@ def _pide_visual_ciclos(utterance: str) -> bool:
     )
 
 
-def _bloque_ciclos(factset: FactSet) -> BloqueCiclos:
-    """Proyecta solo hechos sellados; nunca pide al LLM fechas ni importes."""
-    ciclos = [
-        CicloExplicado(
-            periodo=factset.periodo_previo,
-            total_cent=factset.total_previo_cent,
-            actual=False,
+#: Etiqueta breve en español para la causa de un tramo parcial. Deliberadamente corta
+#: (2-3 palabras): el componente visual la muestra bajo el segmento resaltado, no en
+#: una frase completa — para eso ya está el bloque de causas.
+_ETIQUETA_CAUSA_CORTA: dict[TipoMovimiento, str] = {
+    TipoMovimiento.CAMBIO_PLAN: "cambio de plan",
+    TipoMovimiento.SUSPENSION: "suspensión de servicio",
+    TipoMovimiento.RECONEXION: "reconexión de servicio",
+    TipoMovimiento.ALTA_SERVICIO: "alta de servicio",
+    TipoMovimiento.BAJA_SERVICIO: "baja de servicio",
+    TipoMovimiento.FIN_DESCUENTO: "fin de descuento",
+    TipoMovimiento.ALTA_PAQUETE: "alta de paquete",
+    TipoMovimiento.ALTA_EQUIPO_FINANCIADO: "alta de equipo financiado",
+    TipoMovimiento.NOTA_CREDITO: "nota de crédito",
+    TipoMovimiento.NOTA_DEBITO: "nota de débito",
+    TipoMovimiento.AJUSTE_SUSPENSION: "ajuste por suspensión",
+}
+
+
+def _segmento_relevante(tramos: list[Tramo]) -> Tramo | None:
+    """El tramo que vale la pena resaltar cuando una línea tuvo más de uno.
+
+    Con suspensión de por medio, esa es la noticia. Sin ella, el tramo más corto es
+    el que arrancó o cambió a mitad de ciclo — el más largo es "las condiciones de
+    siempre" y no necesita resaltarse.
+    """
+    if len(tramos) < 2:
+        return None
+    suspendidos = [tramo for tramo in tramos if str(tramo.estado) == "SUSPENDIDO"]
+    if suspendidos:
+        return suspendidos[0]
+    return min(tramos, key=lambda tramo: tramo.dias)
+
+
+def _estado_pago_previo(factset: FactSet) -> Literal["pagado", "pendiente"]:
+    """El ciclo previo no trae una fecha de pago real en este dataset.
+
+    Se infiere de si dejó deuda arrastrada: sin ``deuda_anterior_cent`` no queda saldo
+    de ese ciclo por cobrar, así que se lee como pagado. Es una inferencia declarada
+    como tal (ver ``CicloExplicado.estado_pago``), no un hecho registrado.
+    """
+    return "pendiente" if factset.deuda_anterior_cent > 0 else "pagado"
+
+
+def _estado_pago_actual(factset: FactSet) -> Literal["pagado", "por_pagar", "vencido"]:
+    """Estado de cobro del ciclo que se explica, con los mismos campos que ya ancla."""
+    if factset.total_a_pagar_cent <= 0:
+        return "pagado"
+    if factset.fecha_vencimiento and factset.fecha_vencimiento < factset.generado_en.date():
+        return "vencido"
+    return "por_pagar"
+
+
+def _bloque_ciclos(factset: FactSet, *, es_mas_reciente: bool = True) -> BloqueCiclos:
+    """Proyecta solo hechos sellados; nunca pide al LLM fechas ni importes.
+
+    Genérico por diseño: compara el par (``periodo_previo``, ``periodo_actual``) del
+    ``FactSet`` recibido, sea cual sea ese par. Cuando el cliente pregunta por su recibo
+    de hoy, ``periodo_actual`` es el más reciente; cuando navega su historial y pregunta
+    por un recibo de un mes pasado, el mismo bloque compara ese par de meses pasados sin
+    que este código tenga que saberlo — la única señal que necesita desde fuera es
+    ``es_mas_reciente``, para no rotular como "más reciente" un ciclo que ya quedó atrás.
+
+    Las fechas del ciclo previo NO se calculan por álgebra de calendario: salen del
+    ``Recibo`` anterior real que ``construir_factset`` ya carga (``ciclo_inicio_previo``
+    y compañía), así que ambos lados de la comparación quedan anclados igual de firme.
+    """
+    # Un ciclo es "parcial" cuando alguna de sus líneas trae más de un tramo: solo el
+    # ciclo que se explica reconstruye tramos (el previo no los trae), así que
+    # `completo` queda en `None` ahí — no se adivina lo que no se puede saber.
+    lineas_con_tramos = [linea for linea in factset.lineas if len(linea.tramos or []) > 1]
+    completo_actual = not lineas_con_tramos
+
+    ciclo_previo = CicloExplicado(
+        periodo=factset.periodo_previo,
+        total_cent=factset.total_previo_cent,
+        actual=False,
+        inicio=str(factset.ciclo_inicio_previo) if factset.ciclo_inicio_previo else None,
+        cierre=str(factset.ciclo_fin_previo) if factset.ciclo_fin_previo else None,
+        vencimiento=(
+            str(factset.fecha_vencimiento_previo) if factset.fecha_vencimiento_previo else None
         ),
-        CicloExplicado(
-            periodo=factset.periodo_actual,
-            total_cent=factset.total_actual_cent,
-            actual=True,
-            inicio=str(factset.ciclo_inicio) if factset.ciclo_inicio else None,
-            cierre=str(factset.ciclo_fin) if factset.ciclo_fin else None,
-            vencimiento=str(factset.fecha_vencimiento) if factset.fecha_vencimiento else None,
-        ),
-    ]
+        emision=str(factset.fecha_emision_previo) if factset.fecha_emision_previo else None,
+        estado_pago=_estado_pago_previo(factset),
+    )
+    ciclo_actual = CicloExplicado(
+        periodo=factset.periodo_actual,
+        total_cent=factset.total_actual_cent,
+        actual=True,
+        es_mas_reciente=es_mas_reciente,
+        inicio=str(factset.ciclo_inicio) if factset.ciclo_inicio else None,
+        cierre=str(factset.ciclo_fin) if factset.ciclo_fin else None,
+        vencimiento=str(factset.fecha_vencimiento) if factset.fecha_vencimiento else None,
+        emision=str(factset.fecha_emision) if factset.fecha_emision else None,
+        completo=completo_actual,
+        estado_pago=_estado_pago_actual(factset),
+    )
+    ciclos = [ciclo_previo, ciclo_actual]
+
+    # Tres hitos "de calendario" por ciclo, en secuencia cronológica real:
+    #   Inicio → Cierre/Facturación → Vencimiento
+    # En este sistema el recibo se emite el mismo día que cierra el ciclo (la
+    # facturación NUNCA es un evento aparte del cierre), así que se colapsan en un
+    # único nodo — mostrarlos como dos hitos superpuestos en la misma fecha era
+    # redundante y confundía la lectura de la línea de tiempo. El vencimiento entra a
+    # la MISMA línea (no aparte): es un hito real, posterior al cierre, y el frontend
+    # ya lo distingue por color e icono sin necesidad de separarlo del recorrido.
     hitos: list[HitoCiclo] = []
-    vistos: set[tuple[str, str]] = set()
+    vistos: set[tuple[str, str, str]] = set()
+
+    def _agregar(fecha: str | None, etiqueta: str, tipo: str, periodo: str) -> None:
+        if not fecha or len(hitos) >= 16:
+            return
+        clave = (periodo, fecha, tipo)
+        if clave in vistos:
+            return
+        vistos.add(clave)
+        hitos.append(HitoCiclo(fecha=fecha, etiqueta=etiqueta, tipo=tipo, periodo=periodo))  # type: ignore[arg-type]
+
+    for ciclo in ciclos:
+        _agregar(ciclo.inicio, "Inicio del ciclo", "inicio", ciclo.periodo)
+        if ciclo.emision and ciclo.emision == ciclo.cierre:
+            _agregar(ciclo.emision, "Cierre / Facturación", "facturacion", ciclo.periodo)
+        else:
+            _agregar(ciclo.emision, "Facturación", "facturacion", ciclo.periodo)
+            _agregar(ciclo.cierre, "Fin del ciclo", "cierre", ciclo.periodo)
+        _agregar(ciclo.vencimiento, "Vencimiento", "vencimiento", ciclo.periodo)
+        _agregar(ciclo.vencimiento, "Vencimiento", "vencimiento", ciclo.periodo)
+
+    # Cortes de servicio y reconexiones: solo existen para el ciclo que trae el
+    # detalle de tramos (el que se está explicando), reconstruidos de la misma tabla
+    # que ya usa el desglose de prorrateo — nunca una fecha nueva.
     for linea in factset.lineas:
-        for tramo in linea.tramos or []:
-            tipo = "suspension" if str(tramo.estado) == "SUSPENDIDO" else "prorrateo"
-            clave = (str(tramo.inicio), linea.nombre_comercial)
-            if clave in vistos or len(hitos) >= 8:
+        tramos = linea.tramos or []
+        for indice, tramo in enumerate(tramos):
+            suspendido = str(tramo.estado) == "SUSPENDIDO"
+            anterior_suspendido = indice > 0 and str(tramos[indice - 1].estado) == "SUSPENDIDO"
+            if suspendido:
+                tipo, etiqueta = "suspension", f"Corte de servicio: {linea.nombre_comercial}"
+            elif anterior_suspendido:
+                tipo, etiqueta = "reconexion", f"Reconexión: {linea.nombre_comercial}"
+            else:
                 continue
-            vistos.add(clave)
-            hitos.append(
-                HitoCiclo(fecha=str(tramo.inicio), etiqueta=linea.nombre_comercial, tipo=tipo)
+            _agregar(str(tramo.inicio), etiqueta, tipo, factset.periodo_actual)
+
+    hitos.sort(key=lambda hito: (hito.periodo, hito.fecha))
+
+    # El o los tramos parciales que respaldan `completo=False`: como mucho uno por
+    # línea afectada, con la causa y el monto ya prorrateado que trae el propio tramo.
+    segmentos: list[SegmentoParcial] = []
+    for linea in lineas_con_tramos:
+        if len(segmentos) >= 4:
+            break
+        relevante = _segmento_relevante(linea.tramos or [])
+        if relevante is None:
+            continue
+        causa_corta = _ETIQUETA_CAUSA_CORTA.get(linea.causa) if linea.causa else None
+        if causa_corta is None and linea.causa_oficial:
+            causa_corta = str(linea.causa_oficial).replace("_", " ").lower()
+        segmentos.append(
+            SegmentoParcial(
+                periodo=factset.periodo_actual,
+                inicio=str(relevante.inicio),
+                fin=str(relevante.fin),
+                dias=relevante.dias,
+                causa=causa_corta or "cambio de condiciones",
+                monto_cent=relevante.monto_prorrateado_cent,
             )
+        )
+
     causas = [
         CausaVisual(
             etiqueta=causa.etiqueta_cliente,
@@ -562,11 +742,15 @@ def _bloque_ciclos(factset: FactSet) -> BloqueCiclos:
         modalidad=str(factset.modalidad_renta),
         ciclos=ciclos,
         hitos=hitos,
+        segmentos_parciales=segmentos,
         causas=causas,
         fact_ids=[
             "factset:periodo_previo", "factset:total_previo_cent",
             "factset:periodo_actual", "factset:total_actual_cent",
             "factset:ciclo_inicio", "factset:ciclo_fin", "factset:fecha_vencimiento",
+            "factset:fecha_emision", "factset:ciclo_inicio_previo", "factset:ciclo_fin_previo",
+            "factset:fecha_vencimiento_previo", "factset:fecha_emision_previo",
+            "factset:deuda_anterior_cent", "factset:total_a_pagar_cent",
         ],
     )
 
@@ -654,6 +838,7 @@ def generar_explicacion(
     timeout_s: float | None = None,
     permitidos: ConjuntoPermitido | None = None,
     respuestas_previas: Sequence[str] | None = None,
+    es_mas_reciente: bool = True,
 ) -> ResultadoGeneracion:
     """Genera la explicación aplicando la política LLM → verificar → reintento → plantilla.
 
@@ -670,6 +855,9 @@ def generar_explicacion(
         respuestas_previas: lo que el asistente ya contestó antes en esta conversación
             (más reciente al final). Deja de repetir la misma redacción en la segunda
             pregunta sobre el mismo recibo — ver ``construir_prompt``.
+        es_mas_reciente: si ``factset.periodo_actual`` es el recibo que hoy ve el
+            cliente (``peticion.periodo`` vacío) o uno que está revisando desde su
+            historial. Solo afecta el rótulo del bloque visual de ciclos.
 
     Returns:
         :class:`ResultadoGeneracion` con el texto final, el modo realmente usado, el
@@ -749,7 +937,8 @@ def generar_explicacion(
 
         bloques = componer_bloques(
             factset, explicacion, datos, verbosidad=verbosidad,
-            mostrar_ciclos=_pide_visual_ciclos(utterance),
+            mostrar_ciclos=_pide_visual_ciclos(utterance), es_mas_reciente=es_mas_reciente,
+            mostrar_como_se_calculo=_pide_como_se_calculo(utterance),
         )
         texto = _texto_de(bloques)
         resultado = verificar(
@@ -818,7 +1007,8 @@ def generar_explicacion(
     explicacion = enfocar_resumen_consulta(explicacion, factset, utterance)
     bloques = componer_bloques(
         factset, explicacion, datos, verbosidad=verbosidad,
-        mostrar_ciclos=_pide_visual_ciclos(utterance),
+        mostrar_ciclos=_pide_visual_ciclos(utterance), es_mas_reciente=es_mas_reciente,
+        mostrar_como_se_calculo=_pide_como_se_calculo(utterance),
     )
     texto = _texto_de(bloques)
     resultado = verificar(
