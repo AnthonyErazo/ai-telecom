@@ -45,6 +45,7 @@ import os
 from collections import defaultdict
 from collections.abc import Mapping
 from datetime import date, timedelta
+from decimal import Decimal
 from typing import Any
 
 from apps.api.acl import CuentaNoEncontradaExterna, ErrorSistemaExterno
@@ -492,7 +493,7 @@ class TransporteSupabase:
             "dias_consumidos": int(dias) if dias is not None else None,
             "cuota_numero": int(fila[5]) if fila[5] is not None else None,
             "monto_descuento_cent": (
-                int(round(float(fila[6]) * 100)) if fila[6] is not None else None
+                round(Decimal(fila[6]) * 100) if fila[6] is not None else None
             ),
             "descripcion": fila[7] or "",
             "tipo_descuento": fila[8] or "",

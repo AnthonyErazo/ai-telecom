@@ -19,6 +19,7 @@ Lo que fija cada bloque:
 from __future__ import annotations
 
 from fractions import Fraction
+from typing import ClassVar
 
 import pytest
 
@@ -27,6 +28,7 @@ from packages.facts_engine.prorrateo import (
     DIAS_DESCUENTO_ALTA,
     cargo_fijo_con_descuento_alta,
     cuota_equipo_financiado,
+    promocion_a_parametros,
     recibos_de_alta,
 )
 
@@ -324,3 +326,60 @@ class TestNarrativaDelReciboMixto:
         )
         assert "a mitad del mes" not in texto
         assert "volvió a su precio normal" in texto
+
+
+# --------------------------------------------------------------------------- #
+# Con los parámetros del cliente, no con los del ejemplo
+# --------------------------------------------------------------------------- #
+class TestPromocionRealDelDataset:
+    """El último tramo: la fórmula deja de suponer y usa lo que consta por cliente."""
+
+    #: La cuenta 759816134 tal como la devuelve `v_descuento_cuota`. No es un caso
+    #: inventado: es el registro real, y es además la cuenta que la demo ofrece como
+    #: «Fin de descuento».
+    REAL: ClassVar[dict[str, object]] = {
+        "modalidad_renta": "ADELANTADA",
+        "meses_promocion": 6,
+        "porcentaje_promocion": 50.0,
+        "dias_consumidos": 31,
+    }
+
+    def test_el_porcentaje_llega_como_fraccion_exacta(self) -> None:
+        """50.0 -> Fraction(1, 2), no 0.5.
+
+        El módulo entero evita el `float` a propósito; dejar entrar uno aquí metería su
+        error binario justo en la línea que multiplica importes.
+        """
+        assert promocion_a_parametros(self.REAL)["tasa_descuento"] == Fraction(1, 2)
+
+    def test_los_meses_se_convierten_a_dias_y_se_descuenta_lo_gastado(self) -> None:
+        """6 meses × 30 días − 31 ya consumidos = 149 días de bolsa.
+
+        Las dos conversiones importan. Usar los 90 días por defecto con una promoción de
+        6 meses partiría el cuarto recibo cuando en realidad quedan tres meses enteros de
+        descuento; y no restar lo consumido le prometería al cliente días que ya
+        disfrutó.
+        """
+        assert promocion_a_parametros(self.REAL)["dias_promocion"] == 149
+
+    def test_la_serie_sale_con_los_datos_del_cliente(self) -> None:
+        """Plan de S/ 79,90: cuatro recibos a mitad, uno partido y vuelta al precio."""
+        serie = recibos_de_alta(
+            cargo_fijo_cent=7_990,
+            dias_hasta_cierre=0,
+            dias_ciclo=30,
+            recibos=6,
+            **promocion_a_parametros(self.REAL),
+        )
+        assert [r.cargo_fijo_cent for r in serie] == [3_995, 3_995, 3_995, 3_995, 4_128, 7_990]
+        assert serie[4].es_mixto, "el quinto es donde se agota la bolsa"
+        assert serie[-1].dias_restantes_promocion == 0
+
+    def test_lo_que_no_consta_no_se_inventa(self) -> None:
+        """Sin datos, la fórmula se queda con sus valores por defecto.
+
+        Un campo ausente no puede convertirse en un cero: «no consta el porcentaje» y
+        «el descuento es del 0 %» son cosas distintas y solo una es cierta.
+        """
+        assert promocion_a_parametros({}) == {}
+        assert "dias_promocion" not in promocion_a_parametros({"porcentaje_promocion": 30.0})
