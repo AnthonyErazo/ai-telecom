@@ -17,9 +17,9 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft, Bot, CreditCard, Gift, Home as HomeIcon,
+  AlertCircle, ArrowLeft, Bot, CreditCard, Gift, Home as HomeIcon,
   Key, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
-  ShoppingBag, Smartphone, Star, ThumbsDown, ThumbsUp,
+  ShoppingBag, Smartphone, Star, ThumbsDown, ThumbsUp, TrendingDown, TrendingUp,
   User as UserIcon, Phone, Wifi,
 } from "lucide-react";
 import MovistarLogo from "./MovistarLogo";
@@ -30,6 +30,12 @@ import { GeminiLiveClient, type LiveStatus } from "../live/client";
 import { microphoneSupportError } from "../live/audio";
 
 // ── Helpers ───────────────────────────────────────────────────────────
+// La app se sirve bajo `base: "/ui/"` (vite.config.ts): una ruta absoluta como
+// "/billsense-logo.png" apunta a la raíz del dominio, no a donde vite publica
+// `public/`, y el navegador la resuelve como imagen rota. `BASE_URL` la coloca
+// donde de verdad vive el archivo, en dev y en build.
+const billsenseLogo = `${import.meta.env.BASE_URL}billsense-logo.png`;
+
 const soles = (c: number) =>
   new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(c / 100);
 
@@ -144,6 +150,18 @@ export function MiMovistar({
     ? cuenta.replace("C-DEMO-","Usuario ").replace("C-","Cliente ")
     : "Cliente";
 
+  // Situación del cliente, para el dashboard — todo sale del FactSet que ya trajo el
+  // login (`hechos`), nada se inventa aquí. La fecha de vencimiento es la única cifra
+  // que el frontend calcula (días restantes), y es aritmética sobre un dato real, no
+  // un importe nuevo.
+  const deudaPendienteCent = (hechos?.deuda_anterior_cent as number | undefined) ?? 0;
+  const alDia              = deudaPendienteCent <= 0;
+  const vencimiento        = hechos?.fecha_vencimiento ? new Date(hechos.fecha_vencimiento) : null;
+  const diasParaVencer     = vencimiento ? Math.ceil((vencimiento.getTime() - Date.now()) / 86_400_000) : null;
+  const pctDelta           = hechos && hechos.total_previo_cent > 0
+    ? Math.round(Math.abs(hechos.delta_total_cent) / hechos.total_previo_cent * 100)
+    : null;
+
   // ── Mutations ───────────────────────────────────────────────────
   const entrar = useMutation({
     mutationFn: async (id: string) => {
@@ -201,7 +219,9 @@ export function MiMovistar({
     setPantalla("chat");
     setChatModo(modo);
     setBottomTab("billsense");
-    if (!mensajes.length) preguntar(q ?? "¿Por qué me vino más caro este mes?");
+    if (q && !mensajes.length && !borrador.trim()) {
+      setBorrador(q);
+    }
   };
 
   const pad = (key: string) => {
@@ -227,15 +247,27 @@ export function MiMovistar({
           if (last?.role === "user") return [...cur.slice(0,-1), { role:"user" as const, text:`${last.text} ${t}`.trim() }];
           return [...cur, { role:"user" as const, text:t.trim() }];
         }),
-        onOutputTranscript: (t) => setLiveMsgs((cur) => {
-          const last = cur[cur.length - 1];
-          if (last?.role === "agent") return [...cur.slice(0,-1), { role:"agent" as const, text:`${last.text} ${t}`.trim() }];
-          return [...cur, { role:"agent" as const, text:t.trim() }];
-        }),
+        // Se descarta a propósito: es la narración improvisada que Gemini dice en voz
+        // alta mientras suena el audio, no la respuesta verificada contra el FactSet.
+        // Pintarla junto al bloque verificado duplicaba la respuesta —una hablada, otra
+        // con las cifras comprobadas—; el chat de voz enseña solo la verificada, con el
+        // estado ("BillSense está respondiendo…") como única señal mientras habla.
+        onOutputTranscript: () => {},
         onExplanation: (res) => {
           setUltima(res); setOpinion(null);
-          setMensajes((p) => [...p, { rol:"asistente", texto:narrativa(res.bloques), esVoz:true }]);
-          setLiveMsgs([]);
+          // `liveMsgs` guarda lo dicho por voz mientras dura la sesión, pero este
+          // callback quedó cerrado sobre el valor que tenía al conectar —no el que
+          // tiene ahora—, así que leerlo directo aquí perdía la pregunta hablada justo
+          // al contestarla. La forma funcional de `setLiveMsgs` sí ve el valor actual:
+          // se usa para rescatar la pregunta antes de vaciar la transcripción en vivo.
+          setLiveMsgs((current) => {
+            const pregunta = current.filter((m) => m.role === "user").map((m) => m.text).join(" ").trim();
+            setMensajes((p) => {
+              const conPregunta = pregunta ? [...p, { rol:"cliente" as const, texto:pregunta, esVoz:true }] : p;
+              return [...conPregunta, { rol:"asistente" as const, texto:narrativa(res.bloques), esVoz:true }];
+            });
+            return [];
+          });
           onExplicacion(res);
         },
         onError: setChatError,
@@ -250,9 +282,12 @@ export function MiMovistar({
     setBottomTab(tab);
     if      (tab === "inicio")     setPantalla("dashboard");
     else if (tab === "recibo")     setPantalla("recibo");
-    else if (tab === "billsense")  abrirChat("¿En qué te puedo ayudar hoy?", "chat");
-    else if (tab === "tienda")     abrirChat("¿Qué ofertas y planes tiene Movistar disponibles?", "chat");
-    else if (tab === "beneficios") abrirChat("¿Cuáles son mis beneficios como cliente Movistar?", "chat");
+    else if (tab === "billsense")  {
+      setPantalla("chat"); setChatModo("chat"); setBottomTab("billsense");
+    } else if (tab === "tienda" || tab === "beneficios") {
+      setBottomTab(tab);
+      return;
+    }
   };
 
   /** Genera un PDF imprimible del recibo en una ventana nueva */
@@ -306,7 +341,7 @@ export function MiMovistar({
   };
 
   // ── Shared header ────────────────────────────────────────────────
-  const hdr = (title: string, back?: () => void, extra?: ReactNode) => (
+  const hdr = (title: ReactNode, back?: () => void, extra?: ReactNode) => (
     <div className="mm-header">
       {back
         ? <button onClick={back} className="mm-back-btn" aria-label="Volver"><ArrowLeft size={20} /></button>
@@ -492,14 +527,52 @@ export function MiMovistar({
         </button>
       </div>
       <div className="mm-dash-scroll">
+        {/* Mi situación — con datos reales del recibo, no genéricos */}
+        {hechos && (
+          <div className="mm-situacion-card">
+            <div className="mm-situacion-row">
+              <span className={`mm-situacion-badge ${alDia ? "ok" : "alerta"}`}>
+                {alDia ? <ShieldCheck size={13}/> : <AlertCircle size={13}/>}
+                {alDia ? "Cuenta al día" : `Deuda anterior: ${soles(deudaPendienteCent)}`}
+              </span>
+              {diasParaVencer !== null && (
+                <span className={`mm-situacion-venc${diasParaVencer <= 3 ? " urgente" : ""}`}>
+                  {diasParaVencer < 0
+                    ? "Recibo vencido"
+                    : diasParaVencer === 0
+                    ? "Vence hoy"
+                    : `Vence en ${diasParaVencer} día${diasParaVencer === 1 ? "" : "s"}`}
+                </span>
+              )}
+            </div>
+            <div className="mm-situacion-row">
+              <span className={`mm-situacion-tendencia ${sube ? "up" : "down"}`}>
+                {sube ? <TrendingUp size={14}/> : <TrendingDown size={14}/>}
+                Tu recibo {sube ? "subió" : "bajó"} {soles(Math.abs(hechos.delta_total_cent))}
+                {pctDelta !== null ? ` (${pctDelta}%)` : ""} respecto al mes anterior
+              </span>
+            </div>
+            <div className="mm-situacion-row">
+              <span className="mm-situacion-plan"><Smartphone size={13}/> {hechos.modalidad_renta}</span>
+            </div>
+            {oferta ? (
+              <button className="mm-situacion-promo" onClick={() => abrirChat(`Cuéntame más sobre: ${oferta.etiqueta}`)}>
+                <Gift size={14}/><span>{oferta.etiqueta}</span><span className="mm-situacion-promo-arrow">›</span>
+              </button>
+            ) : (
+              <button className="mm-situacion-promo ghost" onClick={() => abrirChat("¿Qué promociones u ofertas tengo disponibles según mi cuenta?")}>
+                <Gift size={14}/><span>Pregúntale a BillSense por promociones para ti</span><span className="mm-situacion-promo-arrow">›</span>
+              </button>
+            )}
+          </div>
+        )}
         {/* Banner */}
         <div className="mm-dash-banner">
           <div>
             <p className="mm-dash-banner-kicker">🎉 Oferta exclusiva</p>
             <p className="mm-dash-banner-text">¡Disfruta de <strong>35 GB</strong> + velocidad máxima!</p>
           </div>
-          <button className="mm-dash-banner-btn"
-            onClick={() => abrirChat("¿Qué ofertas de datos tiene Movistar disponibles?")}>Ver</button>
+          <button className="mm-dash-banner-btn">Ver</button>
         </div>
         {/* Mejorar plan */}
         <div className="mm-dash-card">
@@ -528,8 +601,8 @@ export function MiMovistar({
           <div className="mm-recibo-card-btns">
             <button id="btn-ver-recibo" className="mm-rc-btn" onClick={() => setPantalla("recibo")}>Ver recibo</button>
             <button id="btn-detalle-factura" className="mm-rc-btn primary"
-              onClick={() => abrirChat("Explícame mi recibo de este mes detalladamente")}>
-              Detalle de mi factura
+              onClick={() => abrirChat("Consulta sobre tu recibo", "chat")}>
+              Consulta sobre tu recibo
             </button>
           </div>
         </div>
@@ -623,14 +696,21 @@ export function MiMovistar({
   // ════════════════════════════════════════════════════════════════
   return (
     <div className={F}>
-      {/* Header común */}
-      {hdr(
-        "BillSense",
-        () => { setPantalla("dashboard"); setBottomTab("inicio"); },
-        <div className={`mm-live-badge${liveIsVisible?" active":""}`}>
-          {liveIsVisible ? <><Mic size={11}/> {liveLabelShort(liveStatus)}</> : <><Bot size={11}/> IA</>}
+      {/* Header propio de esta pantalla: sin el logo de Movistar —aquí el
+          protagonista es el asistente, no la operadora—, con el logo de
+          BillSense y un título que dice para qué sirve la pantalla. */}
+      <div className="mm-header">
+        <button onClick={() => { setPantalla("dashboard"); setBottomTab("inicio"); }} className="mm-back-btn" aria-label="Volver"><ArrowLeft size={20} /></button>
+        <div className="mm-header-title">
+          <img src={billsenseLogo} alt="BillSense" className="mm-header-billsense-logo" />
+          <h1 className="mm-title">Realiza tu consulta</h1>
         </div>
-      )}
+        <div style={{ width:32, display:"flex", justifyContent:"flex-end" }}>
+          <div className={`mm-live-badge${liveIsVisible?" active":""}`}>
+            {liveIsVisible ? <><Mic size={11}/> {liveLabelShort(liveStatus)}</> : <><Bot size={11}/> IA</>}
+          </div>
+        </div>
+      </div>
 
       {/* ── Selector de modo: Chat | BillSense Voz ─────────────── */}
       <div className="mm-mode-tabs">
@@ -683,12 +763,9 @@ export function MiMovistar({
           <div className="mm-chat-scroll">
             {/* Bienvenida */}
             {mensajes.length === 0 && !explicar.isPending && (
-              <div className="mm-chat-welcome">
-                <div className="mm-chat-welcome-avatar"><Bot size={28} /></div>
-                <div className="mm-chat-welcome-bubble">
-                  <strong>¡Hola! Soy BillSense 👋</strong>
-                  <p>Puedo explicarte tu recibo en detalle, analizar consumos y responder tus dudas de facturación.</p>
-                </div>
+              <div className="mm-chat-empty-state">
+                <div className="mm-chat-empty-logo"><img src={billsenseLogo} alt="BillSense" /></div>
+                <p>Tu conversación está lista. Escribe tu consulta sobre el recibo y BillSense te responderá aquí.</p>
               </div>
             )}
 
@@ -697,7 +774,7 @@ export function MiMovistar({
               if (m.esRecibo && hechos) {
                 return (
                   <div key={i} className="mm-chat-turn assistant">
-                    <div className="mm-chat-avatar-bot"><Bot size={16} /></div>
+                    <div className="mm-chat-avatar-bot"><img src={billsenseLogo} alt="" /></div>
                     <ReceiptDetailCard hechos={hechos} onDownload={generarPDF} />
                   </div>
                 );
@@ -707,7 +784,7 @@ export function MiMovistar({
                 <div key={i} className={`mm-chat-turn ${esAsi?"assistant":"client"}`}>
                   {esAsi && (
                     <div className={`mm-chat-avatar-bot${m.esVoz?" voz":""}`}>
-                      {m.esVoz ? <Mic size={14}/> : <Bot size={16}/>}
+                      {m.esVoz ? <Mic size={14}/> : <img src={billsenseLogo} alt="" />}
                     </div>
                   )}
                   <div className={`mm-chat-bubble ${esAsi?"assistant":"client"}`}>{m.texto}</div>
@@ -719,7 +796,7 @@ export function MiMovistar({
             {/* Cargando */}
             {explicar.isPending && (
               <div className="mm-chat-turn assistant">
-                <div className="mm-chat-avatar-bot"><Bot size={16}/></div>
+                <div className="mm-chat-avatar-bot"><img src={billsenseLogo} alt="" /></div>
                 <div className="mm-chat-typing">
                   <Loader2 size={14} className="animate-spin" style={{ color:"#019DF4" }} />
                   <span>BillSense está verificando cifras…</span>
@@ -762,7 +839,7 @@ export function MiMovistar({
             {/* Oferta */}
             {opinion==="arriba" && oferta && (
               <div className="mm-chat-turn assistant">
-                <div className="mm-chat-avatar-bot"><Bot size={16}/></div>
+                <div className="mm-chat-avatar-bot"><img src={billsenseLogo} alt="" /></div>
                 <div className="mm-offer-card">
                   <div className="mm-offer-header"><ShoppingBag size={16}/><span>Oferta exclusiva para ti</span></div>
                   <p className="mm-offer-title">{oferta.etiqueta}</p>
@@ -816,7 +893,7 @@ export function MiMovistar({
               <div className="mm-voz-ring ring3" />
             </>}
             <div className={`mm-voz-avatar${liveIsVisible?" active":""}`}>
-              <Bot size={44} />
+              <img src={billsenseLogo} alt="BillSense" />
             </div>
           </div>
 
@@ -825,23 +902,29 @@ export function MiMovistar({
             {liveLabel(liveStatus)}
           </p>
 
-          {/* Transcripts de la sesión de voz (burbujas) */}
+          {/* Transcripts de la sesión de voz — una única burbuja verificada por turno,
+              no la narración hablada y luego, aparte, la respuesta con cifras. */}
           <div className="mm-voz-transcripts">
-            {/* Mensajes de voz anteriores (de sesiones pasadas) */}
             {mensajes.filter(m => m.esVoz).map((m, i) => {
               const esAsi = m.rol === "asistente";
-              return (
-                <div key={`prev-${i}`} className={`mm-voz-bubble ${esAsi?"agent":"user"}`}>
-                  {esAsi ? <Bot size={14}/> : <Mic size={14}/>}
-                  <span>{m.texto}</span>
+              return esAsi ? (
+                <div key={`prev-${i}`} className="mm-voz-bubble agent">
+                  <div className="mm-voz-bubble-head">
+                    <span className="mm-voz-bubble-who"><Bot size={13}/> BillSense</span>
+                    <span className="mm-voz-bubble-tag"><ShieldCheck size={11}/> Verificado</span>
+                  </div>
+                  <span className="mm-voz-bubble-text">{m.texto}</span>
+                </div>
+              ) : (
+                <div key={`prev-${i}`} className="mm-voz-bubble user">
+                  <Mic size={14}/><span>{m.texto}</span>
                 </div>
               );
             })}
-            {/* Mensajes de la sesión en curso */}
+            {/* Lo que el cliente va diciendo, mientras lo dice */}
             {liveMsgs.map((msg, i) => (
-              <div key={`live-${i}`} className={`mm-voz-bubble ${msg.role} live`}>
-                {msg.role === "agent" ? <Bot size={14}/> : <Mic size={14}/>}
-                <span>{msg.text}</span>
+              <div key={`live-${i}`} className="mm-voz-bubble user live">
+                <Mic size={14}/><span>{msg.text}</span>
               </div>
             ))}
             <div ref={vozScroll} />
@@ -858,10 +941,10 @@ export function MiMovistar({
               aria-label={liveIsVisible?"Detener BillSense Voz":"Iniciar BillSense Voz"}
             >
               {liveStatus === "connecting"
-                ? <Loader2 size={36} className="animate-spin"/>
+                ? <Loader2 size={24} className="animate-spin"/>
                 : liveIsVisible
-                ? <MicOff size={36}/>
-                : <Mic size={36}/>}
+                ? <MicOff size={24}/>
+                : <Mic size={24}/>}
             </button>
             <p className="mm-voz-hint">
               {micIssue

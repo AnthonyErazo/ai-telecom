@@ -77,4 +77,14 @@ describe("login de cuenta", () => {
     expect(api.facts).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Cerrar sesión" })).toBeNull();
   });
+
+  it("no abre BillSense con un prompt automático ni con un saludo preescrito", async () => {
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
+    await screen.findByRole("heading", { name: "App Mi Movistar" });
+
+    expect(screen.queryByText("¿En qué te puedo ayudar hoy?")).toBeNull();
+    expect(screen.queryByText("Tu conversación está lista.")).toBeNull();
+    expect(screen.queryByText("¡Hola! Soy BillSense 👋")).toBeNull();
+  });
 });
