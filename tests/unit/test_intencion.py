@@ -48,6 +48,7 @@ from packages.facts_engine.intencion import (
     Intencion,
     clasificar_intencion,
     detectar_manipulacion,
+    pide_detalle_cargos,
 )
 
 # --------------------------------------------------------------------------- #
@@ -82,6 +83,20 @@ FRASES_POR_INTENCION: tuple[tuple[str, Intencion], ...] = (
 def test_cada_intencion_se_reconoce(frase: str, esperada: Intencion) -> None:
     """Cada intención se alcanza con una frase que un cliente escribiría de verdad."""
     assert clasificar_intencion(frase).intencion is esperada
+
+
+@pytest.mark.parametrize(
+    "frase",
+    (
+        "pero cuales son mis servicios",
+        "muestreme los cargos facturados",
+        "quiero el detalle de mi recibo linea por linea",
+        "que me cobraron este mes",
+    ),
+)
+def test_pedir_cargos_abre_el_recibo_en_modo_detalle(frase: str) -> None:
+    assert pide_detalle_cargos(frase)
+    assert clasificar_intencion(frase).intencion is Intencion.EXPLICAR_RECIBO
 
 
 def test_todas_las_intenciones_estan_cubiertas() -> None:

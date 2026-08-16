@@ -106,6 +106,10 @@ class EstadoTurno(TypedDict, total=False):
     #: Lo que escribió el cliente. Entra al prompt como dato delimitado, jamás como
     #: instrucción.
     utterance: str
+    #: Texto literal antes de resolver una respuesta corta contra el contexto pendiente.
+    #: Permite conservar «si» en el historial aunque el motor procese una consulta
+    #: efectiva como «¿se aplicó prorrateo en mi recibo?».
+    utterance_original: str
     verbosidad: Verbosidad
     periodo: str | None
     #: Campos de identidad que acompañan a cada evento de la bitácora.
@@ -232,6 +236,7 @@ def estado_inicial(
         canal=canal,
         nivel=nivel,
         utterance=utterance,
+        utterance_original=utterance,
         verbosidad=verbosidad,
         periodo=periodo,
         contexto_auditoria=dict(contexto_auditoria),

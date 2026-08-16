@@ -156,6 +156,8 @@ class DatosPlantilla:
             cifras.append(self.deuda_anterior_cent)
         cifras.extend(int(causa["monto_cent"]) for causa in self.causas)
         cifras.extend(int(linea["delta_cent"]) for linea in self.lineas)
+        cifras.extend(int(linea["monto_actual_cent"]) for linea in self.lineas)
+        cifras.extend(int(linea["monto_previo_cent"]) for linea in self.lineas)
         return sorted(dict.fromkeys(cifras))
 
 
@@ -281,17 +283,30 @@ def construir_datos(
     for cruda in resumen.get("causas_agregadas", []):
         monto_cent = int(cruda.get("monto_cent", 0))
         causa_txt = cruda.get("causa")
-        concepto = next(
-            (linea["concepto_id"] for linea in lineas if linea["causa"] == causa_txt),
-            "",
+        linea_causa = next(
+            (linea for linea in lineas if linea["causa"] == causa_txt),
+            None,
         )
+        actual_cent = int(linea_causa["monto_actual_cent"]) if linea_causa else 0
+        previo_cent = int(linea_causa["monto_previo_cent"]) if linea_causa else 0
         causas.append(
             {
                 "etiqueta": str(cruda.get("etiqueta_cliente", "otros cargos")),
                 "causa": causa_txt,
-                "concepto_id": concepto or (lineas[0]["concepto_id"] if lineas else "AGREGADO"),
+                "concepto_id": (
+                    linea_causa["concepto_id"]
+                    if linea_causa
+                    else (lineas[0]["concepto_id"] if lineas else "AGREGADO")
+                ),
                 "monto_cent": monto_cent,
                 "monto": formatear_soles(abs(monto_cent)),
+                # En notas, `monto` es la VARIACIÓN entre meses. Estos dos campos
+                # permiten decir también cuál fue el abono/cargo real de cada recibo,
+                # sin confundir la diferencia con el documento actual.
+                "monto_actual_cent": actual_cent,
+                "monto_actual": formatear_soles(abs(actual_cent)),
+                "monto_previo_cent": previo_cent,
+                "monto_previo": formatear_soles(abs(previo_cent)),
                 "sube": monto_cent > 0,
             }
         )

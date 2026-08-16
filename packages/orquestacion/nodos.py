@@ -75,7 +75,7 @@ from packages.core_domain.esquemas.respuesta import (
     RespuestaCanalAgnostica,
 )
 from packages.facts_engine.confianza import Turno, evaluar_incomprension
-from packages.facts_engine.intencion import Intencion, clasificar_intencion
+from packages.facts_engine.intencion import Intencion, resolver_intencion_contextual
 from packages.llm_layer.conversacional import (
     ResultadoConversacional,
     generar_respuesta_conversacional,
@@ -186,7 +186,12 @@ def clasificar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[str, An
     # Un turno nuevo del cliente resuelve las sondas de silencio que siguieran abiertas.
     servicios.telemetria.registrar_turno_usuario(_conversacion(estado), utterance)
 
-    intencion = clasificar_intencion(utterance)
+    resolucion = resolver_intencion_contextual(
+        utterance,
+        servicios.memoria.turnos(estado["conversation_id"]),
+    )
+    intencion = resolucion.intencion
+    utterance_efectiva = resolucion.utterance_efectiva
     servicios.auditoria.emitir(
         EtapaAuditoria.ROUTE,
         trace_id,
@@ -197,11 +202,17 @@ def clasificar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[str, An
             "explica_recibo": intencion.explica_recibo,
             "deriva": intencion.deriva,
             "motivo_codigo": str(intencion.motivo_derivacion) if intencion.deriva else None,
+            "contexto_pendiente": resolucion.concepto_pendiente,
+            "utterance_efectiva": (
+                utterance_efectiva if resolucion.contexto_aplicado else None
+            ),
         },
         **contexto_auditoria,
     )
     return {
         "intencion": intencion,
+        "utterance": utterance_efectiva,
+        "utterance_original": resolucion.utterance_original,
         "eventos": ["REQUEST", "ROUTE:intencion"],
         "nodos": ["clasificar"],
     }
@@ -396,6 +407,7 @@ def construir_hechos(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[s
     contexto_auditoria = estado["contexto_auditoria"]
     clave = estado["conversation_id"]
     utterance = estado.get("utterance", "")
+    utterance_original = estado.get("utterance_original", utterance)
 
     factset, datos = construir_hechos_conciliados(
         servicios.repositorio,
@@ -423,7 +435,9 @@ def construir_hechos(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[s
     )
 
     historial = list(historial_para_score(servicios.memoria, clave, utterance))
-    servicios.memoria.anotar_turno(clave, Turno(utterance=utterance, rol="cliente"))
+    servicios.memoria.anotar_turno(
+        clave, Turno(utterance=utterance_original, rol="cliente")
+    )
 
     return {
         "factset": factset,

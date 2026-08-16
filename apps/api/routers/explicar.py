@@ -109,7 +109,11 @@ from packages.core_domain.esquemas.respuesta import (
 )
 from packages.core_domain.reglas import ConfiguracionReglas
 from packages.facts_engine.confianza import Turno, evaluar_incomprension
-from packages.facts_engine.intencion import Intencion, ResultadoIntencion, clasificar_intencion
+from packages.facts_engine.intencion import (
+    Intencion,
+    ResultadoIntencion,
+    resolver_intencion_contextual,
+)
 from packages.governance.auditoria import RegistroAuditoria, formatear_para_terminal
 from packages.governance.telemetria import RegistroTelemetria
 from packages.llm_layer.conversacional import (
@@ -650,7 +654,14 @@ def _explicar_directo(
     # tocar la facturación se decide si corresponde explicar. Sin esta compuerta,
     # un «hola» devolvía el recibo completo y «quiero cancelar mi servicio»
     # también, saltándose una regla de cumplimiento regulatorio.
-    intencion = clasificar_intencion(peticion.utterance)
+    utterance_original = peticion.utterance
+    resolucion = resolver_intencion_contextual(
+        utterance_original,
+        memoria.turnos(clave_conversacion),
+    )
+    intencion = resolucion.intencion
+    if resolucion.contexto_aplicado:
+        peticion = peticion.model_copy(update={"utterance": resolucion.utterance_efectiva})
     auditoria.emitir(
         EtapaAuditoria.ROUTE,
         trace_id,
@@ -661,12 +672,16 @@ def _explicar_directo(
             "explica_recibo": intencion.explica_recibo,
             "deriva": intencion.deriva,
             "motivo_codigo": str(intencion.motivo_derivacion) if intencion.deriva else None,
+            "contexto_pendiente": resolucion.concepto_pendiente,
+            "utterance_efectiva": (
+                resolucion.utterance_efectiva if resolucion.contexto_aplicado else None
+            ),
         },
         **contexto_auditoria,
     )
     if not intencion.explica_recibo:
         memoria.anotar_turno(
-            clave_conversacion, Turno(utterance=peticion.utterance, rol="cliente")
+            clave_conversacion, Turno(utterance=utterance_original, rol="cliente")
         )
         return _responder_por_intencion(
             intencion=intencion,
@@ -708,7 +723,9 @@ def _explicar_directo(
     )
 
     historial = historial_para_score(memoria, clave_conversacion, peticion.utterance)
-    memoria.anotar_turno(clave_conversacion, Turno(utterance=peticion.utterance, rol="cliente"))
+    memoria.anotar_turno(
+        clave_conversacion, Turno(utterance=utterance_original, rol="cliente")
+    )
 
     # --- 2. Invariante roto: no se explica, se deriva ---------------------- #
     if not factset.invariante.ok:
@@ -1272,7 +1289,7 @@ def _responder_por_intencion(
     petición explícita de un humano **derivan siempre**, sin negociar y sin score.
     """
     clave_conversacion = str(conversacion)
-    severidad, _ = _COPY_INTENCION[intencion.intencion]
+    _severidad, _ = _COPY_INTENCION[intencion.intencion]
 
     # Una entrada sospechosa NO se le pasa al modelo. Enviarle a un LLM el texto
     # que intenta manipularlo es exactamente el riesgo que se quiere evitar, y

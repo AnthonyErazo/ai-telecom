@@ -4,14 +4,40 @@
 {% from "_comun.jinja" import apertura, totales, cierre_estandar, frase_generica, frase_residual_std, lista_lineas %}
 
 {% macro resumen(d) -%}
+{% if d.causa_principal and d.causa_principal.causa == "NOTA_CREDITO" %}
+{{ apertura(d) }} porque {% if d.subio %}este mes recibió un abono menor{% else %}este mes recibió un abono mayor{% endif %} mediante una nota de crédito.
+{% elif d.causa_principal and d.causa_principal.causa == "NOTA_DEBITO" %}
+{{ apertura(d) }} por la variación de una nota de débito.
+{% else %}
 {{ apertura(d) }} porque se aplicó un ajuste sobre un recibo anterior.
+{% endif %}
 {%- endmacro %}
 
 {% macro frase(d, c) -%}
 {% if c.causa == "NOTA_CREDITO" %}
-La nota de crédito le descuenta {{ c.monto }}: es la devolución de un cobro que no correspondía, aplicada directamente a este recibo.
+{% if c.monto_actual_cent < 0 and c.monto_previo_cent < 0 and c.sube %}
+Este mes recibió {{ c.monto_actual }} de abono mediante una nota de crédito; el mes anterior recibió {{ c.monto_previo }}. Al tener {{ c.monto }} menos de abono, su recibo aumentó por esa misma diferencia.
+{% elif c.monto_actual_cent < 0 and c.monto_previo_cent < 0 %}
+Este mes recibió {{ c.monto_actual }} de abono mediante una nota de crédito; el mes anterior recibió {{ c.monto_previo }}. Los {{ c.monto }} adicionales de abono redujeron su recibo.
+{% elif c.monto_actual_cent < 0 %}
+Este mes recibió un abono nuevo de {{ c.monto_actual }} mediante una nota de crédito, lo que redujo su recibo en {{ c.monto }}.
+{% elif c.monto_previo_cent < 0 %}
+Este mes ya no recibió el abono de {{ c.monto_previo }} que tuvo el mes anterior; por eso su recibo aumentó {{ c.monto }}.
+{% else %}
+La variación de la nota de crédito movió su recibo en {{ c.monto }}.
+{% endif %}
 {% elif c.causa == "NOTA_DEBITO" %}
-La nota de débito le suma {{ c.monto }}: corrige un cobro que quedó por debajo de lo que correspondía en un recibo anterior.
+{% if c.monto_actual_cent > 0 and c.monto_previo_cent > 0 and c.sube %}
+Este mes se aplicó una nota de débito de {{ c.monto_actual }}; el mes anterior fue de {{ c.monto_previo }}. Los {{ c.monto }} adicionales aumentaron su recibo.
+{% elif c.monto_actual_cent > 0 and c.monto_previo_cent > 0 %}
+Este mes se aplicó una nota de débito de {{ c.monto_actual }}; el mes anterior fue de {{ c.monto_previo }}. Esa reducción bajó su recibo en {{ c.monto }}.
+{% elif c.monto_actual_cent > 0 %}
+Este mes se aplicó una nota de débito nueva de {{ c.monto_actual }}, que aumentó su recibo en {{ c.monto }}.
+{% elif c.monto_previo_cent > 0 %}
+Este mes ya no se aplicó la nota de débito de {{ c.monto_previo }} del mes anterior; por eso su recibo bajó {{ c.monto }}.
+{% else %}
+La variación de la nota de débito movió su recibo en {{ c.monto }}.
+{% endif %}
 {% else %}
 {{ frase_generica(d, c) }}
 {% endif %}

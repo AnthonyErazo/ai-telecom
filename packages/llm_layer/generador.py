@@ -55,6 +55,7 @@ from packages.core_domain.esquemas.respuesta import (
     ItemKV,
     RespuestaCanalAgnostica,
 )
+from packages.facts_engine.intencion import concepto_facturacion, pide_detalle_cargos
 from packages.llm_layer.plantillas import (
     DatosPlantilla,
     datos_de_factset,
@@ -84,7 +85,10 @@ __all__ = [
     "ResultadoGeneracion",
     "a_respuesta",
     "componer_bloques",
+    "enfocar_resumen_consulta",
     "explicar",
+    "fijar_narrativa_de_notas",
+    "formatear_centimos_en_prosa",
     "generar_explicacion",
 ]
 
@@ -215,6 +219,111 @@ def sin_preambulo(texto: str) -> str:
     return " ".join(frases).strip()
 
 
+_CENTIMOS_EN_PROSA = re.compile(
+    r"(?<![\w.,])(?P<monto>[+-]?\s*\d+)\s+c[eé]ntimos?\b",
+    re.IGNORECASE,
+)
+
+
+def formatear_centimos_en_prosa(explicacion: ExplicacionLLM) -> ExplicacionLLM:
+    """Convierte importes crudos del LLM al formato monetario visible para el cliente.
+
+    El contrato estructurado conserva ``monto_cent_citado`` como entero para que el
+    verificador trabaje sin decimales. Solo se corrigen ``resumen`` y ``frase``: por
+    ejemplo, ``20 céntimos`` pasa a ``S/ 0.20`` y ``-900 céntimos`` a ``-S/ 9.00``.
+    """
+
+    def convertir(texto: str) -> str:
+        return _CENTIMOS_EN_PROSA.sub(
+            lambda hallado: formatear_soles(int(hallado.group("monto").replace(" ", ""))),
+            texto,
+        )
+
+    return explicacion.model_copy(
+        update={
+            "resumen": convertir(explicacion.resumen),
+            "causas": [
+                causa.model_copy(update={"frase": convertir(causa.frase)})
+                for causa in explicacion.causas
+            ],
+        }
+    )
+
+
+def fijar_narrativa_de_notas(
+    explicacion: ExplicacionLLM,
+    datos: DatosPlantilla,
+) -> ExplicacionLLM:
+    """Impide que un proveedor confunda el valor de una nota con su diferencia mensual.
+
+    El verificador numérico prueba que una cifra existe, pero por sí solo no puede saber
+    si el modelo llamó «nota actual» al delta entre notas. En este caso financiero
+    sensible se sustituye la narrativa por la plantilla construida con
+    ``monto_actual_cent``, ``monto_previo_cent`` y ``delta_cent`` del FactSet.
+    """
+    if datos.plantilla != "nota_credito":
+        return explicacion
+    segura = renderizar_explicacion(datos)
+    return segura.model_copy(update={"siguiente_paso": explicacion.siguiente_paso})
+
+
+def _concepto_aparece_en_factset(factset: FactSet, concepto: str) -> bool:
+    """Comprueba presencia con campos estructurados; nunca por inferencia del LLM."""
+    if concepto == "renta adelantada":
+        return str(factset.modalidad_renta) == "ADELANTADA"
+    if concepto == "renta vencida":
+        return str(factset.modalidad_renta) == "VENCIDA"
+
+    for linea in factset.lineas:
+        identificador = linea.concepto_id.upper()
+        causa = str(linea.causa or "").upper()
+        if concepto == "prorrateo" and (
+            "PRORR" in identificador or linea.dias_prorrateo is not None or bool(linea.tramos)
+        ):
+            return True
+        if concepto == "reconexión" and (
+            "RECONEX" in identificador or causa == "RECONEXION"
+        ):
+            return True
+        if concepto == "nota de crédito" and (
+            "NOTA_CREDITO" in identificador or causa == "NOTA_CREDITO"
+        ):
+            return True
+        if concepto == "nota de débito" and (
+            "NOTA_DEBITO" in identificador or causa == "NOTA_DEBITO"
+        ):
+            return True
+        if concepto == "cuota del equipo" and (
+            linea.cuota_numero is not None or linea.cuotas_totales is not None
+        ):
+            return True
+    return False
+
+
+def enfocar_resumen_consulta(
+    explicacion: ExplicacionLLM,
+    factset: FactSet,
+    utterance: str,
+) -> ExplicacionLLM:
+    """Hace que una consulta aplicada reciba primero un sí/no respaldado por hechos.
+
+    Es especialmente importante en modo plantilla: si Gemini no está disponible, la
+    respuesta determinística ya no vuelve a la causa principal olvidando el concepto
+    que el cliente preguntó.
+    """
+    concepto = concepto_facturacion(utterance)
+    if concepto is None:
+        return explicacion
+    if _concepto_aparece_en_factset(factset, concepto):
+        resumen = f"Sí. En el recibo consultado aparece {concepto}."
+    else:
+        resumen = (
+            f"No identifico {concepto} en el recibo consultado. "
+            "A continuación le muestro lo que sí explica la variación."
+        )
+    return explicacion.model_copy(update={"resumen": resumen})
+
+
 # --------------------------------------------------------------------------- #
 # Composición de bloques — aquí es donde se ponen las cifras
 # --------------------------------------------------------------------------- #
@@ -337,6 +446,7 @@ def componer_bloques(
         )
 
     if detalle:
+        bloques.append(_tabla_cargos_actuales(factset))
         cuerpo = renderizar_texto_libre(datos, "detalle")
         if cuerpo:
             bloques.append(BloqueTexto(titulo="Cómo se calculó", texto=cuerpo))
@@ -373,6 +483,29 @@ def componer_bloques(
         bloques.append(BloqueTexto(texto=cierre))
 
     return bloques
+
+
+def _tabla_cargos_actuales(factset: FactSet) -> BloqueTabla:
+    """Desglose completo del recibo actual, incluidas líneas que no variaron."""
+    lineas_actuales = sorted(
+        (linea for linea in factset.lineas if linea.monto_actual_cent != 0),
+        key=lambda linea: (linea.monto_actual_cent < 0, linea.nombre_comercial.lower()),
+    )
+    filas = [
+        [linea.nombre_comercial, formatear_soles(linea.monto_actual_cent)]
+        for linea in lineas_actuales
+    ]
+    fact_ids = [
+        f"linea:{linea.concepto_id}.monto_actual_cent"
+        for linea in lineas_actuales
+    ]
+    return BloqueTabla(
+        titulo="Cargos de su recibo actual",
+        columnas=["Concepto", "Monto"],
+        filas=filas,
+        nota=f"Total del recibo: {formatear_soles(factset.total_actual_cent)}.",
+        fact_ids=[*fact_ids, "factset:total_actual_cent"],
+    )
 
 
 def _tabla_tramos(factset: FactSet, datos: DatosPlantilla) -> BloqueTabla | None:
@@ -454,6 +587,8 @@ def generar_explicacion(
         el texto entregado.
     """
     arranque = time.perf_counter()
+    if pide_detalle_cargos(utterance):
+        verbosidad = Verbosidad.DETALLE
     datos = datos_de_factset(factset, verbosidad)
     conjunto = permitidos or construir_permitidos(factset)
     espera = float(timeout_s if timeout_s is not None else timeout_por_defecto())
@@ -491,7 +626,11 @@ def generar_explicacion(
                 correccion=correccion,
             )
             bruto = proveedor.completar(prompt, ESQUEMA_EXPLICACION_V1, espera)
-            explicacion = ExplicacionLLM.model_validate(bruto)
+            explicacion = fijar_narrativa_de_notas(
+                formatear_centimos_en_prosa(ExplicacionLLM.model_validate(bruto)),
+                datos,
+            )
+            explicacion = enfocar_resumen_consulta(explicacion, factset, utterance)
         except ErrorProveedor as exc:
             intentos.append(
                 IntentoGeneracion(
@@ -563,7 +702,11 @@ def generar_explicacion(
         _LOG.warning("verificación FAIL en el intento %s: %s", numero, motivos)
 
     # --- Ruta determinística ------------------------------------------------ #
-    explicacion = renderizar_explicacion(datos)
+    explicacion = enfocar_resumen_consulta(
+        formatear_centimos_en_prosa(renderizar_explicacion(datos)),
+        factset,
+        utterance,
+    )
     bloques = componer_bloques(factset, explicacion, datos, verbosidad=verbosidad)
     texto = _texto_de(bloques)
     resultado = verificar(

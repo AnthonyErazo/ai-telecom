@@ -45,8 +45,12 @@ def pytest_configure(config: pytest.Config) -> None:
     # prueba de integración contra la nube —lenta, en red, y contra el dataset real— sin
     # que nadie lo hubiera pedido, y `ORIGEN_RECIBOS=supabase` haría que las pruebas del
     # dataset sintético buscaran cuentas C-DEMO que allí no existen.
-    os.environ["SUPABASE_DB_URL"] = ""
-    os.environ["ORIGEN_RECIBOS"] = ""
+    # El E2E real de notas es opt-in: cuando se pide explícitamente conserva el DSN del
+    # `.env` y ejercita Supabase a través de HTTP. El resto de la suite mantiene la
+    # garantía histórica de cero red accidental.
+    if os.environ.get("RUN_SUPABASE_E2E") != "1":
+        os.environ["SUPABASE_DB_URL"] = ""
+        os.environ["ORIGEN_RECIBOS"] = ""
     # Y el embedder, que es el agujero que quedaba en la garantía nº 1. `LLM_MODE=mock`
     # calla al generador, pero **no** al modelo de embeddings: el índice vectorial seguía
     # llamando a Gemini durante la suite. Eso no era solo lentitud —de 52 s a más de dos

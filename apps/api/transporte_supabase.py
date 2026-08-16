@@ -44,7 +44,8 @@ import logging
 import os
 from collections import defaultdict
 from collections.abc import Mapping
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from apps.api.acl import CuentaNoEncontradaExterna, ErrorSistemaExterno
@@ -89,6 +90,17 @@ ESCENARIOS: tuple[tuple[str, str], ...] = (
 ESCENARIO_CAMBIO_PLAN = "Cambio de plan"
 
 
+#: Tipo del documento en Supabase -> (concepto del recibo, movimiento causal, familia).
+#:
+#: `CRD` y `DSC` son códigos del export NOTAS_CREDITO. No se deducen por el signo: el
+#: dueño funcional confirmó que CRD es crédito y DSC débito. El signo se valida además
+#: al leer para no convertir silenciosamente un dato contradictorio.
+_TIPOS_NOTA: dict[str, tuple[str, str, str]] = {
+    "CRD": ("NOTA_CREDITO", "NOTA_CREDITO", "CREDITO"),
+    "DSC": ("NOTA_DEBITO", "NOTA_DEBITO", "AJUSTE"),
+}
+
+
 #: Familia canónica según el GRUPO del facturador. El orden de comprobación importa:
 #: primero lo que el dato afirma, nunca el prefijo del código (una heurística sobre el
 #: prefijo «FR» resultó ser falsa en los 221 códigos que empiezan así).
@@ -120,6 +132,104 @@ def _fecha(valor: str | None) -> str | None:
     if not valor or len(valor) != 8 or not valor.isdigit():
         return None
     return f"{valor[:4]}-{valor[4:6]}-{valor[6:]}"
+
+
+def _fecha_nota(valor: Any) -> date | None:
+    """Fecha ISO del export de notas, que puede traer siete decimales de segundo."""
+    if valor is None or valor == "":
+        return None
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
+    texto = str(valor).strip()
+    try:
+        return date.fromisoformat(texto[:10])
+    except ValueError:
+        _LOG.warning("fecha de nota descartada por formato desconocido: %r", valor)
+        return None
+
+
+def _id_movimiento_nota(ids: list[int]) -> int:
+    """ID agregado de nota en un espacio que no colisiona con órdenes CRM positivas."""
+    return -min(ids)
+
+
+def _agrupar_notas(filas: list[tuple[Any, ...]]) -> dict[str, list[dict[str, Any]]]:
+    """Agrupa documentos CRD/DSC por ciclo y tipo sin perder la evidencia de origen.
+
+    Las filas tienen el contrato privado de :meth:`TransporteSupabase._notas`. Se suma
+    después de redondear cada documento a céntimos: son documentos independientes y el
+    total que ve el cliente es la suma de lo que cada uno aporta al recibo.
+    """
+    grupos: dict[tuple[str, str], list[tuple[Any, ...]]] = defaultdict(list)
+    for fila in filas:
+        tipo = str(fila[2] or "").strip().upper()
+        ciclo = str(fila[1] or "").strip()
+        if tipo not in _TIPOS_NOTA or not ciclo:
+            _LOG.warning(
+                "nota %s descartada: tipo %r o ciclo %r no soportado", fila[0], tipo, ciclo
+            )
+            continue
+        try:
+            # `amount` es TEXT pero su contrato es decimal SQL con punto. No se pasa el
+            # string directo a `a_centimos`: por diseño, "1.127" en texto humano se
+            # interpreta como separador de millar; aquí significa 1 sol con 127 milésimas.
+            monto = a_centimos(Decimal(str(fila[4]).strip()))
+        except (InvalidOperation, TypeError, ValueError):
+            _LOG.warning("nota %s descartada: monto inválido %r", fila[0], fila[4])
+            continue
+        if monto == 0 or (tipo == "CRD" and monto > 0) or (tipo == "DSC" and monto < 0):
+            _LOG.warning(
+                "nota %s descartada: signo incompatible para %s (%s c)", fila[0], tipo, monto
+            )
+            continue
+        grupos[(ciclo, tipo)].append((*fila, monto))
+
+    por_ciclo: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for (ciclo, tipo), documentos in sorted(grupos.items()):
+        concepto, movimiento, familia = _TIPOS_NOTA[tipo]
+        ids = [int(documento[0]) for documento in documentos]
+        codigos = sorted({str(documento[3]) for documento in documentos if documento[3]})
+        descripciones = sorted({str(documento[8]) for documento in documentos if documento[8]})
+        servicios = sorted({str(documento[9]) for documento in documentos if documento[9]})
+        periodos = []
+        for documento in documentos:
+            desde = _fecha_nota(documento[6])
+            hasta = _fecha_nota(documento[7])
+            if desde or hasta:
+                periodos.append(
+                    {
+                        "desde": desde.isoformat() if desde else None,
+                        "hasta": hasta.isoformat() if hasta else None,
+                    }
+                )
+        total_cent = sum(int(documento[10]) for documento in documentos)
+        descripcion = ", ".join(descripciones[:3]) or "Corrección de facturación"
+        if len(descripciones) > 3:
+            descripcion += f" y {len(descripciones) - 3} concepto(s) más"
+        fechas_efectivas = [
+            fecha for documento in documentos if (fecha := _fecha_nota(documento[5])) is not None
+        ]
+        por_ciclo[ciclo].append(
+            {
+                "tipo_origen": tipo,
+                "concepto_id": concepto,
+                "movimiento_tipo": movimiento,
+                "familia": familia,
+                "movimiento_id": _id_movimiento_nota(ids),
+                "monto_cent": total_cent,
+                "cantidad": len(documentos),
+                "nota_ids": ids,
+                "codigos": codigos,
+                "descripciones": descripciones,
+                "descripcion": descripcion,
+                "servicio_id": servicios[0] if len(servicios) == 1 else None,
+                "periodos_corregidos": periodos,
+                "fecha_efectiva": max(fechas_efectivas, default=None),
+            }
+        )
+    return dict(por_ciclo)
 
 
 class TransporteSupabase:
@@ -227,12 +337,88 @@ class TransporteSupabase:
                     },
                 }
             )
+
+        # Una nota es a la vez una línea financiera y el documento que la causa. El
+        # export no la guarda en `orden_servicio`, sino en `nota_credito`; proyectarla al
+        # mismo contrato de Amdocs permite que la atribución cite evidencia real sin
+        # crear un segundo canal de movimientos dentro del motor.
+        for ciclo, notas in self._notas(cuenta_id).items():
+            for nota in notas:
+                fecha = nota["fecha_efectiva"]
+                ordenes.append(
+                    {
+                        "ORDER_ID": str(nota["movimiento_id"]),
+                        "ACCOUNT_ID": cuenta_id,
+                        "ORDER_TYPE": nota["movimiento_tipo"],
+                        "ORDER_DATE": (
+                            fecha.isoformat() if fecha else f"{ciclo[:4]}-{ciclo[4:6]}-{ciclo[6:8]}"
+                        ),
+                        "SERVICE_ID": nota["servicio_id"] or "",
+                        "CHANNEL": "FACTURACION",
+                        "DETAIL_JSON": {
+                            "documento": f"supabase:notas:{','.join(map(str, nota['nota_ids']))}",
+                            "monto_cent": nota["monto_cent"],
+                            "motivo": nota["descripcion"],
+                            "tipo_origen": nota["tipo_origen"],
+                            "charge_codes": nota["codigos"],
+                            "periodos_corregidos": nota["periodos_corregidos"],
+                        },
+                    }
+                )
+        ordenes.sort(key=lambda orden: (orden["ORDER_DATE"], int(orden["ORDER_ID"])))
         return {
             "cuenta_id": cuenta_id,
             "formato": "amdocs",
             "total": len(ordenes),
             "orders": ordenes,
         }
+
+    def _notas(self, cuenta_id: str) -> dict[str, list[dict[str, Any]]]:
+        """Notas del cliente relacionadas de forma unívoca con sus recibos.
+
+        `ba_no` no es una FK fiable hacia `financial_account_key` (solo coincide en una
+        minoría del export). La relación validada contra el dataset real es la terna
+        cliente + servicio + ciclo: cubre 100 % de CRD y DSC y resuelve una sola cuenta.
+        `EXISTS` evita multiplicar una nota por cada línea del recibo.
+        """
+        filas = self._conexion.execute(
+            """
+            WITH claves_cuenta AS MATERIALIZED (
+                SELECT DISTINCT customer_key, subscriber_key, ciclo
+                FROM cargo_facturado
+                WHERE financial_account_key = %s AND subscriber_key IS NOT NULL
+            ),
+            notas_cuenta AS MATERIALIZED (
+                SELECT n.id, n.ciclo, n.cancel_charge_type, n.charge_code, n.amount,
+                       n.effective_date, n.period_start_date, n.period_end_date,
+                       n.service_receiver_id
+                FROM nota_credito AS n
+                WHERE n.cancel_charge_type IN ('CRD', 'DSC')
+                  AND EXISTS (
+                      SELECT 1 FROM claves_cuenta AS k
+                      WHERE k.customer_key = n.receiver_customer
+                        AND k.subscriber_key = n.service_receiver_id
+                        AND k.ciclo = n.ciclo
+                  )
+            ),
+            descripciones AS (
+                SELECT c.charge_code_id,
+                       MIN(NULLIF(c.charge_code_desc, '')) AS descripcion
+                FROM cargo_facturado AS c
+                JOIN (SELECT DISTINCT charge_code FROM notas_cuenta) AS codigos
+                  ON codigos.charge_code = c.charge_code_id
+                GROUP BY c.charge_code_id
+            )
+            SELECT n.id, n.ciclo, n.cancel_charge_type, n.charge_code, n.amount,
+                   n.effective_date, n.period_start_date, n.period_end_date,
+                   COALESCE(d.descripcion, n.charge_code), n.service_receiver_id
+            FROM notas_cuenta AS n
+            LEFT JOIN descripciones AS d ON d.charge_code_id = n.charge_code
+            ORDER BY n.ciclo, n.cancel_charge_type, n.id
+            """,
+            (cuenta_id,),
+        ).fetchall()
+        return _agrupar_notas(filas)
 
     def cerrar(self) -> None:
         """Cierra la conexión. Idempotente y silenciosa: cerrar no debe propagar."""
@@ -426,6 +612,7 @@ class TransporteSupabase:
         por_ciclo: dict[str, list[tuple]] = defaultdict(list)
         for fila in filas:
             por_ciclo[fila[0]].append(fila)
+        notas_por_ciclo = self._notas(cuenta_id)
 
         # La modalidad se decide una vez para toda la cuenta y se propaga a cada
         # cabecera: el modelo canónico la exige por recibo, y deducirla por separado en
@@ -436,7 +623,16 @@ class TransporteSupabase:
 
         # Los `ciclos` más recientes, el más nuevo primero: es el contrato de BrainyBill.
         recientes = sorted(por_ciclo, reverse=True)[:ciclos]
-        recibos = [self._recibo(cuenta_id, c, por_ciclo[c], modalidad) for c in recientes]
+        recibos = [
+            self._recibo(
+                cuenta_id,
+                c,
+                por_ciclo[c],
+                modalidad,
+                notas=notas_por_ciclo.get(c, []),
+            )
+            for c in recientes
+        ]
         planta = self._planta(cuenta_id)
 
         return {
@@ -496,7 +692,13 @@ class TransporteSupabase:
         return datos
 
     def _recibo(
-        self, cuenta_id: str, ciclo: str, filas: list[tuple], modalidad: str
+        self,
+        cuenta_id: str,
+        ciclo: str,
+        filas: list[tuple],
+        modalidad: str,
+        *,
+        notas: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Un recibo con su cabecera y sus líneas, en la forma que espera el adaptador."""
         cierre = date(int(ciclo[:4]), int(ciclo[4:6]), int(ciclo[6:]))
@@ -526,6 +728,32 @@ class TransporteSupabase:
                     "periodo": _periodo(ciclo),
                     "cantidad": 1,
                     "afecto_igv": True,
+                }
+            )
+        for nota in notas or []:
+            monto = int(nota["monto_cent"])
+            total += monto
+            credito = nota["concepto_id"] == "NOTA_CREDITO"
+            lineas.append(
+                {
+                    "linea_id": len(lineas) + 1,
+                    "concepto_id": nota["concepto_id"],
+                    "nombre_comercial": "Nota de crédito" if credito else "Nota de débito",
+                    "codigo_origen": nota["tipo_origen"],
+                    "familia": nota["familia"],
+                    "descripcion": nota["descripcion"],
+                    "monto_cent": monto,
+                    "periodo": _periodo(ciclo),
+                    "servicio_id": nota["servicio_id"],
+                    "cantidad": nota["cantidad"],
+                    "afecto_igv": True,
+                    "movimiento_id": nota["movimiento_id"],
+                    "meta": {
+                        "nota_ids": nota["nota_ids"],
+                        "charge_codes": nota["codigos"],
+                        "periodos_corregidos": nota["periodos_corregidos"],
+                        "tipo_origen": nota["tipo_origen"],
+                    },
                 }
             )
         return {
