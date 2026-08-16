@@ -122,6 +122,37 @@ def _fecha(valor: str | None) -> str | None:
     return f"{valor[:4]}-{valor[4:6]}-{valor[6:]}"
 
 
+def _apoyo_de_promocion(promocion: dict[str, Any] | None, grupo: str | None) -> dict[str, Any]:
+    """Campos de promoción/cuota que le corresponden a ESTA línea, según su grupo.
+
+    Se reparte por grupo y no se cuelga de todas las líneas porque cada dato explica una
+    cosa distinta: la cuota del equipo solo significa algo en la línea del equipo, y el
+    descuento en la del cargo fijo del plan. Si se colgara de cualquiera, la plantilla
+    acabaría escribiendo «cuota 2 de 6» debajo de un paquete de datos, que es una cifra
+    correcta puesta en el sitio equivocado —y eso el verificador numérico no lo caza,
+    porque la cifra existe—.
+
+    La regla del vídeo que decide el reparto: el descuento de alta aplica **solo al cargo
+    fijo del plan**, nunca a servicios adicionales, paquetes ni financiamiento de equipos.
+    """
+    if not promocion:
+        return {}
+    g = (grupo or "").upper()
+    apoyo: dict[str, Any] = {}
+    # El cargo fijo del plan Y su línea de descuento. La promoción se aplica sobre el
+    # cargo fijo, pero en muchos recibos lo que se mueve —y por tanto lo que hay que
+    # explicar— es la línea de descuento, que es donde el cliente ve el cambio. Dejar
+    # fuera esa línea significaba que las cuentas en promoción, justo las que llevan
+    # cuota, no recibían el dato.
+    if ("CARGO FIJO" in g or "DESCUENTO CARGO RECURRENTE" in g) and promocion.get(
+        "cuota_numero"
+    ) is not None:
+        apoyo["cuota_numero"] = promocion["cuota_numero"]
+        if promocion.get("meses_promocion") is not None:
+            apoyo["cuotas_totales"] = promocion["meses_promocion"]
+    return apoyo
+
+
 class TransporteSupabase:
     """Sirve el documento de BrainyBill leyendo ``cargo_facturado``."""
 
@@ -407,6 +438,67 @@ class TransporteSupabase:
             elegidas.setdefault(str(fila[0]), ESCENARIO_CAMBIO_PLAN)
         return elegidas
 
+    def promocion(self, cuenta_id: str) -> dict[str, Any]:
+        """Promoción y cuota vigentes de la cuenta, según ``v_descuento_cuota``.
+
+        Es el dato que faltaba para que las fórmulas dejaran de trabajar con parámetros
+        por defecto. La transcripción del vídeo enuncia «50 % durante 3 meses, unos 90
+        días»; esta vista lo trae medido **por cliente**: su porcentaje, su duración, los
+        días que lleva consumidos y en qué cuota va.
+
+        Dos detalles que no son míos, son del dato, y que confirman la fórmula:
+
+        * ``tipo_renta`` viene dicho (``RA``/``RV``) en vez de deducirse del sufijo del
+          grupo de cargo. Es la misma distinción del vídeo, escrita en origen.
+        * Los días se reparten según la modalidad: las filas ``RV`` traen
+          ``diasvencidos`` y las ``RA`` ``diasadelantados``. Por eso aquí se toma el que
+          corresponde y se expone como un único ``dias_consumidos``: al motor le da igual
+          de qué columna salió, lo que necesita es cuánta bolsa se gastó.
+
+        Returns:
+            El registro más reciente de la cuenta, o ``{}`` si no tiene promoción. Un
+            diccionario vacío es una respuesta legítima —la mayoría de recibos no están
+            en promoción— y quien llama no debe distinguirla de un fallo, porque el
+            comportamiento es el mismo: se explica sin ese dato.
+        """
+        try:
+            fila = self._conexion.execute(
+                """
+                SELECT tipo_renta, promotionduration, porcentajepromo,
+                       diasvencidos, diasadelantados, cuotaactual,
+                       monto_descuento, descripcion, tipo_descuento, fechainicio, fechafin
+                FROM v_descuento_cuota
+                WHERE cuentafinanciera = %s
+                ORDER BY fechainicio DESC NULLS LAST
+                LIMIT 1
+                """,
+                (cuenta_id,),
+            ).fetchone()
+        except Exception as error:
+            # Sin promoción se explica igual, con los valores por defecto de la fórmula.
+            # Tumbar la explicación por no poder leer un dato de apoyo sería cambiar una
+            # respuesta buena por ninguna.
+            _LOG.warning("no se pudo leer la promoción de %s: %s", cuenta_id, error)
+            return {}
+        if not fila:
+            return {}
+
+        vencida = (fila[0] or "").upper() == "RV"
+        dias = fila[3] if vencida else fila[4]
+        return {
+            "modalidad_renta": "VENCIDA" if vencida else "ADELANTADA",
+            "meses_promocion": int(fila[1]) if fila[1] is not None else None,
+            "porcentaje_promocion": float(fila[2]) if fila[2] is not None else None,
+            "dias_consumidos": int(dias) if dias is not None else None,
+            "cuota_numero": int(fila[5]) if fila[5] is not None else None,
+            "monto_descuento_cent": (
+                int(round(float(fila[6]) * 100)) if fila[6] is not None else None
+            ),
+            "descripcion": fila[7] or "",
+            "tipo_descuento": fila[8] or "",
+            "vigencia": (fila[9], fila[10]),
+        }
+
     # -- construcción del documento ------------------------------------------ #
     def _documento(self, cuenta_id: str, ciclos: int) -> dict[str, Any]:
         filas = self._conexion.execute(
@@ -436,7 +528,13 @@ class TransporteSupabase:
 
         # Los `ciclos` más recientes, el más nuevo primero: es el contrato de BrainyBill.
         recientes = sorted(por_ciclo, reverse=True)[:ciclos]
-        recibos = [self._recibo(cuenta_id, c, por_ciclo[c], modalidad) for c in recientes]
+        # Una sola consulta de promoción para todo el documento: es la misma para toda
+        # la cuenta, y pedirla dentro del bucle multiplicaría por ciclo un viaje que ya
+        # está indexado pero que no es gratis.
+        promocion = self.promocion(cuenta_id)
+        recibos = [
+            self._recibo(cuenta_id, c, por_ciclo[c], modalidad, promocion) for c in recientes
+        ]
         planta = self._planta(cuenta_id)
 
         return {
@@ -496,7 +594,12 @@ class TransporteSupabase:
         return datos
 
     def _recibo(
-        self, cuenta_id: str, ciclo: str, filas: list[tuple], modalidad: str
+        self,
+        cuenta_id: str,
+        ciclo: str,
+        filas: list[tuple],
+        modalidad: str,
+        promocion: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Un recibo con su cabecera y sus líneas, en la forma que espera el adaptador."""
         cierre = date(int(ciclo[:4]), int(ciclo[4:6]), int(ciclo[6:]))
@@ -526,6 +629,7 @@ class TransporteSupabase:
                     "periodo": _periodo(ciclo),
                     "cantidad": 1,
                     "afecto_igv": True,
+                    **_apoyo_de_promocion(promocion, fila[6]),
                 }
             )
         return {
