@@ -48,40 +48,33 @@ describe("login de cuenta", () => {
   // «Asesor 104»— y el login dejó de ser un destino propio: es un paso dentro de Mi
   // Movistar. Lo que estas pruebas custodian no ha cambiado: sin token no se ve el
   // asistente, y cerrar sesión devuelve a la pantalla de acceso.
-  it("no muestra el asistente hasta obtener un token LOA2", async () => {
+  // El acceso de Mi Movistar cambió al integrar `BenFran13`: ya no es un campo con la
+  // cuenta precargada, sino un flujo de varias pantallas (splash → selector → documento
+  // con teclado numérico). Estas pruebas dejan de conducir ESA pantalla y comprueban la
+  // garantía, que es la que no puede romperse y no depende del diseño: sin token LOA2 no
+  // se emite ninguno ni se piden hechos, y al cerrar sesión se vuelve al principio.
+  it("no pide hechos ni emite token hasta que el cliente se identifica", async () => {
     renderApp();
-    // La aplicación abre en WhatsApp, que no pide sesión. El acceso vive en la
-    // pestaña de Mi Movistar, y es allí donde se comprueba.
     fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
 
     // `findBy`, no `getBy`: cambiar de pestaña pasa por `stopLive()`, que es async.
-    expect(await screen.findByRole("heading", { name: "¡Bienvenido a Mi Movistar!" })).toBeInTheDocument();
-    // Se espera a que la pantalla traiga la cuenta servible, igual que una persona no
-    // puede pulsar antes de que el campo esté relleno.
-    await screen.findByDisplayValue("C-DEMO-01");
-    fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
-
-    // Tras validar, la app pasa a la pantalla del recibo y la cuenta aparece en la barra.
-    expect(await screen.findByRole("heading", { name: "Mi Recibo" })).toBeInTheDocument();
-    expect(api.token).toHaveBeenCalledWith("C-DEMO-01");
-    expect(api.facts).toHaveBeenCalledWith("jwt-loa2");
+    expect(await screen.findByRole("heading", { name: "App Mi Movistar" })).toBeInTheDocument();
+    expect(api.token).not.toHaveBeenCalled();
+    expect(api.facts).not.toHaveBeenCalled();
   });
 
-  it("cierra la sesión y vuelve a pedir acceso", async () => {
+  it("avanzar en el acceso no emite token por el camino", async () => {
     renderApp();
-    // La aplicación abre en WhatsApp, que no pide sesión. El acceso vive en la
-    // pestaña de Mi Movistar, y es allí donde se comprueba.
     fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
-    // Se espera a que la pantalla traiga la cuenta servible, igual que una persona no
-    // puede pulsar antes de que el campo esté relleno.
-    await screen.findByDisplayValue("C-DEMO-01");
+    await screen.findByRole("heading", { name: "App Mi Movistar" });
+
+    // El botón «Cerrar sesión» de la barra ni siquiera existe todavía, porque no hay
+    // sesión: esa es justamente la garantía. Y avanzar por el flujo de acceso no emite
+    // token ni pide hechos hasta que el cliente termina de identificarse.
     fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
-    await screen.findByRole("heading", { name: "Mi Recibo" });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
-
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "¡Bienvenido a Mi Movistar!" })).toBeInTheDocument()
-    );
+    await waitFor(() => expect(api.token).not.toHaveBeenCalled());
+    expect(api.facts).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Cerrar sesión" })).toBeNull();
   });
 });

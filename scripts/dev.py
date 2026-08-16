@@ -329,7 +329,8 @@ def main(argv: list[str] | None = None) -> int:
         raiz_datos = RAIZ / raiz_datos
 
     _avisar("recibo-claro · arranque local (sin Docker, sin PostgreSQL)")
-    _avisar(f"  almacenamiento MODO_ALMACENAMIENTO={entorno['MODO_ALMACENAMIENTO']}")
+    modo_almacenamiento = entorno.get("MODO_ALMACENAMIENTO", "no configurado (usando base existente)")
+    _avisar(f"  almacenamiento MODO_ALMACENAMIENTO={modo_almacenamiento}")
     if not preparar_dataset(
         raiz_datos, seed=args.seed, clientes=args.clientes, periodo=args.periodo
     ):
