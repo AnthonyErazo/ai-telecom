@@ -149,6 +149,16 @@ class Intencion(StrEnum):
     FUERA_DE_DOMINIO = "FUERA_DE_DOMINIO"
 
 
+#: Formas de decir que sí. Van sin tilde y en minúscula porque se comparan contra el
+#: texto ya normalizado; «dale» y «ya» son las peruanas, y «ya» es además la respuesta
+#: más común a «¿le gustaría que revisemos su recibo?».
+_AFIRMACIONES: frozenset[str] = frozenset({
+    "si", "sí", "sip", "claro", "ok", "okey", "okay", "dale", "ya", "ya pues",
+    "por favor", "porfa", "bueno", "de acuerdo", "correcto", "exacto", "afirmativo",
+    "revisemos", "veamos", "vamos", "adelante", "hazlo", "hagalo", "hágalo",
+    "si por favor", "sí por favor", "claro que si", "claro que sí", "obvio",
+})
+
 #: Patrones por intención. Cada patrón se evalúa por tokens, así que basta con
 #: escribir la forma canónica: las variantes con posesivos, plurales y
 #: conjugaciones las cubre :func:`coincide_patron`.
@@ -591,6 +601,24 @@ def clasificar_intencion(utterance: str | None) -> ResultadoIntencion:
         resuelta = _clasificar_por_patrones(expandido)
         if resuelta is not None:
             return resuelta
+
+    # Un «sí» pelado es aceptar lo que se acaba de ofrecer.
+    #
+    # Sin esta regla, «Sí» no casaba ningún patrón, caía en FUERA_DE_DOMINIO y el
+    # asistente contestaba que el tema le pillaba fuera de base —después de haber sido
+    # ÉL quien preguntó «¿le gustaría que revisemos su recibo?»—. O peor: repetía la
+    # misma oferta, y el cliente se quedaba diciendo que sí en bucle. Es el fallo más
+    # tonto y más caro posible, porque ocurre justo cuando el cliente ya aceptó.
+    #
+    # Se resuelve mapeando a EXPLICAR_RECIBO y no inventando una intención de
+    # «afirmación» que habría que arrastrar por todo el sistema. La razón por la que es
+    # seguro: en este producto solo se ofrece una cosa, revisar el recibo. Un «sí» aquí
+    # no puede querer decir otra cosa, y si el cliente quería algo distinto, la
+    # explicación de su recibo sigue siendo una respuesta útil y no una invención.
+    if texto.strip(" .!¡").lower() in _AFIRMACIONES:
+        return ResultadoIntencion(
+            Intencion.EXPLICAR_RECIBO, "afirmación", None, explica_recibo=True
+        )
 
     # Sin señal reconocible. Solo se trata como cortesía si TODO lo que escribió
     # es una interjección: «xd» sí, «ya pero qué tienes» no. Contar tokens era
