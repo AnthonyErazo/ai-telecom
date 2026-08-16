@@ -38,6 +38,7 @@ from apps.api.routers import (
     dev,
     evidencia,
     explicar,
+    conversaciones,
     hechos,
     historial,
     live,
@@ -91,6 +92,10 @@ ETIQUETAS_OPENAPI: list[dict[str, Any]] = [
     {"name": "evidencia", "description": "Respaldo de cada afirmación entregada."},
     {"name": "derivacion", "description": "Hand-off a asesor humano con contexto."},
     {"name": "auditoria", "description": "Bitácora encadenada del turno."},
+    {
+        "name": "conversaciones",
+        "description": "Historial durable de chats de BillSense, aislado por cuenta.",
+    },
     {"name": "catalogo", "description": "Conceptos del recibo en lenguaje de cliente."},
     {"name": "desarrollo", "description": "Utilidades de demo. Solo con ENTORNO=dev."},
 ]
@@ -153,6 +158,7 @@ def crear_aplicacion() -> FastAPI:
     aplicacion.include_router(hechos.router)
     aplicacion.include_router(historial.router)
     aplicacion.include_router(explicar.router)
+    aplicacion.include_router(conversaciones.router)
     aplicacion.include_router(evidencia.router)
     aplicacion.include_router(derivacion.router)
     aplicacion.include_router(asesor.router)

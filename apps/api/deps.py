@@ -31,6 +31,7 @@ from typing import Annotated, Any
 from fastapi import Depends
 
 from apps.api.acl import RepositorioCuentas, crear_repositorio
+from apps.api.conversaciones_store import AlmacenConversaciones
 from apps.api.settings import ALMACENAMIENTO_POSTGRES, Ajustes, obtener_ajustes
 from packages.core_domain.esquemas.factset import FactSet
 from packages.core_domain.esquemas.respuesta import ItemEvidencia, RespuestaCanalAgnostica
@@ -45,6 +46,7 @@ __all__ = [
     "AdversarioDep",
     "AjustesDep",
     "AuditoriaDep",
+    "ConversacionesDep",
     "EstadoAdversario",
     "MemoriaConversaciones",
     "MemoriaDep",
@@ -57,6 +59,7 @@ __all__ = [
     "cerrar_recursos",
     "nuevo_trace_id",
     "obtener_adversario",
+    "obtener_almacen_conversaciones",
     "obtener_memoria",
     "obtener_proveedor_llm",
     "obtener_recuperador",
@@ -200,6 +203,13 @@ def obtener_registro_telemetria() -> RegistroTelemetria:
     """Registro de la tasa de silencio post-explicación."""
     ajustes = obtener_ajustes()
     return registro_telemetria_por_defecto(ajustes.telemetria_path or None)
+
+
+@lru_cache(maxsize=1)
+def obtener_almacen_conversaciones() -> AlmacenConversaciones:
+    """Historial durable de BillSense en la misma instancia de Supabase."""
+    ajustes = obtener_ajustes()
+    return AlmacenConversaciones(ajustes.supabase_db_url or ajustes.database_url)
 
 
 # --------------------------------------------------------------------------- #
@@ -503,6 +513,7 @@ def cerrar_recursos() -> None:
         obtener_proveedor_llm,
         obtener_registro_auditoria,
         obtener_registro_telemetria,
+        obtener_almacen_conversaciones,
         obtener_memoria,
         obtener_adversario,
     ):
@@ -541,5 +552,6 @@ RecuperadorDep = Annotated[Recuperador | None, Depends(obtener_recuperador)]
 ProveedorDep = Annotated[ProveedorLLM | None, Depends(obtener_proveedor_llm)]
 AuditoriaDep = Annotated[RegistroAuditoria, Depends(obtener_registro_auditoria)]
 TelemetriaDep = Annotated[RegistroTelemetria, Depends(obtener_registro_telemetria)]
+ConversacionesDep = Annotated[AlmacenConversaciones, Depends(obtener_almacen_conversaciones)]
 MemoriaDep = Annotated[MemoriaConversaciones, Depends(obtener_memoria)]
 AdversarioDep = Annotated[EstadoAdversario, Depends(obtener_adversario)]

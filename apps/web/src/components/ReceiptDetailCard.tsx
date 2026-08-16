@@ -5,7 +5,7 @@
  * solicita ver el detalle de su factura, y como cuerpo principal de la pantalla
  * "Mi Recibo". Sigue la misma estructura con la que Movistar presenta un recibo al
  * cliente: cargos por categoría (Cargos Mensuales, Cargos Adicionales, Descuentos y
- * Bonificaciones, Redondeo, Devoluciones, Débitos), deuda pasada y total a pagar,
+ * Bonificaciones, Redondeo, Notas de crédito y Notas de débito), deuda pasada y total a pagar,
  * más un resumen de cuenta (estado, vencimiento, código de pago).
  *
  * Cada categoría es la suma de líneas reales del `FactSet` (`agruparLineas`, en
@@ -27,9 +27,15 @@ interface Props {
   hechos: FactSet;
   cuentaId?: string;
   onDownload: () => void;
+  mostrarDetalleCargos?: boolean;
 }
 
-export function ReceiptDetailCard({ hechos, cuentaId, onDownload }: Props) {
+export function ReceiptDetailCard({
+  hechos,
+  cuentaId,
+  onDownload,
+  mostrarDetalleCargos = false,
+}: Props) {
   const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
 
   const total = hechos.total_actual_cent;
@@ -84,8 +90,8 @@ export function ReceiptDetailCard({ hechos, cuentaId, onDownload }: Props) {
       {/* ── 3. Desglose por categoría ───────────────────────────── */}
       <div className="mm-rdc-breakdown">
         {grupos.map((grupo) => {
-          const abierto = grupoAbierto === grupo.grupo;
-          const puedeAbrir = grupo.lineas.length > 1;
+          const abierto = mostrarDetalleCargos || grupoAbierto === grupo.grupo;
+          const puedeAbrir = !mostrarDetalleCargos && grupo.lineas.length > 0;
           return (
             <div key={grupo.grupo}>
               <button
@@ -98,9 +104,17 @@ export function ReceiptDetailCard({ hechos, cuentaId, onDownload }: Props) {
               </button>
               {abierto && (
                 <div className="mm-rdc-bk-sub">
-                  {grupo.lineas.map((linea) => (
-                    <div className="mm-rdc-bk-subrow" key={linea.concepto_id}>
-                      <span>{linea.nombre_comercial}</span>
+                  {grupo.lineas.map((linea, indice) => (
+                    <div className="mm-rdc-bk-subrow" key={`${linea.concepto_id}-${indice}`}>
+                      <span className="mm-rdc-bk-concepto">
+                        <strong>{linea.nombre_comercial || linea.concepto_id}</strong>
+                        {linea.cuota_numero != null && linea.cuotas_totales != null && (
+                          <small>Cuota {linea.cuota_numero} de {linea.cuotas_totales}</small>
+                        )}
+                        {linea.dias_prorrateo != null && (
+                          <small>{linea.dias_prorrateo} días prorrateados</small>
+                        )}
+                      </span>
                       <span>{soles(linea.monto_actual_cent)}</span>
                     </div>
                   ))}
@@ -180,7 +194,7 @@ export function ReceiptDetailCard({ hechos, cuentaId, onDownload }: Props) {
 
       {/* ── 6. Botón PDF ────────────────────────────────────────── */}
       <button className="mm-rdc-pdf" onClick={onDownload}>
-        <Download size={14} /> Descargar PDF original
+        <Download size={14} /> Descargar PDF detallado
       </button>
     </div>
   );

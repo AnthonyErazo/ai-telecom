@@ -34,10 +34,11 @@ import hashlib
 import json
 import logging
 import re
+import unicodedata
 from typing import Any, NamedTuple
 
 from packages.core_domain.enums import ModoGeneracion
-from packages.facts_engine.intencion import Intencion
+from packages.facts_engine.intencion import Intencion, concepto_facturacion
 from packages.llm_layer.providers.base import (
     ErrorProveedor,
     ProveedorLLM,
@@ -259,6 +260,88 @@ GUION: dict[Intencion, _Guion] = {
     ),
 }
 
+
+_DEFINICIONES_CONCEPTO: dict[str, str] = {
+    "prorrateo": (
+        "El prorrateo es el cobro proporcional por los días en que un servicio estuvo "
+        "activo dentro del ciclo. Suele aparecer cuando el servicio se activa, cambia "
+        "de plan o pasa por una suspensión a mitad del periodo."
+    ),
+    "nota de crédito": (
+        "Una nota de crédito es un abono que reduce el total por pagar, normalmente por "
+        "una corrección, devolución o ajuste de facturación."
+    ),
+    "nota de débito": (
+        "Una nota de débito es un ajuste que aumenta el total por pagar cuando corresponde "
+        "incorporar un cargo o corregir un importe pendiente."
+    ),
+    "menor abono": (
+        "Menor abono significa que este mes la nota de crédito descontó menos dinero que "
+        "el mes anterior. No es una nota de débito: sigue siendo un crédito, pero al ser "
+        "menor deja una parte más alta del recibo por pagar."
+    ),
+    "mayor abono": (
+        "Mayor abono significa que este mes la nota de crédito descontó más dinero que "
+        "el mes anterior. Sigue siendo un crédito y ayuda a reducir el total por pagar."
+    ),
+    "mayor cargo": (
+        "Mayor cargo significa que este mes la nota de débito agregó un importe mayor que "
+        "el mes anterior, por lo que aumenta el total por pagar."
+    ),
+    "menor cargo": (
+        "Menor cargo significa que este mes la nota de débito agregó un importe menor que "
+        "el mes anterior, por lo que ese concepto pesa menos en el total por pagar."
+    ),
+    "renta adelantada": (
+        "La renta adelantada significa que el cargo fijo del plan se factura al inicio "
+        "del ciclo que se va a utilizar."
+    ),
+    "renta vencida": (
+        "La renta vencida significa que el cargo del servicio se factura después del "
+        "periodo en que fue utilizado."
+    ),
+    "cuota del equipo": (
+        "La cuota del equipo es el cargo periódico de un equipo comprado con financiamiento. "
+        "Se cobra según su cronograma y no se prorratea."
+    ),
+    "reconexión": (
+        "La reconexión es el cargo asociado a reactivar un servicio que estuvo suspendido, "
+        "cuando corresponde según las condiciones de facturación."
+    ),
+}
+
+
+def _guion_explicacion_concepto(utterance: str) -> _Guion | None:
+    """Explica una elección «general» o una pregunta explícita «qué es»."""
+    normalizado = "".join(
+        caracter
+        for caracter in unicodedata.normalize("NFD", utterance.lower())
+        if unicodedata.category(caracter) != "Mn"
+    )
+    pide_definicion = "general" in normalizado or any(
+        frase in normalizado
+        for frase in ("que es", "que significa", "explicame", "explicacion de")
+    )
+    if not pide_definicion:
+        return None
+    concepto = concepto_facturacion(utterance)
+    definicion = _DEFINICIONES_CONCEPTO.get(concepto or "")
+    if not definicion:
+        return None
+    return _Guion(
+        objetivo=f"Explique directamente este concepto de facturación: {definicion}",
+        debe=(
+            "Responder la definición solicitada, sin volver a preguntar si la quiere en general.",
+            "Ser claro, breve y útil.",
+            "Ofrecer al final revisar si ese concepto aparece en su recibo.",
+        ),
+        no_debe=(
+            "Inventar importes, fechas o cantidades.",
+            "Afirmar que el concepto aparece en la cuenta del cliente.",
+        ),
+        respaldos=(f"{definicion} Si quiere, también puedo revisar si aparece en su recibo.",),
+    )
+
 _PROMPT = """Eres el asistente de recibos de Movistar Perú, atendiendo por chat.
 
 REGLAS QUE NO PUEDES ROMPER:
@@ -305,13 +388,13 @@ def tiene_cifras(texto: str) -> bool:
     return bool(_DIGITO.search(texto))
 
 
-def _respaldo(intencion: Intencion, semilla: str) -> str:
+def _respaldo(intencion: Intencion, semilla: str, guion: _Guion | None = None) -> str:
     """Elige un respaldo de forma determinista pero variada.
 
     Determinista para que la demo sea reproducible; variada para que dos turnos
     seguidos no devuelvan la misma frase.
     """
-    opciones = GUION[intencion].respaldos
+    opciones = (guion or GUION[intencion]).respaldos
     indice = int(hashlib.sha256(semilla.encode("utf-8")).hexdigest()[:8], 16) % len(opciones)
     return opciones[indice]
 
@@ -350,12 +433,16 @@ def generar_respuesta_conversacional(
     El respaldo no es una degradación vergonzante: es el mismo mecanismo que
     protege la explicación del recibo, aplicado aquí.
     """
-    guion = GUION[intencion]
+    guion = (
+        _guion_explicacion_concepto(utterance)
+        if intencion is Intencion.CONSULTA_CONCEPTO
+        else None
+    ) or GUION[intencion]
     semilla = f"{intencion}|{utterance}|{len(historial or [])}"
 
     if proveedor is None:
         return ResultadoConversacional(
-            _respaldo(intencion, semilla),
+            _respaldo(intencion, semilla, guion),
             ModoGeneracion.PLANTILLA,
             "plantilla-conversacional-1.0.0",
             bloqueado_por_cifras=False,
@@ -376,7 +463,7 @@ def generar_respuesta_conversacional(
     except ErrorProveedor as error:
         _LOG.info("turno conversacional: proveedor falló (%s); se usa respaldo", error)
         return ResultadoConversacional(
-            _respaldo(intencion, semilla),
+            _respaldo(intencion, semilla, guion),
             ModoGeneracion.PLANTILLA,
             "plantilla-conversacional-1.0.0",
             bloqueado_por_cifras=False,
@@ -385,7 +472,7 @@ def generar_respuesta_conversacional(
     except Exception as error:
         _LOG.warning("turno conversacional: error inesperado (%r); se usa respaldo", error)
         return ResultadoConversacional(
-            _respaldo(intencion, semilla),
+            _respaldo(intencion, semilla, guion),
             ModoGeneracion.PLANTILLA,
             "plantilla-conversacional-1.0.0",
             bloqueado_por_cifras=False,
@@ -396,7 +483,7 @@ def generar_respuesta_conversacional(
 
     if not texto:
         return ResultadoConversacional(
-            _respaldo(intencion, semilla),
+            _respaldo(intencion, semilla, guion),
             ModoGeneracion.PLANTILLA,
             "plantilla-conversacional-1.0.0",
             bloqueado_por_cifras=False,
@@ -409,7 +496,7 @@ def generar_respuesta_conversacional(
         # forma más estricta.
         _LOG.warning("turno conversacional bloqueado por cifra sin respaldo: %r", texto[:120])
         return ResultadoConversacional(
-            _respaldo(intencion, semilla),
+            _respaldo(intencion, semilla, guion),
             ModoGeneracion.PLANTILLA,
             "plantilla-conversacional-1.0.0",
             bloqueado_por_cifras=True,

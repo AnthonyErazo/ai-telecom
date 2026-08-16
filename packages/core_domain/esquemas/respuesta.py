@@ -33,6 +33,7 @@ __all__ = [
     "BarraPuente",
     "Bloque",
     "BloqueAviso",
+    "BloqueCiclos",
     "BloqueKV",
     "BloquePuente",
     "BloqueTabla",
@@ -117,10 +118,10 @@ class BarraPuente(BaseModel):
 
 
 class BloquePuente(_BloqueBase):
-    """Gráfico de cascada que reconstruye el recibo previo hasta el actual.
+    """Resumen visual de los componentes que explican una variación.
 
-    Es la pieza visual que responde "¿por qué me vino más caro?": barra de entrada
-    (recibo previo), una barra por causa (incremento/decremento) y barra de total.
+    Puede representar una cascada completa o, cuando los totales ya aparecen en otro
+    bloque, únicamente sus incrementos y decrementos para evitar redundancia.
     """
 
     tipo: Literal["puente"] = "puente"
@@ -163,9 +164,66 @@ class BloqueAviso(_BloqueBase):
         return f"{self.titulo}\n{self.texto}" if self.titulo else self.texto
 
 
+class CicloExplicado(BaseModel):
+    """Uno de los dos ciclos que puede comparar el componente visual."""
+
+    model_config = ConfigDict(extra="forbid")
+    periodo: str
+    total_cent: Centimos
+    actual: bool = False
+    inicio: str | None = None
+    cierre: str | None = None
+    vencimiento: str | None = None
+
+
+class HitoCiclo(BaseModel):
+    """Evento verificable situado sobre la línea de tiempo."""
+
+    model_config = ConfigDict(extra="forbid")
+    fecha: str
+    etiqueta: str
+    tipo: Literal["inicio", "cierre", "vencimiento", "prorrateo", "suspension", "reconexion"]
+
+
+class CausaVisual(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    etiqueta: str
+    monto_cent: Centimos
+    participacion_bp: int = Field(ge=0, le=10_000)
+
+
+class BloqueCiclos(_BloqueBase):
+    """Explicación visual respaldada de un máximo de dos ciclos."""
+
+    tipo: Literal["ciclos"] = "ciclos"
+    modalidad: str
+    ciclos: list[CicloExplicado] = Field(min_length=1, max_length=2)
+    hitos: list[HitoCiclo] = Field(default_factory=list, max_length=8)
+    causas: list[CausaVisual] = Field(default_factory=list, max_length=8)
+
+    def a_texto(self) -> str:
+        partes = [self.titulo or "Comparación de ciclos", f"Modalidad: {self.modalidad}"]
+        for ciclo in self.ciclos:
+            linea = f"Ciclo {ciclo.periodo}: {formatear_soles(ciclo.total_cent)}"
+            fechas = [
+                f"inicio {ciclo.inicio}" if ciclo.inicio else "",
+                f"cierre {ciclo.cierre}" if ciclo.cierre else "",
+                f"vence {ciclo.vencimiento}" if ciclo.vencimiento else "",
+            ]
+            fechas = [fecha for fecha in fechas if fecha]
+            partes.append(f"{linea} ({', '.join(fechas)})" if fechas else linea)
+        partes.extend(f"{hito.fecha}: {hito.etiqueta}" for hito in self.hitos)
+        partes.extend(
+            f"{causa.etiqueta}: {formatear_soles(causa.monto_cent)} "
+            f"({causa.participacion_bp / 100:g} %)"
+            for causa in self.causas
+        )
+        return "\n".join(partes)
+
+
 #: Unión discriminada por el campo ``tipo``. Pydantic elige la clase automáticamente.
 Bloque = Annotated[
-    BloqueTexto | BloqueKV | BloquePuente | BloqueTabla | BloqueAviso,
+    BloqueTexto | BloqueKV | BloquePuente | BloqueTabla | BloqueAviso | BloqueCiclos,
     Field(discriminator="tipo"),
 ]
 

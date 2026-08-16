@@ -76,8 +76,7 @@ def seleccionar_recibo_previo(
     candidatos = [
         recibo
         for recibo in recibos_previos
-        if recibo.periodo < periodo_actual
-        and (cuenta_id is None or recibo.cuenta_id == cuenta_id)
+        if recibo.periodo < periodo_actual and (cuenta_id is None or recibo.cuenta_id == cuenta_id)
     ]
     if not candidatos:
         return None
@@ -95,10 +94,19 @@ def movimientos_del_ciclo(
     Es la "ventana" de la sección 4.7. Acotarla al ciclo es lo que evita que una orden
     de hace tres meses se cuele como explicación de la variación de este mes.
     """
+    # Las notas tributarias son la única excepción al extremo exclusivo: el facturador
+    # las marca con fecha efectiva igual al cierre (`fin`) y las aplica precisamente en
+    # ese recibo. Excluirlas dejaría la línea financiera sin su documento causal. El
+    # resto de movimientos conserva estrictamente la convención [inicio, fin).
+    tipos_nota = {TipoMovimiento.NOTA_CREDITO, TipoMovimiento.NOTA_DEBITO}
     ventana = [
         movimiento
         for movimiento in movimientos
-        if movimiento.cuenta_id == cuenta_id and inicio <= movimiento.fecha < fin
+        if movimiento.cuenta_id == cuenta_id
+        and (
+            inicio <= movimiento.fecha < fin
+            or (movimiento.tipo in tipos_nota and movimiento.fecha == fin)
+        )
     ]
     ventana.sort(key=lambda movimiento: (movimiento.ocurrido_en, movimiento.movimiento_id))
     return ventana
@@ -135,7 +143,15 @@ def agregar_causas(
     for linea in lineas:
         if not linea.se_explica:
             continue
-        clave = (linea.causa_oficial, linea.causa)
+        causa = linea.causa
+        # El concepto canónico también identifica de forma inequívoca el tipo de
+        # nota. Esto conserva la separación incluso si una fuente trae el documento
+        # pero no adjunta el movimiento causal por separado.
+        if causa is None and linea.concepto_id == "NOTA_CREDITO":
+            causa = TipoMovimiento.NOTA_CREDITO
+        elif causa is None and linea.concepto_id == "NOTA_DEBITO":
+            causa = TipoMovimiento.NOTA_DEBITO
+        clave = (linea.causa_oficial, causa)
         grupo = grupos.setdefault(
             clave,
             {
@@ -158,9 +174,7 @@ def agregar_causas(
 
     claves = list(grupos)
     pesos = [abs(grupos[clave]["monto"]) for clave in claves]
-    participaciones = (
-        repartir_mayor_resto(10_000, pesos) if sum(pesos) > 0 else [0] * len(claves)
-    )
+    participaciones = repartir_mayor_resto(10_000, pesos) if sum(pesos) > 0 else [0] * len(claves)
 
     causas: list[CausaAgregada] = []
     for clave, participacion in zip(claves, participaciones, strict=True):
@@ -168,6 +182,22 @@ def agregar_causas(
         datos = grupos[clave]
         confianzas = datos["confianzas"]
         etiqueta = etiqueta_causa_oficial(causa_oficial or causa)
+        # La ficha agrupa ambas notas en una causa oficial, pero el documento
+        # contable que viene de facturación sigue siendo distinto. El signo aquí
+        # describe la VARIACIÓN contra el mes anterior, no cambia una nota de
+        # crédito en débito ni al revés.
+        if causa is TipoMovimiento.NOTA_CREDITO:
+            etiqueta = "nota de crédito"
+            if datos["monto"] > 0:
+                etiqueta += " (menor abono)"
+            elif datos["monto"] < 0:
+                etiqueta += " (mayor abono)"
+        elif causa is TipoMovimiento.NOTA_DEBITO:
+            etiqueta = "nota de débito"
+            if datos["monto"] > 0:
+                etiqueta += " (mayor cargo)"
+            elif datos["monto"] < 0:
+                etiqueta += " (menor cargo)"
         if causa_oficial is None and causa is None:
             # Sin causa (IGV, redondeo): se nombra el propio concepto, que sí significa
             # algo para el cliente, en lugar del genérico "otros cargos".
@@ -450,7 +480,12 @@ def construir_factset(
         total_actual_cent=recibo_actual.total_cent,
         total_previo_cent=previo.total_cent,
         delta_total_cent=recibo_actual.total_cent - previo.total_cent,
-        lineas=lineas,
+        # Las líneas sin variación no participan en atribución, confianza ni causas,
+        # pero sí pertenecen al recibo. Conservarlas en el FactSet permite responder
+        # «¿qué me cobraron?» mostrando el plan y otros cargos estables. La proyección
+        # para el LLM sigue usando `lineas_explicables()`, así que no alarga ni
+        # contamina la explicación causal.
+        lineas=[*lineas, *resumen.iguales],
         causas_agregadas=causas,
         invariante=invariante,
         deuda_anterior_cent=recibo_actual.deuda_anterior_cent,

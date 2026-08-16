@@ -100,13 +100,24 @@ class TestEstructura:
 
     def test_los_bloques_llevan_discriminador_de_tipo(self, respuestas) -> None:
         """El canal decide cómo pintar cada bloque leyendo ``tipo``."""
-        tipos_validos = {"texto", "kv", "puente", "tabla", "aviso"}
+        tipos_validos = {"texto", "kv", "puente", "tabla", "aviso", "ciclos"}
         vistos: set[str] = set()
         for respuesta in respuestas:
             for bloque in respuesta.bloques:
                 assert bloque.tipo in tipos_validos
                 vistos.add(bloque.tipo)
         assert {"texto", "kv"} <= vistos, "la suite debería ejercitar al menos texto y kv"
+
+    def test_la_explicacion_visual_nunca_supera_dos_ciclos(self, respuestas) -> None:
+        visuales = [
+            bloque
+            for respuesta in respuestas
+            for bloque in respuesta.bloques
+            if bloque.tipo == "ciclos"
+        ]
+        assert visuales, "los casos de variación deben ejercitar el componente de ciclos"
+        assert all(1 <= len(bloque.ciclos) <= 2 for bloque in visuales)
+        assert all(sum(ciclo.actual for ciclo in bloque.ciclos) == 1 for bloque in visuales)
 
     def test_el_factset_hace_ida_y_vuelta_y_conserva_su_sello(self, exige_dataset: None) -> None:
         from eval.datos import cargar_cuenta, factset_de_cuenta

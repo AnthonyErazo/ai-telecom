@@ -42,6 +42,7 @@ RUTAS_EXIGIDAS = (
     "/v1/explicar",
     "/v1/derivacion",
     "/v1/auditoria",
+    "/v1/conversaciones",
 )
 
 

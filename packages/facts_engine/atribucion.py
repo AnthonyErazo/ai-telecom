@@ -249,6 +249,15 @@ def atribuir(
             candidatos = candidatos_para(linea.concepto_id, movimientos, configuracion)
             permitidas = configuracion.causas_permitidas(linea.concepto_id)
             preferida = configuracion.causa_preferida(linea.concepto_id, linea.clase)
+            vinculado = next(
+                (
+                    movimiento
+                    for movimiento in candidatos
+                    if linea.movimiento_id is not None
+                    and movimiento.movimiento_id == linea.movimiento_id
+                ),
+                None,
+            )
             if preferida is not None:
                 # REGLA DE CONCEPTO: la causa la fija lo que la variación *es*, no el
                 # movimiento que más cerca quedó. Si el CRM emitió la orden, se cita y
@@ -267,6 +276,19 @@ def atribuir(
                     confianza = parametros.regla_concepto
                 # Los movimientos descartados no desaparecen: son justamente los que la
                 # atribución ingenua habría elegido y el asesor tiene que poder verlos.
+                evidencia.extend(
+                    f"mov:{otro.movimiento_id}"
+                    for otro in candidatos
+                    if otro.movimiento_id != movimiento_id
+                )
+            elif vinculado is not None:
+                # La línea del facturador puede traer la FK exacta al documento que la
+                # originó. Ese vínculo es evidencia más fuerte que la mera proximidad de
+                # otros movimientos compatibles dentro del ciclo (por ejemplo, una nota
+                # del cierre anterior que cae justo en el inicio de la ventana actual).
+                causa = vinculado.tipo
+                movimiento_id = vinculado.movimiento_id
+                confianza = parametros.causa_unica
                 evidencia.extend(
                     f"mov:{otro.movimiento_id}"
                     for otro in candidatos

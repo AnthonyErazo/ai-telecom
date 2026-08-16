@@ -18,6 +18,7 @@ Router                     Nivel   Ruta
 from apps.api.routers import (
     auditoria,
     catalogo,
+    conversaciones,
     derivacion,
     dev,
     evidencia,
@@ -30,6 +31,7 @@ from apps.api.routers import (
 __all__ = [
     "auditoria",
     "catalogo",
+    "conversaciones",
     "derivacion",
     "dev",
     "evidencia",

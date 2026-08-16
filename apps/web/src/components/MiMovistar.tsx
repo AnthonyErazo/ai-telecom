@@ -2,7 +2,7 @@
  * MiMovistar — App Mi Movistar completa
  *
  * Flujo de 7 pantallas:
- *   splash → selector → loginDNI/registroDNI → productos? → dashboard → recibo → chat
+ *   splash → loginCuenta/registroCuenta → dashboard → recibo → chat
  *
  * La pantalla "chat" tiene DOS modos seleccionables:
  *   ① Chat  — texto puro, sin audio. Incluye ReceiptDetailCard dentro
@@ -18,7 +18,7 @@ import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertCircle, ArrowLeft, Bot, Clock, CreditCard, Gift, Home as HomeIcon,
-  Key, Layers, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
+  History, Layers, Loader2, MessageSquare, Mic, MicOff, Plus, Send, ShieldCheck,
   ShoppingBag, Smartphone, Star, ThumbsDown, ThumbsUp, TrendingDown, TrendingUp,
   User as UserIcon, Wallet, Wifi,
 } from "lucide-react";
@@ -53,18 +53,13 @@ const liveLabel = (s: LiveStatus): string =>
     error:      "Error de conexión de voz",
   })[s];
 
-const liveLabelShort = (s: LiveStatus): string =>
-  ({ idle:"Voz", connecting:"Conectando…", listening:"Escuchando…", consulting:"Consultando…", speaking:"Respondiendo…", error:"Error" })[s];
-
 // ── Types ─────────────────────────────────────────────────────────────
-type TipoDoc  = "DNI" | "CE" | "Pasaporte";
-type Pantalla = "splash"|"selector"|"loginDNI"|"registroDNI"|"productos"|"dashboard"|"recibo"|"mejorarPlan"|"comoFunciona"|"historial"|"chat";
+type Pantalla = "splash"|"loginCuenta"|"registroCuenta"|"dashboard"|"recibo"|"mejorarPlan"|"comoFunciona"|"historial"|"chat";
 type ChatModo = "chat" | "voz";
 /** Un mensaje del historial del chat. Los del asistente guardan los `bloques`
  * estructurados que ya trajo el backend (no un texto aplanado) para pintarlos con
  * formato rico; esRecibo muestra la tarjeta de factura inline en su lugar. */
 type Mensaje  = { rol: "cliente"|"asistente"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean };
-interface Producto { id: string; tipo: "movil"|"hogar"; etiqueta: string; numero: string }
 
 // ── Numpad grid ───────────────────────────────────────────────────────
 const PAD: string[][] = [
@@ -84,9 +79,7 @@ export function MiMovistar({
 }) {
   // ── Pantalla / nav ──────────────────────────────────────────────
   const [pantalla,      setPantalla]      = useState<Pantalla>("splash");
-  const [modoSoloMovil, setModoSoloMovil] = useState(false);
   const [aceptaTC,      setAceptaTC]      = useState(false);
-  const [esRegistro,    setEsRegistro]    = useState(false);
   const [bottomTab,     setBottomTab]     = useState("inicio");
   const [chatModo,      setChatModo]      = useState<ChatModo>("chat");
   const [mostrarPago,   setMostrarPago]   = useState(false);
@@ -101,8 +94,7 @@ export function MiMovistar({
   const [errorPeriodo,   setErrorPeriodo]   = useState("");
 
   // ── Auth ────────────────────────────────────────────────────────
-  const [tipoDoc,   setTipoDoc]   = useState<TipoDoc>("DNI");
-  const [documento, setDocumento] = useState("");
+  const [cuentaEntrada, setCuentaEntrada] = useState("");
   const [cuenta,    setCuenta]    = useState("");
   const [token,     setToken]     = useState("");
   const [hechos,    setHechos]    = useState<FactSet | null>(null);
@@ -114,9 +106,7 @@ export function MiMovistar({
   const [ultima,       setUltima]       = useState<Explanation | null>(null);
   const [opinion,      setOpinion]      = useState<"arriba"|"abajo"|null>(null);
   const [chatError,    setChatError]    = useState("");
-
-  // ── Productos ───────────────────────────────────────────────────
-  const [productosSim, setProductosSim] = useState<Producto[]>([]);
+  const [mostrarHistorialChats, setMostrarHistorialChats] = useState(false);
 
   // ── BillSense Voz ───────────────────────────────────────────────
   const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
@@ -145,7 +135,7 @@ export function MiMovistar({
   }, [liveMsgs]);
 
   // ── Derived ─────────────────────────────────────────────────────
-  const cuentaElegida = (documento || sugerida).trim();
+  const cuentaElegida = (cuentaEntrada || sugerida).trim();
   const liveActivo    = Boolean(liveRef.current);
   const liveIsVisible = liveActivo || ["connecting","listening","consulting","speaking"].includes(liveStatus);
   const oferta        = ultima?.acciones.find((a) => a.id === "VER_ALTERNATIVAS");
@@ -188,18 +178,7 @@ export function MiMovistar({
     },
     onSuccess: ({ id, token: tk, factset }) => {
       setCuenta(id); setToken(tk); setHechos(factset); setChatError(""); onSesion(id, tk);
-      const todas = cuentas.data?.demo ?? [];
-      if (todas.length > 1 && pantalla === "registroDNI") {
-        setProductosSim(todas.slice(0, 3).map((c, i) => ({
-          id: c,
-          tipo: (i % 2 === 0 ? "movil" : "hogar") as "movil"|"hogar",
-          etiqueta: i % 2 === 0 ? `Línea móvil ${i+1}` : `Movistar Hogar ${i+1}`,
-          numero:   i % 2 === 0 ? `+51 9${c.slice(-8)}`  : `Jr. Los Olivos ${100+i}, Lima`,
-        })));
-        setPantalla("productos");
-      } else {
-        setPantalla("dashboard");
-      }
+      setPantalla("dashboard");
     },
     onError: (e) => setChatError(err(e)),
   });
@@ -217,6 +196,7 @@ export function MiMovistar({
       setUltima(res); setOpinion(null);
       setMensajes((p) => [...p, { rol: "asistente", bloques: res.bloques }]);
       onExplicacion(res);
+      void historialChats.refetch();
     },
     onError: (e) => setChatError(err(e)),
   });
@@ -227,6 +207,44 @@ export function MiMovistar({
     queryKey: ["historial", cuenta],
     queryFn: () => api.historial(token),
     enabled: pantalla === "historial" && Boolean(token),
+  });
+
+  const historialChats = useQuery({
+    queryKey: ["conversaciones", cuenta],
+    queryFn: () => api.conversaciones(token),
+    enabled: mostrarHistorialChats && Boolean(token),
+  });
+
+  const nuevoChat = useMutation({
+    mutationFn: () => api.nuevaConversacion(token, periodoActivo ?? undefined),
+    onSuccess: (chat) => {
+      setConversacion(chat.conversation_id);
+      setMensajes([]);
+      setUltima(null);
+      setOpinion(null);
+      setChatError("");
+      setMostrarHistorialChats(false);
+      void historialChats.refetch();
+    },
+    onError: (e) => setChatError(err(e)),
+  });
+
+  const cargarChat = useMutation({
+    mutationFn: (conversationId: string) => api.conversacion(token, conversationId),
+    onSuccess: (chat) => {
+      setConversacion(chat.conversation_id);
+      setPeriodoActivo(chat.periodo ?? null);
+      setMensajes(chat.mensajes.map((mensaje) => ({
+        rol: mensaje.rol === "cliente" ? "cliente" : "asistente",
+        texto: mensaje.contenido,
+        bloques: mensaje.bloques ?? undefined,
+      })));
+      setUltima(null);
+      setOpinion(null);
+      setMostrarHistorialChats(false);
+      setChatError("");
+    },
+    onError: (e) => setChatError(err(e)),
   });
 
   /** Carga el `FactSet` de un periodo pasado para verlo y, si el cliente quiere,
@@ -284,8 +302,8 @@ export function MiMovistar({
     explicar.mutate("¿Qué alternativas de plan tengo disponibles según mi cuenta?");
 
   const pad = (key: string) => {
-    if (key === "⌫") setDocumento((p) => p.slice(0, -1));
-    else if (key) setDocumento((p) => p + key);
+    if (key === "⌫") setCuentaEntrada((p) => p.slice(0, -1));
+    else if (key) setCuentaEntrada((p) => p + key);
   };
 
   const stopLive = async () => {
@@ -313,6 +331,7 @@ export function MiMovistar({
         // estado ("BillSense está respondiendo…") como única señal mientras habla.
         onOutputTranscript: () => {},
         onExplanation: (res) => {
+          setConversacion(res.conversation_id);
           setUltima(res); setOpinion(null);
           // `liveMsgs` guarda lo dicho por voz mientras dura la sesión, pero este
           // callback quedó cerrado sobre el valor que tenía al conectar —no el que
@@ -328,6 +347,7 @@ export function MiMovistar({
             return [];
           });
           onExplicacion(res);
+          void historialChats.refetch();
         },
         onError: setChatError,
       }
@@ -354,14 +374,32 @@ export function MiMovistar({
     if (!fs) return;
     const deudaAnterior = fs.deuda_anterior_cent ?? 0;
     const totalAPagar = fs.total_a_pagar_cent ?? (fs.total_actual_cent + deudaAnterior);
-    // Mismo agrupamiento que la tarjeta en pantalla (`ReceiptDetailCard`): cada fila
-    // es una suma real de líneas del FactSet, nunca un cálculo inventado en el
-    // navegador (ni IGV al 18%, ni ningún otro porcentaje).
-    const filas = agruparLineas(fs.lineas)
-      .map((g) => `<tr><td>${g.etiqueta}</td><td${g.aFavor ? ' style="color:#5BC500"' : ""}>${g.aFavor ? "− " : ""}${soles(Math.abs(g.monto_cent))}</td></tr>`)
-      .join("");
+    const vencimiento = fs.fecha_vencimiento ? String(fs.fecha_vencimiento) : null;
+    const vencido = Boolean(vencimiento && vencimiento < new Date().toISOString().slice(0, 10));
+    const subio = fs.delta_total_cent >= 0;
+    const escapar = (valor: unknown) => String(valor ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+    // El PDF imprime siempre tanto el total de cada categoría como cada cargo
+    // facturado que la tarjeta permite desplegar. Todos los importes vienen del
+    // mismo FactSet usado por `ReceiptDetailCard`.
+    const filas = agruparLineas(fs.lineas).map((grupo) => `
+      <tr class="grupo">
+        <td>${escapar(grupo.etiqueta)}</td>
+        <td class="${grupo.aFavor ? "credito" : ""}">${grupo.aFavor ? "− " : ""}${escapar(soles(Math.abs(grupo.monto_cent)))}</td>
+      </tr>
+      ${grupo.lineas.map((linea) => `
+        <tr class="detalle">
+          <td><strong>${escapar(linea.nombre_comercial)}</strong><small>${escapar(linea.concepto_id)}</small></td>
+          <td>${escapar(soles(linea.monto_actual_cent))}</td>
+        </tr>`).join("")}
+    `).join("");
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Factura Movistar ${fs.periodo_actual}</title>
+<title>Factura Movistar ${escapar(fs.periodo_actual)}</title>
 <style>
   body{font-family:Arial,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#172033}
   .top{background:#019DF4;color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px}
@@ -369,31 +407,51 @@ export function MiMovistar({
   .hero{background:#e4f7fd;border:1.5px solid #b3e0f7;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px}
   .hero .amt{font-size:36px;font-weight:900;color:#019DF4;margin:8px 0}
   .hero .due{color:#cc4c3d;font-size:12px;font-weight:700}
+  h2{font-size:12px;color:#68768a;text-transform:uppercase;letter-spacing:.09em;margin:22px 0 8px}
   table{width:100%;border-collapse:collapse;margin-bottom:16px}
   td{padding:10px 8px;border-bottom:1px solid #edf0f4;font-size:13px}
   td:last-child{text-align:right;font-weight:600}
+  .grupo td{font-weight:800;background:#f7f9fb;border-top:1px solid #dce4ec}
+  .detalle td{padding-top:7px;padding-bottom:7px;color:#526174}
+  .detalle td:first-child{padding-left:22px}.detalle strong{display:block;font-weight:600}
+  .detalle small{display:block;color:#9aaabd;font-size:10px;margin-top:2px}
+  .credito{color:#3a7a10!important}
   .alert td{background:#fff2f2;color:#cc4c3d}
   .total td{background:#e4f7fd;font-weight:800;font-size:15px}
+  .estado-vencido{color:#cc4c3d}.estado-vigente{color:#3a7a10}
   .footer{font-size:11px;color:#9fb1c4;text-align:center;margin-top:20px}
   @media print{.no-print{display:none}}
 </style></head><body>
-<div class="top"><h1>App Mi Movistar</h1><p>Detalle de Facturación — ${fs.periodo_actual}</p></div>
+<div class="top">
+  <h1>Detalle de Facturación</h1>
+  <p>Ciclo: ${escapar(fs.periodo_actual)} · Variación: ${subio ? "+" : "−"}${escapar(soles(Math.abs(fs.delta_total_cent)))}</p>
+</div>
 <div class="hero">
   <p style="margin:0;font-size:12px;color:#68768a;text-transform:uppercase;letter-spacing:.1em">Total a Pagar</p>
-  <p class="amt">${soles(totalAPagar)}</p>
-  ${fs.fecha_vencimiento ? `<p class="due">⚠ Vence: ${String(fs.fecha_vencimiento)}</p>` : ""}
+  <p class="amt">${escapar(soles(totalAPagar))}</p>
+  ${vencimiento ? `<p class="due">⚠ ${vencido ? "Venció el" : "Vence"}: ${escapar(vencimiento)}</p>` : ""}
 </div>
+<h2>Detalle de cargos facturados</h2>
 <table>
   ${filas}
-  ${deudaAnterior > 0 ? `<tr class="alert"><td>Deuda pasada</td><td>${soles(deudaAnterior)}</td></tr>` : ""}
-  <tr class="total"><td>Total a pagar</td><td>${soles(totalAPagar)}</td></tr>
+  ${deudaAnterior > 0 ? `<tr class="alert"><td>⚠ Deuda pasada</td><td>${escapar(soles(deudaAnterior))}</td></tr>` : ""}
+  <tr class="total"><td>Total a pagar</td><td>${escapar(soles(totalAPagar))}</td></tr>
 </table>
+<h2>Resumen de mi cuenta</h2>
 <table>
-  <tr><td>Mes anterior</td><td>${soles(fs.total_previo_cent)}</td></tr>
-  <tr><td>Modalidad</td><td>${fs.modalidad_renta}</td></tr>
-  <tr><td>Código de pago</td><td>${cuenta}</td></tr>
+  <tr><td>Estado</td><td class="${vencido ? "estado-vencido" : "estado-vigente"}">${vencido ? "Vencido" : "Vigente"}</td></tr>
+  <tr><td>Vencimiento</td><td>${escapar(vencimiento ?? "—")}</td></tr>
+  <tr><td>Código de pago</td><td>${escapar(cuenta)}</td></tr>
+  <tr><td>Total</td><td>${escapar(soles(totalAPagar))}</td></tr>
+  <tr><td>Modalidad</td><td>${escapar(fs.modalidad_renta)}</td></tr>
 </table>
-<p class="footer">Movistar Perú · Cuenta ${cuenta} · Generado: ${new Date().toLocaleDateString("es-PE")}</p>
+<h2>Comparativa con el mes anterior</h2>
+<table>
+  <tr><td>Mes anterior</td><td>${escapar(soles(fs.total_previo_cent))}</td></tr>
+  <tr><td>Este mes</td><td>${escapar(soles(fs.total_actual_cent))}</td></tr>
+  <tr><td>Variación</td><td>${subio ? "+" : "−"}${escapar(soles(Math.abs(fs.delta_total_cent)))}</td></tr>
+</table>
+<p class="footer">Movistar Perú · Cuenta ${escapar(cuenta)} · Generado: ${escapar(new Date().toLocaleDateString("es-PE"))}</p>
 <button class="no-print" onclick="window.print()" style="margin-top:16px;width:100%;padding:12px;background:#019DF4;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button>
 </body></html>`;
     const w = window.open("","_blank","width=680,height=860");
@@ -434,8 +492,8 @@ export function MiMovistar({
           </div>
         </div>
         <div className="mm-splash-actions">
-          <button className="mm-btn-primary" onClick={() => { setEsRegistro(false); setPantalla("selector"); }}>Iniciar sesión</button>
-          <button className="mm-btn-outline" onClick={() => { setEsRegistro(true); setAceptaTC(false); setPantalla("selector"); }}>
+          <button className="mm-btn-primary" onClick={() => { setCuentaEntrada(""); setChatError(""); setPantalla("loginCuenta"); }}>Iniciar sesión</button>
+          <button className="mm-btn-outline" onClick={() => { setAceptaTC(false); setCuentaEntrada(""); setChatError(""); setPantalla("registroCuenta"); }}>
             Registrarme
           </button>
         </div>
@@ -447,72 +505,38 @@ export function MiMovistar({
   );
 
   // ════════════════════════════════════════════════════════════════
-  // SELECTOR — Vista 1 (dos tarjetas)
+  // ACCESO UNIFICADO POR CUENTA CLIENTE
   // ════════════════════════════════════════════════════════════════
-  if (pantalla === "selector") return (
-    <div className={F}>
-      {hdr("Iniciar sesión", () => setPantalla("splash"))}
-      <div className="mm-selector-body">
-        <div className="mm-selector-hero">
-          <div className="mm-selector-hero-icon">
-            <div className="mm-selector-phone-shadow" />
-            <div className="mm-selector-phone-body"><Smartphone size={40} className="text-white" /></div>
-          </div>
-        </div>
-        <h2 className="mm-selector-titulo">Elige tu forma de ingreso</h2>
-        <p className="mm-selector-sub">Selecciona cómo deseas gestionar tus servicios Movistar</p>
-        <div className="mm-selector-cards">
-          <button id="btn-todos-productos" className="mm-selector-card"
-            onClick={() => { setModoSoloMovil(false); setDocumento(""); setChatError(""); setPantalla(esRegistro ? "registroDNI" : "loginDNI"); }}>
-            <div className="mm-sc-icon" style={{ background:"#e4f7fd" }}><Key size={24} className="text-[#019DF4]" /></div>
-            <div className="mm-sc-body">
-              <strong>{esRegistro ? "Soy titular" : "Todos mis productos"}</strong>
-              <span>Gestiona todos tus productos y beneficios como titular</span>
-            </div>
-            <span className="mm-sc-arrow">›</span>
-          </button>
-          <button id="btn-solo-movil" className="mm-selector-card"
-            onClick={() => { setModoSoloMovil(true); setDocumento(""); setChatError(""); setPantalla(esRegistro ? "registroDNI" : "loginDNI"); }}>
-            <div className="mm-sc-icon" style={{ background:"#edfae1" }}><Smartphone size={24} className="text-[#5BC500]" /></div>
-            <div className="mm-sc-body">
-              <strong>Solo con mi móvil</strong>
-              <span>Podrás ver y gestionar solo una línea móvil</span>
-            </div>
-            <span className="mm-sc-arrow">›</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ════════════════════════════════════════════════════════════════
-  // LOGIN DNI (Vista 2) / REGISTRO DNI (Vista 4)
-  // ════════════════════════════════════════════════════════════════
-  if (pantalla === "loginDNI" || pantalla === "registroDNI") {
-    const esReg = pantalla === "registroDNI";
+  if (pantalla === "loginCuenta" || pantalla === "registroCuenta") {
+    const esReg = pantalla === "registroCuenta";
     const puede = cuentaElegida.length > 0 && (!esReg || aceptaTC);
     return (
       <div className={F}>
-        {hdr(esReg ? "Registrarme" : "Iniciar sesión",
-             () => setPantalla(esReg ? "splash" : "selector"))}
+        {hdr(esReg ? "Registrarme" : "Iniciar sesión", () => setPantalla("splash"))}
         <div className="mm-dni-body">
           <div className="mm-dni-illustration">
             <div className="mm-dni-ilu-circle"><UserIcon size={38} className="text-[#019DF4]" /></div>
             {esReg && <div className="mm-dni-ilu-badge"><ShieldCheck size={14} className="text-white" /></div>}
           </div>
-          <h2 className="mm-dni-titulo">¡Genial!</h2>
-          <p className="mm-dni-sub">Solo ingresa tu documento de identidad</p>
+          <h2 className="mm-dni-titulo">Ingresa a tu cuenta</h2>
+          <p className="mm-dni-sub">Escribe tu cuenta cliente asociada a tus recibos</p>
           <div className="mm-dni-form">
-            <select className="mm-dni-select" value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value as TipoDoc)}>
-              <option value="DNI">DNI</option>
-              <option value="CE">Carnet Ext.</option>
-              <option value="Pasaporte">Pasaporte</option>
-            </select>
-            <div className="mm-dni-display" aria-label="Número de documento">
-              {documento
-                ? <span className="mm-dni-number">{documento}</span>
-                : <span className="mm-dni-placeholder">{sugerida || "N° de documento"}</span>}
-            </div>
+            <input
+              className="mm-dni-display"
+              aria-label="Cuenta cliente"
+              type="text"
+              inputMode="numeric"
+              autoComplete="username"
+              spellCheck={false}
+              value={cuentaEntrada}
+              placeholder={sugerida || "N.º de cuenta cliente"}
+              onChange={(e) => setCuentaEntrada(e.target.value.trim())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && puede && !entrar.isPending) {
+                  entrar.mutate(cuentaElegida);
+                }
+              }}
+            />
           </div>
           {chatError && <p className="mm-error-msg">{chatError}</p>}
           {esReg && (
@@ -546,32 +570,6 @@ export function MiMovistar({
   }
 
   // ════════════════════════════════════════════════════════════════
-  // PRODUCTOS
-  // ════════════════════════════════════════════════════════════════
-  if (pantalla === "productos") return (
-    <div className={F}>
-      {hdr("Mis Productos", () => setPantalla("registroDNI"))}
-      <div className="mm-productos-body">
-        <p className="mm-productos-intro">
-          Tienes <strong>{productosSim.length} productos</strong> a tu nombre. Selecciona el que deseas gestionar:
-        </p>
-        <div className="mm-productos-lista">
-          {productosSim.map((p) => (
-            <button key={p.id} className="mm-producto-item"
-              onClick={() => p.id !== cuenta ? entrar.mutate(p.id) : setPantalla("dashboard")}>
-              <div className={`mm-producto-icon ${p.tipo}`}>
-                {p.tipo === "movil" ? <Smartphone size={22} /> : <HomeIcon size={22} />}
-              </div>
-              <div className="mm-producto-info"><strong>{p.etiqueta}</strong><span>{p.numero}</span></div>
-              <div className="mm-producto-arrow">›</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  // ════════════════════════════════════════════════════════════════
   // DASHBOARD — Vista 3 (con bottom nav)
   // ════════════════════════════════════════════════════════════════
   if (pantalla === "dashboard") return (
@@ -583,10 +581,42 @@ export function MiMovistar({
         </div>
         <button className="mm-dash-line-pill" onClick={() => navTo("recibo")}>
           <Smartphone size={13} />
-          <span>{modoSoloMovil ? "Solo móvil" : hechos?.modalidad_renta ?? "Mi Plan"}</span>
+          <span>{hechos?.modalidad_renta ?? "Cuenta cliente"}</span>
         </button>
       </div>
       <div className="mm-dash-scroll">
+        {/* MI RECIBO — primer bloque del inicio */}
+        <div className="mm-recibo-card">
+          <div
+            className="mm-recibo-card-top clicable"
+            role="button"
+            tabIndex={0}
+            aria-label="Ver detalle de mi recibo"
+            onClick={() => setPantalla("recibo")}
+            onKeyDown={(e) => {
+              if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                setPantalla("recibo");
+              }
+            }}
+          >
+            <div className="mm-recibo-card-icon"><CreditCard size={22} /></div>
+            <div className="mm-recibo-card-info">
+              <p className="mm-recibo-card-label">Mi recibo</p>
+              <p className="mm-recibo-card-sub">Paga tu plan aquí</p>
+            </div>
+            <div className="mm-recibo-card-amount">
+              <strong>{soles(hechos?.total_actual_cent ?? 0)}</strong>
+              <span>{hechos?.periodo_actual ?? "—"}</span>
+            </div>
+          </div>
+          <div className="mm-recibo-card-btns">
+            <button id="btn-ver-recibo" className="mm-rc-btn" onClick={() => setPantalla("recibo")}>Ver recibo</button>
+            <button id="btn-detalle-factura" className="mm-rc-btn primary"
+              onClick={() => abrirChat("Consulta sobre tu recibo", "chat")}>
+              Consulta sobre tu recibo
+            </button>
+          </div>
+        </div>
         {/* Mi situación — con datos reales del recibo, no genéricos */}
         {hechos && (
           <div className="mm-situacion-card">
@@ -654,27 +684,6 @@ export function MiMovistar({
           <button className="mm-dash-card-cta" onClick={abrirMejorarPlan}>
             Ver opciones
           </button>
-        </div>
-        {/* MI RECIBO */}
-        <div className="mm-recibo-card">
-          <div className="mm-recibo-card-top">
-            <div className="mm-recibo-card-icon"><CreditCard size={22} /></div>
-            <div className="mm-recibo-card-info">
-              <p className="mm-recibo-card-label">Mi recibo</p>
-              <p className="mm-recibo-card-sub">Paga tu plan aquí</p>
-            </div>
-            <div className="mm-recibo-card-amount">
-              <strong>{soles(hechos?.total_actual_cent ?? 0)}</strong>
-              <span>{hechos?.periodo_actual ?? "—"}</span>
-            </div>
-          </div>
-          <div className="mm-recibo-card-btns">
-            <button id="btn-ver-recibo" className="mm-rc-btn" onClick={() => setPantalla("recibo")}>Ver recibo</button>
-            <button id="btn-detalle-factura" className="mm-rc-btn primary"
-              onClick={() => abrirChat("Consulta sobre tu recibo", "chat")}>
-              Consulta sobre tu recibo
-            </button>
-          </div>
         </div>
         {/* PAGOS — apartado propio en el inicio, con su código de pago y pasos, sin
             derivar a ningún canal externo. */}
@@ -752,7 +761,23 @@ export function MiMovistar({
   // ════════════════════════════════════════════════════════════════
   if (pantalla === "recibo") return (
     <div className={F}>
-      {hdr("Mi Recibo", () => setPantalla("dashboard"))}
+      {hdr(
+        "Mi Recibo",
+        () => setPantalla("dashboard"),
+        <button
+          type="button"
+          className="mm-back-btn"
+          aria-label="Ver historial de recibos"
+          title="Historial de recibos"
+          onClick={() => {
+            setHechosPeriodo(null);
+            setErrorPeriodo("");
+            setPantalla("historial");
+          }}
+        >
+          <Clock size={19} />
+        </button>,
+      )}
       <div className="mm-recibo-body">
         <div className="mm-recibo-hero">
           <p className="mm-recibo-period">Período {hechos?.periodo_actual}</p>
@@ -763,14 +788,16 @@ export function MiMovistar({
         </div>
         {hechos && (
           <div style={{ marginBottom:12 }}>
-            <ReceiptDetailCard hechos={hechos} cuentaId={cuenta} onDownload={() => generarPDF()} />
+            <ReceiptDetailCard
+              hechos={hechos}
+              cuentaId={cuenta}
+              onDownload={() => generarPDF()}
+              mostrarDetalleCargos
+            />
           </div>
         )}
         <button className="mm-btn-outline" onClick={() => setPantalla("comoFunciona")}>
           <Layers size={18} /> ¿Cómo se calculó mi recibo?
-        </button>
-        <button className="mm-btn-outline" style={{ marginTop:12 }} onClick={() => { setHechosPeriodo(null); setErrorPeriodo(""); setPantalla("historial"); }}>
-          <Clock size={18} /> Ver mis recibos anteriores
         </button>
         <button className="mm-btn-primary" style={{ marginTop:12 }} onClick={() => abrirChat("Explícame mi recibo detalladamente")}>
           <Bot size={18} /> Explícame este recibo con BillSense
@@ -787,7 +814,7 @@ export function MiMovistar({
   // ════════════════════════════════════════════════════════════════
   if (pantalla === "historial") return (
     <div className={F}>
-      {hdr("Recibos anteriores", () => setPantalla("recibo"))}
+      {hdr("Recibos anteriores", () => setPantalla("dashboard"))}
       <div className="mm-historial-body">
         {!hechosPeriodo && !errorPeriodo && !cargandoPeriodo && (
           <>
@@ -822,7 +849,12 @@ export function MiMovistar({
         {hechosPeriodo && !cargandoPeriodo && (
           <>
             <button className="mm-btn-outline" style={{ marginBottom:12 }} onClick={() => setHechosPeriodo(null)}>‹ Volver a la lista</button>
-            <ReceiptDetailCard hechos={hechosPeriodo} cuentaId={cuenta} onDownload={() => generarPDF(hechosPeriodo)} />
+            <ReceiptDetailCard
+              hechos={hechosPeriodo}
+              cuentaId={cuenta}
+              onDownload={() => generarPDF(hechosPeriodo)}
+              mostrarDetalleCargos
+            />
             <button className="mm-btn-primary" style={{ marginTop:12 }} onClick={() => {
               setPeriodoActivo(hechosPeriodo.periodo_actual);
               abrirChat(`Explícame mi recibo de ${hechosPeriodo.periodo_actual}`);
@@ -927,10 +959,20 @@ export function MiMovistar({
           <img src={billsenseLogo} alt="BillSense" className="mm-header-billsense-logo" />
           <h1 className="mm-title">Realiza tu consulta</h1>
         </div>
-        <div style={{ width:32, display:"flex", justifyContent:"flex-end" }}>
-          <div className={`mm-live-badge${liveIsVisible?" active":""}`}>
-            {liveIsVisible ? <><Mic size={11}/> {liveLabelShort(liveStatus)}</> : <><Bot size={11}/> IA</>}
-          </div>
+        <div className="mm-chat-header-actions">
+          <button
+            className="mm-chat-header-btn"
+            aria-label="Historial de chats"
+            title="Historial de chats"
+            onClick={() => setMostrarHistorialChats((visible) => !visible)}
+          ><History size={17} /></button>
+          <button
+            className="mm-chat-header-btn primary"
+            aria-label="Nuevo chat"
+            title="Nuevo chat"
+            disabled={nuevoChat.isPending}
+            onClick={() => nuevoChat.mutate()}
+          >{nuevoChat.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={18} />}</button>
         </div>
       </div>
 
@@ -951,6 +993,32 @@ export function MiMovistar({
           <Mic size={14} /> BillSense Voz
         </button>
       </div>
+
+      {mostrarHistorialChats && (
+        <div className="mm-chat-history-panel">
+          <div className="mm-chat-history-head">
+            <div><strong>Historial de BillSense</strong><small>Conversaciones guardadas por fecha</small></div>
+            <button onClick={() => setMostrarHistorialChats(false)} aria-label="Cerrar historial">×</button>
+          </div>
+          <div className="mm-chat-history-list">
+            {historialChats.isPending && <div className="mm-chat-history-state"><Loader2 size={15} className="animate-spin" /> Cargando…</div>}
+            {historialChats.isError && <div className="mm-chat-history-state error">{err(historialChats.error)}</div>}
+            {historialChats.data?.length === 0 && <div className="mm-chat-history-state">Aún no hay conversaciones guardadas.</div>}
+            {historialChats.data?.map((chat) => (
+              <button
+                key={chat.conversation_id}
+                className={`mm-chat-history-item${chat.conversation_id === conversacion ? " active" : ""}`}
+                onClick={() => cargarChat.mutate(chat.conversation_id)}
+                disabled={cargarChat.isPending}
+              >
+                <History size={15} />
+                <span><strong>{chat.titulo}</strong><small>{new Intl.DateTimeFormat("es-PE", { dateStyle:"medium", timeStyle:"short" }).format(new Date(chat.actualizada_en))}</small></span>
+                <em>{chat.mensajes} mensajes{chat.periodo ? ` · ${chat.periodo}` : ""}</em>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════════
           MODO CHAT — texto sin audio

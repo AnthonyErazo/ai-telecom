@@ -57,8 +57,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from enum import StrEnum
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from packages.core_domain.enums import MotivoDerivacion
 from packages.facts_engine.jerga import expandir
@@ -66,11 +67,16 @@ from packages.facts_engine.peticion_humano import pide_humano
 
 __all__ = [
     "PATRONES",
+    "PATRONES_DETALLE_CARGOS",
     "Intencion",
+    "ResolucionContextual",
     "ResultadoIntencion",
     "clasificar_intencion",
     "coincide_patron",
+    "concepto_facturacion",
     "detectar_manipulacion",
+    "pide_detalle_cargos",
+    "resolver_intencion_contextual",
     "tokens_significativos",
 ]
 
@@ -158,6 +164,84 @@ _AFIRMACIONES: frozenset[str] = frozenset({
     "revisemos", "veamos", "vamos", "adelante", "hazlo", "hagalo", "hágalo",
     "si por favor", "sí por favor", "claro que si", "claro que sí", "obvio",
 })
+
+#: Conceptos que pueden quedar pendientes cuando el asistente ofrece revisarlos en el
+#: recibo. Se guarda la forma canónica, nunca el texto libre completo del cliente: así
+#: el turno siguiente puede recuperar el tema sin convertir el historial en una nueva
+#: instrucción para el modelo.
+_CONCEPTOS_FACTURACION: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("nota de crédito", ("nota de credito",)),
+    ("nota de débito", ("nota de debito",)),
+    ("menor abono", ("menor abono", "menos abono")),
+    ("mayor abono", ("mayor abono", "mas abono")),
+    ("mayor cargo", ("mayor cargo", "mas cargo")),
+    ("menor cargo", ("menor cargo", "menos cargo")),
+    ("renta adelantada", ("renta adelantada",)),
+    ("renta vencida", ("renta vencida",)),
+    ("cuota del equipo", ("cuota del equipo", "equipo financiado")),
+    ("prorrateo", ("prorrateo",)),
+    ("reconexión", ("reconexion",)),
+)
+
+#: Marcadores que convierten la mención de un concepto en una pregunta sobre la
+#: cuenta. «¿Qué es un prorrateo?» sigue siendo conceptual; «¿tuve prorrateo?»
+#: abre el recibo. Esto evita la aclaración innecesaria que originó el bucle de la UI.
+_PATRONES_CONCEPTO_APLICADO: tuple[str, ...] = (
+    "tuve",
+    "tengo",
+    "aparece",
+    "aparecio",
+    "me aplicaron",
+    "me aplico",
+    "me cobraron",
+    "cuando",
+    "en mi recibo",
+    "ultimo recibo",
+    "este recibo",
+    "este mes",
+)
+
+#: Respuestas que aceptan la oferta de revisar el concepto pendiente en el recibo.
+#: Las afirmaciones puras ya las reconoce el clasificador; estas formas cubren la
+#: respuesta natural a «¿lo quiere en general o aplicado a su recibo?».
+_PATRONES_APLICAR_PENDIENTE: tuple[str, ...] = (
+    "aplicado a mi recibo",
+    "en mi recibo",
+    "mi ultimo recibo",
+    "revisar mi recibo",
+)
+
+#: Respuestas que eligen la explicación conceptual después de que el asistente
+#: preguntó «¿en general o aplicado a su recibo?». Sin esta rama, un «general»
+#: quedaba clasificado como fuera de dominio y se perdía el tema pendiente.
+_PATRONES_EXPLICAR_GENERAL: tuple[str, ...] = (
+    "general",
+    "en general",
+    "explicacion general",
+    "solo el concepto",
+)
+
+#: Peticiones que requieren abrir el recibo y mostrar TODAS sus líneas actuales, no
+#: solo las que explican la variación mensual. Se comparte entre el clasificador y la
+#: capa de presentación para que «mis servicios» no vuelva a caer fuera de dominio.
+PATRONES_DETALLE_CARGOS: tuple[str, ...] = (
+    "detalle del recibo",
+    "detalle linea por linea",
+    "mis cargos",
+    "cargos facturados",
+    "cargos cobrados",
+    "que me cobraron",
+    "que me cobran",
+    "mis servicios",
+    "cuales son mis servicios",
+    "servicios cobrados",
+    "desglose del recibo",
+)
+
+
+def pide_detalle_cargos(utterance: str) -> bool:
+    """Si el cliente pide el desglose completo de cargos/servicios de su recibo."""
+    return any(coincide_patron(patron, utterance) for patron in PATRONES_DETALLE_CARGOS)
 
 #: Patrones por intención. Cada patrón se evalúa por tokens, así que basta con
 #: escribir la forma canónica: las variantes con posesivos, plurales y
@@ -279,6 +363,7 @@ PATRONES: dict[Intencion, tuple[str, ...]] = {
         "hasta luego",
     ),
     Intencion.EXPLICAR_RECIBO: (
+        *PATRONES_DETALLE_CARGOS,
         # Formas reales con las que se escribe esta consulta en Perú. Van PRIMERO
         # porque exigen dos raíces y las palabras sueltas de abajo exigen una: al
         # coincidir antes, el `patron` que queda como evidencia es el que de verdad
@@ -338,6 +423,14 @@ PATRONES: dict[Intencion, tuple[str, ...]] = {
         "reconexion",
         "nota de credito",
         "nota de debito",
+        "menor abono",
+        "menos abono",
+        "mayor abono",
+        "mas abono",
+        "mayor cargo",
+        "mas cargo",
+        "menor cargo",
+        "menos cargo",
         "renta adelantada",
         "renta vencida",
         "cuota del equipo",
@@ -531,6 +624,41 @@ class ResultadoIntencion(NamedTuple):
         return self.motivo_derivacion is not None
 
 
+class ResolucionContextual(NamedTuple):
+    """Intención del turno y texto efectivo después de resolver una repregunta.
+
+    ``utterance_original`` siempre conserva lo escrito por el cliente.
+    ``utterance_efectiva`` solo difiere cuando una respuesta corta acepta revisar un
+    concepto pendiente; es la que debe llegar al RAG y al generador.
+    """
+
+    intencion: ResultadoIntencion
+    utterance_original: str
+    utterance_efectiva: str
+    concepto_pendiente: str | None = None
+
+    @property
+    def contexto_aplicado(self) -> bool:
+        return self.concepto_pendiente is not None
+
+
+def concepto_facturacion(utterance: str | None) -> str | None:
+    """Devuelve el concepto canónico mencionado, si pertenece al catálogo conocido."""
+    texto = (utterance or "").strip()
+    if not texto:
+        return None
+    for concepto, patrones in _CONCEPTOS_FACTURACION:
+        if any(coincide_patron(patron, texto) for patron in patrones):
+            return concepto
+    return None
+
+
+def _es_consulta_aplicada_de_concepto(texto: str) -> bool:
+    return concepto_facturacion(texto) is not None and any(
+        coincide_patron(patron, texto) for patron in _PATRONES_CONCEPTO_APLICADO
+    )
+
+
 def _clasificar_por_patrones(texto: str) -> ResultadoIntencion | None:
     """Recorre las intenciones por prioridad y devuelve la primera que case.
 
@@ -553,6 +681,18 @@ def _clasificar_por_patrones(texto: str) -> ResultadoIntencion | None:
                     explica_recibo=False,
                 )
             continue
+        # CONSULTA_CONCEPTO tiene prioridad sobre EXPLICAR_RECIBO para que una mención
+        # desnuda («prorrateo») no abra datos privados. Justo antes de aplicar esa
+        # prioridad distinguimos la forma aplicada («¿tuve prorrateo?»), que sí pide
+        # revisar la cuenta.
+        if intencion is Intencion.CONSULTA_CONCEPTO and _es_consulta_aplicada_de_concepto(texto):
+            concepto = concepto_facturacion(texto)
+            return ResultadoIntencion(
+                intencion=Intencion.EXPLICAR_RECIBO,
+                patron=f"concepto aplicado:{concepto}",
+                motivo_derivacion=None,
+                explica_recibo=True,
+            )
         for patron in PATRONES[intencion]:
             if coincide_patron(patron, texto):
                 return ResultadoIntencion(
@@ -562,6 +702,68 @@ def _clasificar_por_patrones(texto: str) -> ResultadoIntencion | None:
                     explica_recibo=intencion is Intencion.EXPLICAR_RECIBO,
                 )
     return None
+
+
+def _ultimo_concepto_pendiente(historial: Sequence[Any] | None) -> str | None:
+    """Recupera una aclaración pendiente solo del par de turnos inmediatamente previo.
+
+    No se busca hacia atrás indefinidamente: un concepto antiguo no debe contaminar una
+    nueva pregunta. El par esperado es cliente conceptual + respuesta del asistente.
+    """
+    turnos = list(historial or ())
+    if len(turnos) < 2:
+        return None
+    turno_cliente, turno_asistente = turnos[-2], turnos[-1]
+    if getattr(turno_cliente, "rol", None) != "cliente":
+        return None
+    if getattr(turno_asistente, "rol", None) != "asistente":
+        return None
+    texto_previo = str(getattr(turno_cliente, "utterance", "") or "")
+    if clasificar_intencion(texto_previo).intencion is not Intencion.CONSULTA_CONCEPTO:
+        return None
+    return concepto_facturacion(texto_previo)
+
+
+def resolver_intencion_contextual(
+    utterance: str | None,
+    historial: Sequence[Any] | None = None,
+) -> ResolucionContextual:
+    """Resuelve respuestas cortas contra el concepto pendiente de la conversación.
+
+    Una afirmación sin pendiente conserva el comportamiento histórico de abrir el
+    recibo general. Con pendiente, se transforma en una consulta explícita y acotada,
+    por ejemplo ``sí`` -> ``¿Se aplicó prorrateo en mi último recibo?``.
+    """
+    original = (utterance or "").strip()
+    intencion = clasificar_intencion(original)
+    concepto = _ultimo_concepto_pendiente(historial)
+    pide_general = any(
+        coincide_patron(patron, original) for patron in _PATRONES_EXPLICAR_GENERAL
+    )
+    if concepto is not None and pide_general:
+        efectiva = f"Explique en general qué significa {concepto}."
+        resuelta = ResultadoIntencion(
+            intencion=Intencion.CONSULTA_CONCEPTO,
+            patron=f"contexto general:{concepto}",
+            motivo_derivacion=None,
+            explica_recibo=False,
+        )
+        return ResolucionContextual(resuelta, original, efectiva, concepto)
+
+    acepta_pendiente = intencion.patron == "afirmación" or any(
+        coincide_patron(patron, original) for patron in _PATRONES_APLICAR_PENDIENTE
+    )
+    if concepto is None or not acepta_pendiente:
+        return ResolucionContextual(intencion, original, original)
+
+    efectiva = f"¿Se aplicó {concepto} en mi último recibo?"
+    resuelta = ResultadoIntencion(
+        intencion=Intencion.EXPLICAR_RECIBO,
+        patron=f"contexto pendiente:{concepto}",
+        motivo_derivacion=None,
+        explica_recibo=True,
+    )
+    return ResolucionContextual(resuelta, original, efectiva, concepto)
 
 
 def clasificar_intencion(utterance: str | None) -> ResultadoIntencion:

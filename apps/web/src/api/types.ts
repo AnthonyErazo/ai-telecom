@@ -3,7 +3,31 @@ export type Block =
   | { tipo: "kv"; titulo?: string | null; items: Array<{ clave: string; valor: string; fact_id?: string | null }> }
   | { tipo: "puente"; titulo?: string | null; barras: Array<{ etiqueta: string; monto_cent: number; tipo: string; fact_id?: string | null }> }
   | { tipo: "tabla"; titulo?: string | null; columnas: string[]; filas: string[][]; nota?: string | null }
-  | { tipo: "aviso"; titulo?: string | null; texto: string; severidad: string; fact_ids?: string[] };
+  | { tipo: "aviso"; titulo?: string | null; texto: string; severidad: string; fact_ids?: string[] }
+  | { tipo: "ciclos"; titulo?: string | null; modalidad: string; ciclos: CicloExplicado[]; hitos: HitoCiclo[]; causas: CausaVisual[]; fact_ids?: string[] };
+
+export interface CicloExplicado {
+  periodo: string;
+  total_cent: number;
+  actual: boolean;
+  inicio?: string | null;
+  cierre?: string | null;
+  vencimiento?: string | null;
+}
+
+export interface HitoCiclo {
+  fecha: string;
+  etiqueta: string;
+  tipo: "inicio" | "cierre" | "vencimiento" | "prorrateo" | "suspension" | "reconexion";
+}
+
+export interface CausaVisual {
+  etiqueta: string;
+  monto_cent: number;
+  participacion_bp: number;
+}
+
+export type ExtractBlock<T extends Block["tipo"]> = Extract<Block, { tipo: T }>;
 
 /** Fracción homogénea del ciclo: misma tarifa y mismo estado de servicio.
  *
@@ -132,6 +156,29 @@ export interface Explanation {
 export interface DemoAccounts {
   demo: string[];
   guion: Record<string, string>;
+}
+
+export interface ResumenConversacionChat {
+  conversation_id: string;
+  titulo: string;
+  canal: string;
+  periodo?: string | null;
+  creada_en: string;
+  actualizada_en: string;
+  mensajes: number;
+}
+
+export interface MensajeConversacionChat {
+  mensaje_id: string;
+  rol: "cliente" | "asistente" | "asesor";
+  contenido: string;
+  bloques?: Block[] | null;
+  trace_id?: string | null;
+  creado_en: string;
+}
+
+export interface DetalleConversacionChat extends Omit<ResumenConversacionChat, "mensajes"> {
+  mensajes: MensajeConversacionChat[];
 }
 
 // --------------------------------------------------------------------------- //

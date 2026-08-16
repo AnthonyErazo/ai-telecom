@@ -211,6 +211,72 @@
         "title": "BloqueAviso",
         "type": "object"
       },
+      "BloqueCiclos": {
+        "additionalProperties": false,
+        "description": "Explicación visual respaldada de un máximo de dos ciclos.",
+        "properties": {
+          "causas": {
+            "items": {
+              "$ref": "#/components/schemas/CausaVisual"
+            },
+            "maxItems": 8,
+            "title": "Causas",
+            "type": "array"
+          },
+          "ciclos": {
+            "items": {
+              "$ref": "#/components/schemas/CicloExplicado"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Ciclos",
+            "type": "array"
+          },
+          "fact_ids": {
+            "description": "Campos del FactSet que respaldan el bloque",
+            "items": {
+              "type": "string"
+            },
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "hitos": {
+            "items": {
+              "$ref": "#/components/schemas/HitoCiclo"
+            },
+            "maxItems": 8,
+            "title": "Hitos",
+            "type": "array"
+          },
+          "modalidad": {
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "tipo": {
+            "const": "ciclos",
+            "default": "ciclos",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          }
+        },
+        "required": [
+          "modalidad",
+          "ciclos"
+        ],
+        "title": "BloqueCiclos",
+        "type": "object"
+      },
       "BloqueKV": {
         "additionalProperties": false,
         "description": "Lista de pares clave/valor: el desglose corto que cabe en un chat.",
@@ -253,7 +319,7 @@
       },
       "BloquePuente": {
         "additionalProperties": false,
-        "description": "Gráfico de cascada que reconstruye el recibo previo hasta el actual.\n\nEs la pieza visual que responde \"¿por qué me vino más caro?\": barra de entrada\n(recibo previo), una barra por causa (incremento/decremento) y barra de total.",
+        "description": "Resumen visual de los componentes que explican una variación.\n\nPuede representar una cascada completa o, cuando los totales ya aparecen en otro\nbloque, únicamente sus incrementos y decrementos para evitar redundancia.",
         "properties": {
           "barras": {
             "items": {
@@ -550,6 +616,90 @@
         "title": "CausaPaquete",
         "type": "object"
       },
+      "CausaVisual": {
+        "additionalProperties": false,
+        "properties": {
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "monto_cent": {
+            "title": "Monto Cent",
+            "type": "integer"
+          },
+          "participacion_bp": {
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Participacion Bp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "etiqueta",
+          "monto_cent",
+          "participacion_bp"
+        ],
+        "title": "CausaVisual",
+        "type": "object"
+      },
+      "CicloExplicado": {
+        "additionalProperties": false,
+        "description": "Uno de los dos ciclos que puede comparar el componente visual.",
+        "properties": {
+          "actual": {
+            "default": false,
+            "title": "Actual",
+            "type": "boolean"
+          },
+          "cierre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cierre"
+          },
+          "inicio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inicio"
+          },
+          "periodo": {
+            "title": "Periodo",
+            "type": "string"
+          },
+          "total_cent": {
+            "title": "Total Cent",
+            "type": "integer"
+          },
+          "vencimiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vencimiento"
+          }
+        },
+        "required": [
+          "periodo",
+          "total_cent"
+        ],
+        "title": "CicloExplicado",
+        "type": "object"
+      },
       "CifraEntregada": {
         "additionalProperties": false,
         "description": "Una cifra que **ya se le dijo al cliente**, con el estado que le dio el verificador.\n\nEs la lista literal del evento ``VERIFY``. Para el asesor vale más que la prosa: le\ndice qué números tiene el cliente en la cabeza y cuáles de ellos están respaldados.",
@@ -782,6 +932,61 @@
           }
         },
         "title": "Derivacion",
+        "type": "object"
+      },
+      "DetalleConversacion": {
+        "properties": {
+          "actualizada_en": {
+            "format": "date-time",
+            "title": "Actualizada En",
+            "type": "string"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "creada_en": {
+            "format": "date-time",
+            "title": "Creada En",
+            "type": "string"
+          },
+          "mensajes": {
+            "items": {
+              "$ref": "#/components/schemas/MensajeConversacion"
+            },
+            "title": "Mensajes",
+            "type": "array"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "titulo",
+          "canal",
+          "creada_en",
+          "actualizada_en",
+          "mensajes"
+        ],
+        "title": "DetalleConversacion",
         "type": "object"
       },
       "ElementoCola": {
@@ -1417,6 +1622,39 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HitoCiclo": {
+        "additionalProperties": false,
+        "description": "Evento verificable situado sobre la línea de tiempo.",
+        "properties": {
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "fecha": {
+            "title": "Fecha",
+            "type": "string"
+          },
+          "tipo": {
+            "enum": [
+              "inicio",
+              "cierre",
+              "vencimiento",
+              "prorrateo",
+              "suspension",
+              "reconexion"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fecha",
+          "etiqueta",
+          "tipo"
+        ],
+        "title": "HitoCiclo",
+        "type": "object"
+      },
       "Incertidumbre": {
         "additionalProperties": false,
         "description": "Algo que el sistema **no pudo confirmar**, con su porqué y su impacto.\n\nExiste porque el fallo más caro de un traspaso no es la falta de datos: es que el\nasesor dé por confirmado lo que era una hipótesis del motor. Aquí se nombra.",
@@ -1795,6 +2033,62 @@
         "title": "MensajeAsesor",
         "type": "object"
       },
+      "MensajeConversacion": {
+        "properties": {
+          "bloques": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bloques"
+          },
+          "contenido": {
+            "title": "Contenido",
+            "type": "string"
+          },
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
+          "mensaje_id": {
+            "format": "uuid",
+            "title": "Mensaje Id",
+            "type": "string"
+          },
+          "rol": {
+            "title": "Rol",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "mensaje_id",
+          "rol",
+          "contenido",
+          "creado_en"
+        ],
+        "title": "MensajeConversacion",
+        "type": "object"
+      },
       "ModalidadRenta": {
         "description": "Cómo se cobra la renta respecto del ciclo facturado.\n\nEn ADELANTADA el recibo del ciclo *k* cobra la renta del ciclo *k+1* y corrige\nel ciclo *k*: por eso conviven dos rentas en el mismo documento y el recibo puede\nsubir aunque el plan nuevo sea más barato.",
         "enum": [
@@ -1839,6 +2133,30 @@
         ],
         "title": "NivelAseguramiento",
         "type": "string"
+      },
+      "NuevaConversacion": {
+        "additionalProperties": false,
+        "properties": {
+          "canal": {
+            "default": "APP",
+            "title": "Canal",
+            "type": "string"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          }
+        },
+        "title": "NuevaConversacion",
+        "type": "object"
       },
       "PaqueteAsesor": {
         "additionalProperties": false,
@@ -2455,6 +2773,7 @@
               "discriminator": {
                 "mapping": {
                   "aviso": "#/components/schemas/BloqueAviso",
+                  "ciclos": "#/components/schemas/BloqueCiclos",
                   "kv": "#/components/schemas/BloqueKV",
                   "puente": "#/components/schemas/BloquePuente",
                   "tabla": "#/components/schemas/BloqueTabla",
@@ -2477,6 +2796,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/BloqueAviso"
+                },
+                {
+                  "$ref": "#/components/schemas/BloqueCiclos"
                 }
               ]
             },
@@ -2748,6 +3070,58 @@
           "familia"
         ],
         "title": "ResumenConcepto",
+        "type": "object"
+      },
+      "ResumenConversacion": {
+        "properties": {
+          "actualizada_en": {
+            "format": "date-time",
+            "title": "Actualizada En",
+            "type": "string"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "creada_en": {
+            "format": "date-time",
+            "title": "Creada En",
+            "type": "string"
+          },
+          "mensajes": {
+            "default": 0,
+            "title": "Mensajes",
+            "type": "integer"
+          },
+          "periodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodo"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "titulo",
+          "canal",
+          "creada_en",
+          "actualizada_en"
+        ],
+        "title": "ResumenConversacion",
         "type": "object"
       },
       "ResumenRecibo": {
@@ -3844,6 +4218,152 @@
         ]
       }
     },
+    "/v1/conversaciones": {
+      "get": {
+        "operationId": "listar_conversaciones_v1_conversaciones_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumenConversacion"
+                  },
+                  "title": "Response Listar Conversaciones V1 Conversaciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Conversaciones",
+        "tags": [
+          "conversaciones"
+        ]
+      },
+      "post": {
+        "operationId": "crear_conversacion_v1_conversaciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevaConversacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenConversacion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Conversacion",
+        "tags": [
+          "conversaciones"
+        ]
+      }
+    },
+    "/v1/conversaciones/{conversation_id}": {
+      "get": {
+        "operationId": "obtener_conversacion_v1_conversaciones__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleConversacion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Conversacion",
+        "tags": [
+          "conversaciones"
+        ]
+      }
+    },
     "/v1/derivacion": {
       "post": {
         "description": "Crea el contexto del hand-off y devuelve la referencia y el brief del asesor.\n\nReutiliza el FactSet del último turno de la conversación si existe; si no —por\nejemplo, el cliente pide asesor sin haber pedido explicación—, lo construye. Un\nhand-off sin hechos sería exactamente la derivación \"a ciegas\" que este proyecto\nquiere eliminar.",
@@ -4211,6 +4731,10 @@
     {
       "description": "Bitácora encadenada del turno.",
       "name": "auditoria"
+    },
+    {
+      "description": "Historial durable de chats de BillSense, aislado por cuenta.",
+      "name": "conversaciones"
     },
     {
       "description": "Conceptos del recibo en lenguaje de cliente.",
