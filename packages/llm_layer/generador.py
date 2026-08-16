@@ -46,13 +46,17 @@ from packages.core_domain.esquemas.respuesta import (
     BarraPuente,
     Bloque,
     BloqueAviso,
+    BloqueCiclos,
     BloqueKV,
     BloquePuente,
     BloqueTabla,
     BloqueTexto,
+    CausaVisual,
+    CicloExplicado,
     Cita,
     Derivacion,
     Gobernanza,
+    HitoCiclo,
     ItemKV,
     RespuestaCanalAgnostica,
 )
@@ -360,6 +364,7 @@ def componer_bloques(
     datos: DatosPlantilla,
     *,
     verbosidad: Verbosidad | str = Verbosidad.CORTO,
+    mostrar_ciclos: bool = False,
 ) -> list[Bloque]:
     """Construye los bloques de la respuesta.
 
@@ -379,6 +384,9 @@ def componer_bloques(
                 fact_ids=["factset:delta_total_cent", "factset:total_actual_cent"],
             )
         )
+
+    if mostrar_ciclos:
+        bloques.append(_bloque_ciclos(factset))
 
     items = [
         ItemKV(
@@ -417,15 +425,16 @@ def componer_bloques(
                 fact_id="factset:total_a_pagar_cent",
             )
         )
-    bloques.append(
-        BloqueKV(
-            titulo="Su recibo en números",
-            items=items,
-            fact_ids=["factset:total_actual_cent", "factset:total_previo_cent"],
+    if not mostrar_ciclos:
+        bloques.append(
+            BloqueKV(
+                titulo="Su recibo en números",
+                items=items,
+                fact_ids=["factset:total_actual_cent", "factset:total_previo_cent"],
+            )
         )
-    )
 
-    if factset.causas_agregadas:
+    if factset.causas_agregadas and not mostrar_ciclos:
         # Los totales anterior/actual y la diferencia ya aparecen justo arriba en
         # «Su recibo en números». Aquí se muestran solo las causas para no repetir
         # tres importes dentro de la misma respuesta.
@@ -498,6 +507,68 @@ def componer_bloques(
         bloques.append(BloqueTexto(texto=cierre))
 
     return bloques
+
+
+def _pide_visual_ciclos(utterance: str) -> bool:
+    normalizada = utterance.lower()
+    return any(
+        termino in normalizada
+        for termino in (
+            "prorrate", "ciclo", "cómo se calcula", "como se calcula",
+            "detalle", "por qué", "por que", "subió", "subio", "bajó", "bajo",
+        )
+    )
+
+
+def _bloque_ciclos(factset: FactSet) -> BloqueCiclos:
+    """Proyecta solo hechos sellados; nunca pide al LLM fechas ni importes."""
+    ciclos = [
+        CicloExplicado(
+            periodo=factset.periodo_previo,
+            total_cent=factset.total_previo_cent,
+            actual=False,
+        ),
+        CicloExplicado(
+            periodo=factset.periodo_actual,
+            total_cent=factset.total_actual_cent,
+            actual=True,
+            inicio=str(factset.ciclo_inicio) if factset.ciclo_inicio else None,
+            cierre=str(factset.ciclo_fin) if factset.ciclo_fin else None,
+            vencimiento=str(factset.fecha_vencimiento) if factset.fecha_vencimiento else None,
+        ),
+    ]
+    hitos: list[HitoCiclo] = []
+    vistos: set[tuple[str, str]] = set()
+    for linea in factset.lineas:
+        for tramo in linea.tramos or []:
+            tipo = "suspension" if str(tramo.estado) == "SUSPENDIDO" else "prorrateo"
+            clave = (str(tramo.inicio), linea.nombre_comercial)
+            if clave in vistos or len(hitos) >= 8:
+                continue
+            vistos.add(clave)
+            hitos.append(
+                HitoCiclo(fecha=str(tramo.inicio), etiqueta=linea.nombre_comercial, tipo=tipo)
+            )
+    causas = [
+        CausaVisual(
+            etiqueta=causa.etiqueta_cliente,
+            monto_cent=causa.monto_cent,
+            participacion_bp=causa.participacion_bp,
+        )
+        for causa in factset.causas_agregadas[:8]
+    ]
+    return BloqueCiclos(
+        titulo="Así cambió entre dos ciclos",
+        modalidad=str(factset.modalidad_renta),
+        ciclos=ciclos,
+        hitos=hitos,
+        causas=causas,
+        fact_ids=[
+            "factset:periodo_previo", "factset:total_previo_cent",
+            "factset:periodo_actual", "factset:total_actual_cent",
+            "factset:ciclo_inicio", "factset:ciclo_fin", "factset:fecha_vencimiento",
+        ],
+    )
 
 
 def _tabla_cargos_actuales(factset: FactSet) -> BloqueTabla:
@@ -676,7 +747,10 @@ def generar_explicacion(
             _LOG.exception("error inesperado del proveedor %s", nombre_proveedor)
             break
 
-        bloques = componer_bloques(factset, explicacion, datos, verbosidad=verbosidad)
+        bloques = componer_bloques(
+            factset, explicacion, datos, verbosidad=verbosidad,
+            mostrar_ciclos=_pide_visual_ciclos(utterance),
+        )
         texto = _texto_de(bloques)
         resultado = verificar(
             texto,
@@ -742,7 +816,10 @@ def generar_explicacion(
     # El foco se aplica al final: conserva la variación natural en las causas, pero la
     # primera frase responde exactamente al concepto pendiente incluso sin proveedor.
     explicacion = enfocar_resumen_consulta(explicacion, factset, utterance)
-    bloques = componer_bloques(factset, explicacion, datos, verbosidad=verbosidad)
+    bloques = componer_bloques(
+        factset, explicacion, datos, verbosidad=verbosidad,
+        mostrar_ciclos=_pide_visual_ciclos(utterance),
+    )
     texto = _texto_de(bloques)
     resultado = verificar(
         texto, factset, permitidos=conjunto, salida_llm=explicacion, estricto=estricto

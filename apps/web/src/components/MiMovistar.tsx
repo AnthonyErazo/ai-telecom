@@ -18,7 +18,7 @@ import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertCircle, ArrowLeft, Bot, Clock, CreditCard, Gift, Home as HomeIcon,
-  Layers, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
+  History, Layers, Loader2, MessageSquare, Mic, MicOff, Plus, Send, ShieldCheck,
   ShoppingBag, Smartphone, Star, ThumbsDown, ThumbsUp, TrendingDown, TrendingUp,
   User as UserIcon, Wallet, Wifi,
 } from "lucide-react";
@@ -52,9 +52,6 @@ const liveLabel = (s: LiveStatus): string =>
     speaking:   "BillSense está respondiendo…",
     error:      "Error de conexión de voz",
   })[s];
-
-const liveLabelShort = (s: LiveStatus): string =>
-  ({ idle:"Voz", connecting:"Conectando…", listening:"Escuchando…", consulting:"Consultando…", speaking:"Respondiendo…", error:"Error" })[s];
 
 // ── Types ─────────────────────────────────────────────────────────────
 type Pantalla = "splash"|"loginCuenta"|"registroCuenta"|"dashboard"|"recibo"|"mejorarPlan"|"comoFunciona"|"historial"|"chat";
@@ -109,6 +106,7 @@ export function MiMovistar({
   const [ultima,       setUltima]       = useState<Explanation | null>(null);
   const [opinion,      setOpinion]      = useState<"arriba"|"abajo"|null>(null);
   const [chatError,    setChatError]    = useState("");
+  const [mostrarHistorialChats, setMostrarHistorialChats] = useState(false);
 
   // ── BillSense Voz ───────────────────────────────────────────────
   const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
@@ -198,6 +196,7 @@ export function MiMovistar({
       setUltima(res); setOpinion(null);
       setMensajes((p) => [...p, { rol: "asistente", bloques: res.bloques }]);
       onExplicacion(res);
+      void historialChats.refetch();
     },
     onError: (e) => setChatError(err(e)),
   });
@@ -208,6 +207,44 @@ export function MiMovistar({
     queryKey: ["historial", cuenta],
     queryFn: () => api.historial(token),
     enabled: pantalla === "historial" && Boolean(token),
+  });
+
+  const historialChats = useQuery({
+    queryKey: ["conversaciones", cuenta],
+    queryFn: () => api.conversaciones(token),
+    enabled: mostrarHistorialChats && Boolean(token),
+  });
+
+  const nuevoChat = useMutation({
+    mutationFn: () => api.nuevaConversacion(token, periodoActivo ?? undefined),
+    onSuccess: (chat) => {
+      setConversacion(chat.conversation_id);
+      setMensajes([]);
+      setUltima(null);
+      setOpinion(null);
+      setChatError("");
+      setMostrarHistorialChats(false);
+      void historialChats.refetch();
+    },
+    onError: (e) => setChatError(err(e)),
+  });
+
+  const cargarChat = useMutation({
+    mutationFn: (conversationId: string) => api.conversacion(token, conversationId),
+    onSuccess: (chat) => {
+      setConversacion(chat.conversation_id);
+      setPeriodoActivo(chat.periodo ?? null);
+      setMensajes(chat.mensajes.map((mensaje) => ({
+        rol: mensaje.rol === "cliente" ? "cliente" : "asistente",
+        texto: mensaje.contenido,
+        bloques: mensaje.bloques ?? undefined,
+      })));
+      setUltima(null);
+      setOpinion(null);
+      setMostrarHistorialChats(false);
+      setChatError("");
+    },
+    onError: (e) => setChatError(err(e)),
   });
 
   /** Carga el `FactSet` de un periodo pasado para verlo y, si el cliente quiere,
@@ -294,6 +331,7 @@ export function MiMovistar({
         // estado ("BillSense está respondiendo…") como única señal mientras habla.
         onOutputTranscript: () => {},
         onExplanation: (res) => {
+          setConversacion(res.conversation_id);
           setUltima(res); setOpinion(null);
           // `liveMsgs` guarda lo dicho por voz mientras dura la sesión, pero este
           // callback quedó cerrado sobre el valor que tenía al conectar —no el que
@@ -309,6 +347,7 @@ export function MiMovistar({
             return [];
           });
           onExplicacion(res);
+          void historialChats.refetch();
         },
         onError: setChatError,
       }
@@ -920,10 +959,20 @@ export function MiMovistar({
           <img src={billsenseLogo} alt="BillSense" className="mm-header-billsense-logo" />
           <h1 className="mm-title">Realiza tu consulta</h1>
         </div>
-        <div style={{ width:32, display:"flex", justifyContent:"flex-end" }}>
-          <div className={`mm-live-badge${liveIsVisible?" active":""}`}>
-            {liveIsVisible ? <><Mic size={11}/> {liveLabelShort(liveStatus)}</> : <><Bot size={11}/> IA</>}
-          </div>
+        <div className="mm-chat-header-actions">
+          <button
+            className="mm-chat-header-btn"
+            aria-label="Historial de chats"
+            title="Historial de chats"
+            onClick={() => setMostrarHistorialChats((visible) => !visible)}
+          ><History size={17} /></button>
+          <button
+            className="mm-chat-header-btn primary"
+            aria-label="Nuevo chat"
+            title="Nuevo chat"
+            disabled={nuevoChat.isPending}
+            onClick={() => nuevoChat.mutate()}
+          >{nuevoChat.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={18} />}</button>
         </div>
       </div>
 
@@ -944,6 +993,32 @@ export function MiMovistar({
           <Mic size={14} /> BillSense Voz
         </button>
       </div>
+
+      {mostrarHistorialChats && (
+        <div className="mm-chat-history-panel">
+          <div className="mm-chat-history-head">
+            <div><strong>Historial de BillSense</strong><small>Conversaciones guardadas por fecha</small></div>
+            <button onClick={() => setMostrarHistorialChats(false)} aria-label="Cerrar historial">×</button>
+          </div>
+          <div className="mm-chat-history-list">
+            {historialChats.isPending && <div className="mm-chat-history-state"><Loader2 size={15} className="animate-spin" /> Cargando…</div>}
+            {historialChats.isError && <div className="mm-chat-history-state error">{err(historialChats.error)}</div>}
+            {historialChats.data?.length === 0 && <div className="mm-chat-history-state">Aún no hay conversaciones guardadas.</div>}
+            {historialChats.data?.map((chat) => (
+              <button
+                key={chat.conversation_id}
+                className={`mm-chat-history-item${chat.conversation_id === conversacion ? " active" : ""}`}
+                onClick={() => cargarChat.mutate(chat.conversation_id)}
+                disabled={cargarChat.isPending}
+              >
+                <History size={15} />
+                <span><strong>{chat.titulo}</strong><small>{new Intl.DateTimeFormat("es-PE", { dateStyle:"medium", timeStyle:"short" }).format(new Date(chat.actualizada_en))}</small></span>
+                <em>{chat.mensajes} mensajes{chat.periodo ? ` · ${chat.periodo}` : ""}</em>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════════
           MODO CHAT — texto sin audio

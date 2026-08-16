@@ -1,5 +1,6 @@
 import type {
   DemoAccounts,
+  DetalleConversacionChat,
   ElementoCola,
   EstadoSala,
   Explanation,
@@ -7,6 +8,7 @@ import type {
   LiveToken,
   PaqueteAsesor,
   ResumenRecibo,
+  ResumenConversacionChat,
 } from "./types";
 
 const configuredBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
@@ -59,6 +61,15 @@ export const api = {
   facts: (token: string, periodo?: string) =>
     request<FactSet>(`/v1/hechos${periodo ? `?periodo=${encodeURIComponent(periodo)}` : ""}`, authorized(token)),
   historial: (token: string) => request<ResumenRecibo[]>("/v1/historial", authorized(token)),
+  conversaciones: (token: string) =>
+    request<ResumenConversacionChat[]>("/v1/conversaciones", authorized(token)),
+  nuevaConversacion: (token: string, periodo?: string) =>
+    request<ResumenConversacionChat>("/v1/conversaciones", authorized(token, {
+      method: "POST",
+      body: JSON.stringify({ canal: "APP", periodo: periodo || null }),
+    })),
+  conversacion: (token: string, conversationId: string) =>
+    request<DetalleConversacionChat>(`/v1/conversaciones/${encodeURIComponent(conversationId)}`, authorized(token)),
   explain: (token: string, input: { conversation_id?: string; cuenta_id: string; periodo?: string; verbosidad: string; utterance: string }) =>
     request<Explanation>("/v1/explicar", authorized(token, { method: "POST", body: JSON.stringify({ ...input, canal: "APP" }) })),
   // El mismo endpoint que usa la App: el canal viaja en el cuerpo y la respuesta es la

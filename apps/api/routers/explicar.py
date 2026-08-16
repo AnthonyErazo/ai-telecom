@@ -53,6 +53,8 @@ ciclo de importación.
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any
@@ -64,6 +66,7 @@ from apps.api.deps import (
     AdversarioDep,
     AjustesDep,
     AuditoriaDep,
+    ConversacionesDep,
     EstadoAdversario,
     MemoriaConversaciones,
     MemoriaDep,
@@ -122,6 +125,57 @@ from packages.llm_layer.conversacional import (
 )
 from packages.llm_layer.generador import ETIQUETAS_ACCION, ResultadoGeneracion, generar_explicacion
 from packages.llm_layer.providers.base import ProveedorLLM
+
+_MESES_CONSULTA = {
+    "enero": 1,
+    "febrero": 2,
+    "marzo": 3,
+    "abril": 4,
+    "mayo": 5,
+    "junio": 6,
+    "julio": 7,
+    "agosto": 8,
+    "setiembre": 9,
+    "septiembre": 9,
+    "octubre": 10,
+    "noviembre": 11,
+    "diciembre": 12,
+}
+_PATRON_MES = re.compile(
+    rf"\b({'|'.join(_MESES_CONSULTA)})\b(?:\s+(?:de\s+)?(20\d{{2}}))?",
+    re.IGNORECASE,
+)
+_PATRON_PERIODO = re.compile(r"\b(20\d{2})[-/](0?[1-9]|1[0-2])\b")
+
+
+def _periodo_mencionado(
+    utterance: str,
+    periodo_interfaz: str | None,
+    repositorio: RepositorioCuentas,
+    cuenta: str,
+) -> str | None:
+    """Resuelve un mes dicho por el cliente sin permitir que el LLM elija el periodo."""
+    texto = unicodedata.normalize("NFKD", utterance).encode("ascii", "ignore").decode().lower()
+    numerico = _PATRON_PERIODO.search(texto)
+    if numerico:
+        return f"{int(numerico.group(1)):04d}-{int(numerico.group(2)):02d}"
+
+    nombrado = _PATRON_MES.search(texto)
+    if not nombrado:
+        return periodo_interfaz
+
+    mes = _MESES_CONSULTA[nombrado.group(1).lower()]
+    if nombrado.group(2):
+        return f"{int(nombrado.group(2)):04d}-{mes:02d}"
+
+    referencia = periodo_interfaz
+    if referencia is None:
+        referencia = repositorio.cargar(cuenta).periodo
+    anio_referencia, mes_referencia = (int(parte) for parte in referencia.split("-"))
+    # Sin año, se elige la aparición más reciente de ese mes que no sea futura
+    # respecto del recibo que el cliente está viendo.
+    anio = anio_referencia if mes <= mes_referencia else anio_referencia - 1
+    return f"{anio:04d}-{mes:02d}"
 from packages.llm_layer.verificador import (
     ConjuntoPermitido,
     ResultadoVerificacion,
@@ -214,7 +268,7 @@ def _asegurar_puente(
     un texto peor verificado que el que ya se tenía.
     """
     bloques = list(resultado.bloques)
-    if any(bloque.tipo == "puente" for bloque in bloques):
+    if any(bloque.tipo in {"puente", "ciclos"} for bloque in bloques):
         return bloques, resultado.verificacion
     puente = construir_bloque_puente(factset)
     if puente is None:
@@ -436,6 +490,7 @@ def explicar_recibo(
     memoria: MemoriaDep,
     telemetria: TelemetriaDep,
     adversario: AdversarioDep,
+    conversaciones: ConversacionesDep = None,
 ) -> RespuestaCanalAgnostica:
     """Explica por qué varió el recibo del periodo pedido.
 
@@ -461,7 +516,34 @@ def explicar_recibo(
     # flujo: si hay una persona atendiendo, ninguna de las dos rutas debe explicar nada.
     # Por eso se comprueba aquí y no dentro del grafo ni de la función lineal — así
     # ambas vías se comportan igual sin duplicar la regla.
+    cuenta = cuenta_autorizada(identidad, peticion.cuenta_id)
+    periodo_resuelto = _periodo_mencionado(
+        peticion.utterance,
+        peticion.periodo,
+        repositorio,
+        cuenta,
+    )
+    if periodo_resuelto != peticion.periodo:
+        peticion = peticion.model_copy(update={"periodo": periodo_resuelto})
     clave_conversacion = str(peticion.conversation_id or uuid.uuid4())
+    if (
+        conversaciones is not None
+        and peticion.conversation_id is not None
+        and not memoria.turnos(clave_conversacion)
+    ):
+        try:
+            for guardado in conversaciones.turnos(peticion.conversation_id, cuenta):
+                memoria.anotar_turno(
+                    clave_conversacion,
+                    Turno(
+                        utterance=str(guardado.get("contenido") or "")[:2000],
+                        rol=str(guardado.get("rol") or "cliente"),
+                        ts=guardado.get("creado_en"),
+                        progreso=guardado.get("rol") in {"asistente", "asesor"},
+                    ),
+                )
+        except Exception as error:
+            _LOG.warning("no se pudo rehidratar la conversación %s: %s", clave_conversacion, error)
     asesor_en_sala = memoria.asesor_presente(clave_conversacion)
     if asesor_en_sala:
         trace_id = nuevo_trace_id()
@@ -480,7 +562,7 @@ def explicar_recibo(
             },
             **identidad.contexto_auditoria(),
         )
-        return _responder_en_copiloto(
+        respuesta = _responder_en_copiloto(
             asesor=asesor_en_sala,
             trace_id=trace_id,
             conversacion=uuid.UUID(clave_conversacion),
@@ -488,9 +570,11 @@ def explicar_recibo(
             auditoria=auditoria,
             contexto_auditoria=identidad.contexto_auditoria(),
         )
+        _guardar_chat(conversaciones, cuenta, peticion, respuesta)
+        return respuesta
 
     conducir = _explicar_con_grafo if ajustes.usa_grafo else _explicar_directo
-    return conducir(
+    respuesta = conducir(
         peticion=peticion,
         http=http,
         identidad=identidad,
@@ -504,6 +588,32 @@ def explicar_recibo(
         telemetria=telemetria,
         adversario=adversario,
     )
+    _guardar_chat(conversaciones, cuenta, peticion, respuesta)
+    return respuesta
+
+
+def _guardar_chat(
+    almacen: Any,
+    cuenta: str,
+    peticion: PeticionExplicacion,
+    respuesta: RespuestaCanalAgnostica,
+) -> None:
+    """Persiste el par cliente/asistente sin convertir una caída de red en una caída del chat."""
+    if almacen is None:
+        return
+    try:
+        almacen.guardar_intercambio(
+            conversation_id=respuesta.conversation_id,
+            cuenta_ref=cuenta,
+            canal=str(peticion.canal or Canal.APP),
+            periodo=peticion.periodo,
+            utterance=peticion.utterance,
+            trace_id=respuesta.trace_id,
+            respuesta_texto=respuesta.texto,
+            bloques=[bloque.model_dump(mode="json") for bloque in respuesta.bloques],
+        )
+    except Exception as error:
+        _LOG.warning("no se pudo persistir el chat %s: %s", respuesta.conversation_id, error)
 
 
 def _explicar_con_grafo(

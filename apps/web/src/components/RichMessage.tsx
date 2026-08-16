@@ -13,6 +13,7 @@ import {
   Info, PauseCircle, Percent, PhoneCall, Receipt, Repeat, Wallet,
 } from "lucide-react";
 import type { Block } from "../api/types";
+import { CycleExplanationCard } from "./CycleExplanationCard";
 
 export const money = (cents: number) =>
   new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(cents / 100);
@@ -120,6 +121,10 @@ export function RichMessage({ bloques }: { bloques: Block[] }) {
       }
 
       // puente — waterfall compacto: previo -> incrementos/decrementos -> actual.
+      if (bloque.tipo === "ciclos") {
+        return <CycleExplanationCard bloque={bloque} key={key} />;
+      }
+
       return <div className="mm-rich-puente" key={key}>
         {bloque.titulo && <p className="mm-rich-titulo">{bloque.titulo}</p>}
         {bloque.barras.map((barra) =>

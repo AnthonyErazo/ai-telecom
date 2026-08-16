@@ -607,6 +607,54 @@ COMMENT ON FUNCTION auditoria_verificar_cadena(text) IS
 -- -----------------------------------------------------------------------------
 -- Vista por turno — alimenta GET /v1/auditoria y las métricas de eval/
 -- -----------------------------------------------------------------------------
+-- =============================================================================
+-- Historial de conversaciones de BillSense
+-- =============================================================================
+-- La identidad nunca sale del cuerpo de la petición: `cuenta_ref` es la cuenta
+-- tokenizada obtenida del JWT. Los mensajes conservan los bloques estructurados para
+-- reconstruir las tarjetas y gráficos exactamente como se entregaron originalmente.
+CREATE TABLE IF NOT EXISTS chat_conversacion (
+    conversation_id uuid PRIMARY KEY,
+    cuenta_ref      text        NOT NULL,
+    canal           text        NOT NULL DEFAULT 'APP',
+    titulo          text        NOT NULL DEFAULT 'Nueva conversación',
+    periodo         text,
+    creada_en       timestamptz NOT NULL DEFAULT now(),
+    actualizada_en  timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ck_chat_periodo CHECK (periodo IS NULL OR periodo ~ '^\d{4}-\d{2}$'),
+    CONSTRAINT ck_chat_titulo CHECK (length(btrim(titulo)) BETWEEN 1 AND 120)
+);
+
+CREATE INDEX IF NOT EXISTS ix_chat_conversacion_cuenta_fecha
+    ON chat_conversacion (cuenta_ref, actualizada_en DESC);
+
+CREATE TABLE IF NOT EXISTS chat_mensaje (
+    mensaje_id       uuid        PRIMARY KEY,
+    conversation_id uuid        NOT NULL REFERENCES chat_conversacion(conversation_id) ON DELETE CASCADE,
+    rol              text        NOT NULL,
+    contenido        text        NOT NULL,
+    bloques          jsonb,
+    trace_id         text,
+    creado_en        timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ck_chat_mensaje_rol CHECK (rol IN ('cliente', 'asistente', 'asesor')),
+    CONSTRAINT ck_chat_mensaje_contenido CHECK (length(contenido) <= 20000),
+    CONSTRAINT ck_chat_mensaje_bloques CHECK (bloques IS NULL OR jsonb_typeof(bloques) = 'array')
+);
+
+CREATE INDEX IF NOT EXISTS ix_chat_mensaje_conversacion_fecha
+    ON chat_mensaje (conversation_id, creado_en, mensaje_id);
+
+-- El navegador nunca consulta estas tablas mediante PostgREST: toda lectura pasa por
+-- la API, que obtiene `cuenta_ref` del JWT. Sin políticas RLS, los roles anon/authenticated
+-- de Supabase no pueden enumerar conversaciones aunque la tabla viva en `public`.
+ALTER TABLE chat_conversacion ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_mensaje ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE chat_conversacion IS
+    'Hilos de BillSense por cuenta tokenizada. Permite Nuevo chat e historial por fecha.';
+COMMENT ON TABLE chat_mensaje IS
+    'Turnos persistidos con los bloques estructurados exactos devueltos por /v1/explicar.';
+
 CREATE OR REPLACE VIEW v_auditoria_turno AS
 SELECT e.trace_id,
        min(e.ts)                                   AS inicio,
