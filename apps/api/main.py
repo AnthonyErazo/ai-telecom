@@ -39,6 +39,7 @@ from apps.api.routers import (
     evidencia,
     explicar,
     hechos,
+    historial,
     live,
     salud,
 )
@@ -150,6 +151,7 @@ def crear_aplicacion() -> FastAPI:
     aplicacion.include_router(salud.router)
     aplicacion.include_router(catalogo.router)
     aplicacion.include_router(hechos.router)
+    aplicacion.include_router(historial.router)
     aplicacion.include_router(explicar.router)
     aplicacion.include_router(evidencia.router)
     aplicacion.include_router(derivacion.router)

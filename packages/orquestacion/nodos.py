@@ -521,6 +521,7 @@ def generar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[str, Any]:
     factset = estado["factset"]
     assert factset is not None
     contexto = estado.get("contexto_recuperado")
+    clave = estado["conversation_id"]
 
     permitidos = construir_permitidos(factset)
     servicios.bolsa[_clave_permitidos(trace_id)] = permitidos
@@ -534,6 +535,13 @@ def generar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[str, Any]:
         estricto=servicios.ajustes.verificador_estricto,
         timeout_s=servicios.ajustes.llm_timeout_s,
         permitidos=permitidos,
+        # Lo que el asistente ya le contestó antes en esta conversación (mismo método
+        # que usa el camino conversacional en `redactar_sin_cifras`): sin esto, la
+        # segunda pregunta sobre el mismo recibo reconstruye el prompt desde cero y
+        # el modelo repite casi textual la primera respuesta.
+        respuestas_previas=servicios.memoria.turnos_asistente(clave)
+        if hasattr(servicios.memoria, "turnos_asistente")
+        else None,
     )
     degradado = resultado.modo is ModoGeneracion.PLANTILLA and servicios.proveedor is not None
 
@@ -711,6 +719,13 @@ def verificar_y_armar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[
     )
     if oferta is not None and all(accion.id is not oferta.id for accion in acciones):
         acciones.append(oferta)
+    # Igual que en la vía directa (`explicar.py`): ofrecer pagar no depende de que el
+    # cliente lo pida, basta con que tenga saldo pendiente.
+    if factset.total_a_pagar_cent > 0 and all(
+        accion.id is not AccionSiguiente.PAGAR for accion in acciones
+    ):
+        etiqueta, riesgo = ETIQUETAS_ACCION[AccionSiguiente.PAGAR]
+        acciones.append(Accion(id=AccionSiguiente.PAGAR, etiqueta=etiqueta, riesgo=riesgo))  # type: ignore[arg-type]
 
     gobernanza = resultado.gobernanza.model_copy(
         update={

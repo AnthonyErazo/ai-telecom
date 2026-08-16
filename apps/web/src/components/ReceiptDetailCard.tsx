@@ -1,58 +1,54 @@
 /**
  * ReceiptDetailCard — Tarjeta de desglose de factura
  *
- * Aparece como un mensaje especial dentro del chat de BillSense cuando
- * el cliente solicita ver el detalle de su factura o cuando el bot
- * considera apropiado mostrarlo. Está diseñada para verse bien dentro
- * de un flujo de chat en móvil (max-width 85 % del ancho).
+ * Aparece como un mensaje especial dentro del chat de BillSense cuando el cliente
+ * solicita ver el detalle de su factura, y como cuerpo principal de la pantalla
+ * "Mi Recibo". Sigue la misma estructura con la que Movistar presenta un recibo al
+ * cliente: cargos por categoría (Cargos Mensuales, Cargos Adicionales, Descuentos y
+ * Bonificaciones, Redondeo, Devoluciones, Débitos), deuda pasada y total a pagar,
+ * más un resumen de cuenta (estado, vencimiento, código de pago).
  *
- * Estructura (siguiendo anatomía real de factura telco):
- *   1. Cabecera    — ícono + título + período
- *   2. Hero         — total a pagar + vencimiento en rojo
- *   3. Timeline    — barra visual del ciclo de facturación
- *   4. Desglose    — filas contables (base + IGV + extras + total)
- *   5. Comparativa — mes anterior vs mes actual
- *   6. Acción      — botón "Descargar PDF original"
+ * Cada categoría es la suma de líneas reales del `FactSet` (`agruparLineas`, en
+ * `lib/recibo.ts`) — nada se calcula aquí salvo esa suma; ningún porcentaje ni
+ * proporción se inventa.
  */
-import { AlertCircle, Download, FileText, TrendingDown, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertCircle, ChevronDown, ChevronUp, CreditCard, Download,
+  FileText, ShieldCheck, TrendingDown, TrendingUp,
+} from "lucide-react";
 import type { FactSet } from "../api/types";
+import { agruparLineas } from "../lib/recibo";
 
 const soles = (c: number) =>
   new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(c / 100);
 
 interface Props {
   hechos: FactSet;
+  cuentaId?: string;
   onDownload: () => void;
 }
 
-export function ReceiptDetailCard({ hechos, onDownload }: Props) {
-  /* El desglose de IGV se retiró.
+export function ReceiptDetailCard({ hechos, cuentaId, onDownload }: Props) {
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
 
-     Aquí se hacía `Math.round(total / 1.18)` para separar base e impuesto. La cifra
-     salía correcta y aun así no puede estar: en este producto NINGÚN importe que ve
-     el cliente se calcula en el navegador. No es purismo, es lo que sostiene todo lo
-     demás —el verificador numérico comprueba cada cifra contra el FactSet antes de
-     salir, y una calculada aquí lo esquiva por completo—. Además el 18 % quedaría
-     grabado en el front: el día que cambie, o que una línea venga exenta, la tarjeta
-     mentiría con total aplomo y sin que ninguna prueba se entere.
+  const total = hechos.total_actual_cent;
+  const previo = hechos.total_previo_cent;
+  const delta = hechos.delta_total_cent;
+  const deudaAnterior = hechos.deuda_anterior_cent ?? 0;
+  const totalAPagar = hechos.total_a_pagar_cent ?? (total + deudaAnterior);
+  const sube = delta >= 0;
 
-     Si el desglose hace falta, lo aporta el FactSet como una línea más, con su
-     `fact_id`, y se pinta como se pinta todo lo demás. */
-  const total         = hechos.total_actual_cent;
-  const previo        = hechos.total_previo_cent;
-  const delta         = hechos.delta_total_cent;
-  const saldoAnt      = (hechos.deuda_anterior_cent as number | undefined) ?? 0;
-  const prorrateo     = (hechos.prorrateo_cent    as number | undefined) ?? 0;
-  const reconexion    = (hechos.reconexion_cent   as number | undefined) ?? 0;
-  const sube          = delta >= 0;
+  const periodo = hechos.periodo_actual ?? "—";
+  const vencimiento = hechos.fecha_vencimiento ? String(hechos.fecha_vencimiento) : null;
+  // Sin objeto `Date`: comparar dos strings "YYYY-MM-DD" ordena igual que comparar
+  // las fechas, y evita el desfase de huso horario de parsear una fecha con `Date`.
+  const vencido = Boolean(vencimiento && vencimiento < new Date().toISOString().slice(0, 10));
 
-  /* ── Datos de período ────────────────────────────────────────── */
-  const periodo       = hechos.periodo_actual ?? "—";
-  const vencimiento   = hechos.fecha_vencimiento ? String(hechos.fecha_vencimiento) : null;
+  const grupos = agruparLineas(hechos.lineas);
 
-  /* ── Porcentaje de la barra de comparativa ───────────────────── */
-  const maxVal  = Math.max(total, previo) || 1;
-  const pctCurr = (total  / maxVal) * 100;
+  const maxVal = Math.max(total, previo) || 1;
+  const pctCurr = (total / maxVal) * 100;
   const pctPrev = (previo / maxVal) * 100;
 
   return (
@@ -76,81 +72,86 @@ export function ReceiptDetailCard({ hechos, onDownload }: Props) {
       {/* ── 2. Hero — Total a pagar ──────────────────────────────── */}
       <div className="mm-rdc-hero">
         <p className="mm-rdc-hero-label">Total a Pagar</p>
-        <p className="mm-rdc-hero-amount">{soles(total)}</p>
+        <p className="mm-rdc-hero-amount">{soles(totalAPagar)}</p>
         {vencimiento && (
-          <div className="mm-rdc-due">
+          <div className={`mm-rdc-due${vencido ? " vencido" : ""}`}>
             <AlertCircle size={11} />
-            <span>Vence: {vencimiento}</span>
+            <span>{vencido ? "Venció el" : "Vence"}: {vencimiento}</span>
           </div>
         )}
       </div>
 
-      {/* ── 3. Línea de tiempo del ciclo ────────────────────────── */}
-      <div className="mm-rdc-timeline">
-        <div className="mm-rdc-tl-row">
-          {/* Inicio */}
-          <div className="mm-rdc-tl-step">
-            <div className="mm-rdc-tl-dot start" />
-            <span>Inicio ciclo</span>
-          </div>
-          {/* Barra */}
-          <div className="mm-rdc-tl-bar">
-            <div className="mm-rdc-tl-fill" style={{ width: "55%" }} />
-          </div>
-          {/* Vencimiento */}
-          <div className="mm-rdc-tl-step">
-            <div className={`mm-rdc-tl-dot ${vencimiento ? "mid" : "start"}`} />
-            <span>{vencimiento ? "Vencimiento" : "Pago"}</span>
-          </div>
-          {/* Barra corta */}
-          <div className="mm-rdc-tl-bar short">
-            <div className="mm-rdc-tl-fill danger" style={{ width: "80%" }} />
-          </div>
-          {/* Fin */}
-          <div className="mm-rdc-tl-step">
-            <div className="mm-rdc-tl-dot end" />
-            <span>Fin ciclo</span>
-          </div>
-        </div>
-        <p className="mm-rdc-tl-caption">Período facturado: {periodo}</p>
-      </div>
-
-      {/* ── 4. Desglose contable ────────────────────────────────── */}
+      {/* ── 3. Desglose por categoría ───────────────────────────── */}
       <div className="mm-rdc-breakdown">
-        <div className="mm-rdc-bk-row subtle">
-          <span>Saldo mes anterior</span>
-          <span>{soles(saldoAnt)}</span>
-        </div>
-        {/* Las dos filas que había aquí —base imponible e «IGV 18%»— se calculaban en el
-            navegador dividiendo el total entre 1,18. Se retiran: el importe del mes se
-            enseña entero, tal como lo devuelve el motor. Cuando el FactSet traiga el
-            desglose fiscal como línea propia, vuelven, y entonces con su `fact_id`. */}
-        <div className="mm-rdc-bk-row">
-          <span>Servicios del mes</span>
-          <span>{soles(hechos.total_actual_cent)}</span>
-        </div>
-        {prorrateo > 0 && (
-          <div className="mm-rdc-bk-row">
-            <span>Prorrateo</span>
-            <span>{soles(prorrateo)}</span>
-          </div>
-        )}
-        {reconexion > 0 && (
+        {grupos.map((grupo) => {
+          const abierto = grupoAbierto === grupo.grupo;
+          const puedeAbrir = grupo.lineas.length > 1;
+          return (
+            <div key={grupo.grupo}>
+              <button
+                type="button"
+                className={`mm-rdc-bk-row cat${grupo.aFavor ? " credito" : ""}${puedeAbrir ? " clicable" : ""}`}
+                onClick={() => puedeAbrir && setGrupoAbierto(abierto ? null : grupo.grupo)}
+              >
+                <span>{grupo.etiqueta}{puedeAbrir && (abierto ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}</span>
+                <span>{grupo.aFavor ? "− " : ""}{soles(Math.abs(grupo.monto_cent))}</span>
+              </button>
+              {abierto && (
+                <div className="mm-rdc-bk-sub">
+                  {grupo.lineas.map((linea) => (
+                    <div className="mm-rdc-bk-subrow" key={linea.concepto_id}>
+                      <span>{linea.nombre_comercial}</span>
+                      <span>{soles(linea.monto_actual_cent)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {deudaAnterior > 0 && (
           <div className="mm-rdc-bk-row alert">
-            <span>⚠ Cargo por reconexión</span>
-            <span className="text-red">{soles(reconexion)}</span>
+            <span>⚠ Deuda pasada</span>
+            <span className="text-red">{soles(deudaAnterior)}</span>
           </div>
         )}
         <div className="mm-rdc-divider" />
         <div className="mm-rdc-bk-row total">
-          <span>Total a pagar servicio</span>
-          <span>{soles(total)}</span>
+          <span>Total a pagar</span>
+          <span>{soles(totalAPagar)}</span>
+        </div>
+      </div>
+
+      {/* ── 4. Resumen de mi cuenta ─────────────────────────────── */}
+      <div className="mm-rdc-cuenta">
+        <p className="mm-rdc-cuenta-title">Resumen de mi cuenta</p>
+        <div className="mm-rdc-cuenta-grid">
+          <div>
+            <small>Estado</small>
+            <strong className={vencido ? "text-red" : "text-green"}>
+              {vencido ? <><AlertCircle size={12} /> Vencido</> : <><ShieldCheck size={12} /> Vigente</>}
+            </strong>
+          </div>
+          <div>
+            <small>Vencimiento</small>
+            <strong>{vencimiento ?? "—"}</strong>
+          </div>
+          {cuentaId && (
+            <div>
+              <small><CreditCard size={11} /> Código de pago</small>
+              <strong>{cuentaId}</strong>
+            </div>
+          )}
+          <div>
+            <small>Total</small>
+            <strong>{soles(totalAPagar)}</strong>
+          </div>
         </div>
       </div>
 
       {/* ── 5. Comparativa gráfica ──────────────────────────────── */}
       <div className="mm-rdc-compare">
-        <p className="mm-rdc-compare-label">Evolución del consumo</p>
+        <p className="mm-rdc-compare-label">Comparativa con el mes anterior</p>
         <div className="mm-rdc-bars">
           <div className="mm-rdc-bar-group">
             <div className="mm-rdc-bar-track">

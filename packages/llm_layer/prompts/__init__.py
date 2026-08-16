@@ -198,6 +198,7 @@ def construir_prompt(
     verbosidad: Verbosidad = Verbosidad.CORTO,
     canal: Canal = Canal.APP,
     correccion: str | None = None,
+    respuestas_previas: Sequence[str] | None = None,
 ) -> str:
     """Renderiza el prompt ``explicar_v1`` para un FactSet concreto.
 
@@ -208,10 +209,16 @@ def construir_prompt(
         verbosidad: ``CORTO`` o ``DETALLE``.
         canal: canal de origen, informativo para el modelo.
         correccion: si es un reintento, el mensaje con los números no anclados.
+        respuestas_previas: lo que el asistente ya le dijo al cliente en esta misma
+            conversación (``MemoriaConversaciones.turnos_asistente``), más reciente
+            al final. Se usa solo la última, para que el modelo sepa que no debe
+            repetir la misma redacción en la segunda pregunta sobre el mismo recibo.
+            Vacío o ``None`` en el primer turno: el prompt queda igual que antes.
 
     Returns:
         El prompt completo, determinístico para las mismas entradas.
     """
+    previas = list(respuestas_previas or ())
     parametros = {
         "esquema": NOMBRE_ESQUEMA_SALIDA,
         "prompt_version": version_prompt(),
@@ -223,6 +230,7 @@ def construir_prompt(
         "factset_sha256": factset.sha256 or factset.calcular_sha256(),
         "rules_version": factset.rules_version,
         "reintento": bool(correccion),
+        "turno_numero": len(previas),
     }
     plantilla = _entorno().get_template(PLANTILLA_EXPLICAR)
     return plantilla.render(
@@ -234,6 +242,7 @@ def construir_prompt(
         contexto=_preparar_contexto(contexto_recuperado),
         utterance=sanear_utterance(utterance),
         correccion=correccion,
+        respuesta_previa=previas[-1][:600] if previas else None,
     )
 
 

@@ -6,6 +6,7 @@ import type {
   FactSet,
   LiveToken,
   PaqueteAsesor,
+  ResumenRecibo,
 } from "./types";
 
 const configuredBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
@@ -55,7 +56,9 @@ export const api = {
         acting_on_behalf_of: cuentaAtendida, canal: "ASESOR"
       })
     }),
-  facts: (token: string) => request<FactSet>("/v1/hechos", authorized(token)),
+  facts: (token: string, periodo?: string) =>
+    request<FactSet>(`/v1/hechos${periodo ? `?periodo=${encodeURIComponent(periodo)}` : ""}`, authorized(token)),
+  historial: (token: string) => request<ResumenRecibo[]>("/v1/historial", authorized(token)),
   explain: (token: string, input: { conversation_id?: string; cuenta_id: string; periodo?: string; verbosidad: string; utterance: string }) =>
     request<Explanation>("/v1/explicar", authorized(token, { method: "POST", body: JSON.stringify({ ...input, canal: "APP" }) })),
   // El mismo endpoint que usa la App: el canal viaja en el cuerpo y la respuesta es la

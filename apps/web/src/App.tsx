@@ -7,8 +7,6 @@ import { WhatsApp } from "./components/WhatsApp";
 import { Asesor } from "./components/Asesor";
 import { MiMovistar } from "./components/MiMovistar";
 import { ReciboGuiado } from "./components/ReciboGuiado";
-import { GeminiLiveClient, type LiveStatus } from "./live/client";
-import { microphoneSupportError } from "./live/audio";
 
 // Solo se usan si `/dev/cuentas` no contesta. Son las cuentas del dataset sintético, así
 // que dependen de que la API esté sirviendo el disco: cuando sirve Supabase, las cuentas
@@ -17,6 +15,12 @@ import { microphoneSupportError } from "./live/audio";
 // tocar nada fallaba con «la cuenta no existe»—.
 const fallback = ["C-DEMO-01", "C-DEMO-02", "C-DEMO-03"];
 type View = "whatsapp" | "mimovistar" | "guiado" | "conversacional";
+
+// La app se sirve bajo `base: "/ui/"` (vite.config.ts): una ruta absoluta como
+// "/billsense-logo.png" apunta a la raíz del dominio, no a donde vite publica
+// `public/`, y el navegador la resuelve como imagen rota. `BASE_URL` la coloca
+// donde de verdad vive el archivo, en dev y en build.
+const billsenseLogo = `${import.meta.env.BASE_URL}billsense-logo.png`;
 
 /** Un turno de la conversación, tal y como se pinta.
  *
@@ -34,7 +38,7 @@ export default function App() {
   const [accountDraft, setAccountDraft] = useState("");
   const [token, setToken] = useState("");
   const [facts, setFacts] = useState<FactSet | null>(null);
-  const [question, setQuestion] = useState("¿Por qué me vino más caro este mes?");
+  const [question, setQuestion] = useState("");
   const [detail, setDetail] = useState("CORTO");
   const [explanation, setExplanation] = useState<Explanation | null>(null);
   const [turns, setTurns] = useState<Turno[]>([]);
@@ -44,16 +48,11 @@ export default function App() {
   // borraba la pantalla del recibo justo después de conseguirla.
   const [sesionesCerradas, setSesionesCerradas] = useState(0);
   const [error, setError] = useState("");
-  const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
-  const [inputTranscript, setInputTranscript] = useState("");
-  const [outputTranscript, setOutputTranscript] = useState("");
-  const liveClient = useRef<GeminiLiveClient | null>(null);
   const finDeLaConversacion = useRef<HTMLDivElement | null>(null);
 
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, retry: 1 });
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, retry: 1 });
   const accountList = accounts.data?.demo?.length ? accounts.data.demo : fallback;
-  const microphoneIssue = microphoneSupportError();
 
   // El campo se rellena con la primera cuenta que la API declara servible, y solo
   // mientras el usuario no haya escrito: así entrar de un clic funciona, y funciona con
@@ -94,8 +93,6 @@ export default function App() {
     },
     onError: (cause) => setError(message(cause)),
   });
-
-  useEffect(() => () => { void liveClient.current?.close(); }, []);
 
   const explain = useMutation({
     mutationFn: (utterance: string) => api.explain(token, {
@@ -148,23 +145,9 @@ export default function App() {
     if (cuentaElegida) bootstrap.mutate(cuentaElegida);
   };
 
-  const stopLive = async () => {
-    if (!liveClient.current) return;
-    const client = liveClient.current;
-    liveClient.current = null;
-    await client.close();
-  };
+  const selectView = (next: View) => setView(next);
 
-  const selectView = async (next: View) => {
-    // WhatsApp y Mi Movistar no exigen sesión previa: uno identifica por teléfono y el
-    // otro pide el id del usuario en su propia pantalla. La conversacional sí, porque
-    // reutiliza el token que emitió Mi Movistar.
-    if (next !== "conversacional") await stopLive();
-    setView(next);
-  };
-
-  const logout = async () => {
-    await stopLive();
+  const logout = () => {
     setSesionesCerradas((n) => n + 1);
     setToken("");
     setAccount("");
@@ -172,45 +155,8 @@ export default function App() {
     setExplanation(null);
     setTurns([]);
     setAudit(null);
-    setInputTranscript("");
-    setOutputTranscript("");
     setError("");
-    setLiveStatus("idle");
     setView("mimovistar");
-  };
-
-  const toggleLive = async () => {
-    if (liveClient.current) {
-      await stopLive();
-      return;
-    }
-    if (!token || !account) return;
-
-    setInputTranscript("");
-    setOutputTranscript("");
-    setError("");
-    const client = new GeminiLiveClient(
-      { authToken: token, accountId: account, conversationId: explanation?.conversation_id, detail },
-      {
-        onStatus: setLiveStatus,
-        onInputTranscript: (text) => setInputTranscript((current) => `${current} ${text}`.trim()),
-        onOutputTranscript: (text) => setOutputTranscript((current) => `${current} ${text}`.trim()),
-        onExplanation: (result) => {
-          setExplanation(result);
-          void api.audit(token, result.trace_id).then(setAudit).catch(() => setAudit(null));
-        },
-        onError: setError,
-      },
-    );
-    liveClient.current = client;
-    try {
-      await client.connect();
-    } catch (cause) {
-      liveClient.current = null;
-      setError(message(cause));
-      await client.close();
-      setLiveStatus("error");
-    }
   };
 
   const governance = explanation?.gobernanza;
@@ -221,7 +167,7 @@ export default function App() {
   const auditLines = Array.isArray(audit?.terminal) ? (audit.terminal as string[]) : [];
   return <div className="shell">
     <header className="topbar">
-      <a className="brand" href="/ui/"><span>RE</span><div>Recibo Explicado<small>IA financiera verificable</small></div></a>
+      <a className="brand" href="/ui/"><img src="https://cert-cdn.movistar.com.pe/2024/12/logo-2.svg" alt="Movistar" className="brand-logo" /><div><strong>MOVISTAR</strong></div></a>
       {/* Un canal, una pestaña. Ni más. El login dejó de ser un destino: es un paso DENTRO
           de Mi Movistar, que es donde el cliente se autentica de verdad. WhatsApp y la
           consola del 104 no lo necesitan —uno identifica por teléfono y el otro por
@@ -283,17 +229,19 @@ export default function App() {
         <button onClick={() => void selectView("mimovistar")}>Ir a Mi Movistar</button>
       </section>
     </main> : <main>
-      <section className="hero"><p className="eyebrow">IA conversacional · Cero cifras inventadas</p><h1>Entiende qué cambió en tu recibo.</h1><p>El motor calcula; la IA explica; el verificador comprueba cada número antes de mostrarlo.</p></section>
       <div className="workspace">
         <section className="customer panel">
+          <div className="ia-brand-row">
+            <img src={billsenseLogo} alt="BillSense" className="ia-brand-logo" />
+            <div><strong>BillSense</strong><span>Explicación verificada de tu recibo</span></div>
+          </div>
           <div className="controls">
             <div className="account-identity"><small>Cuenta autenticada</small><strong>{account}</strong></div>
             <label>Detalle<select value={detail} onChange={(event) => setDetail(event.target.value)}><option>CORTO</option><option>DETALLE</option></select></label>
-            <div className="live-control"><button type="button" className={liveClient.current ? "live-stop" : "live-start"} title={microphoneIssue ?? undefined} disabled={!token || Boolean(microphoneIssue) || bootstrap.isPending || liveStatus === "connecting"} onClick={() => void toggleLive()}>{liveClient.current ? "Detener voz" : "Hablar con Gemini Live"}</button><small title={microphoneIssue ?? undefined}>{microphoneIssue ? "Requiere HTTPS o localhost" : liveLabel(liveStatus)}</small></div>
           </div>
           {facts && <div className="summary"><div><small>Anterior</small><strong>{money(facts.total_previo_cent)}</strong></div><div><small>Actual</small><strong>{money(facts.total_actual_cent)}</strong></div><div className={facts.delta_total_cent >= 0 ? "up" : "down"}><small>Variación</small><strong>{facts.delta_total_cent > 0 ? "+" : ""}{money(facts.delta_total_cent)}</strong></div><div><small>Periodo</small><strong>{facts.periodo_actual}</strong></div></div>}
           <div className="conversation">
-            {turns.length === 0 && !explain.isPending && <div className="welcome"><span>✦</span><h2>Hola, soy su asistente de recibos</h2><p>Pregúnteme por qué cambió su recibo, o inicie una conversación de voz verificable.</p></div>}
+            {turns.length === 0 && !explain.isPending && <div className="welcome"><img src={billsenseLogo} alt="BillSense" /><h2>Hola, soy su asistente de recibos</h2><p>Pregúnteme por qué cambió su recibo.</p></div>}
             {turns.map((turno, indice) => turno.rol === "cliente"
               ? <div className="turn client" key={`c-${indice}`}><p>{turno.texto}</p></div>
               : <div className="turn agent" key={`a-${indice}`}><Blocks blocks={turno.explicacion.bloques} /></div>)}
@@ -301,7 +249,6 @@ export default function App() {
             <div ref={finDeLaConversacion} />
           </div>
           <div className="quick"><button onClick={() => setQuestion("¿Por qué me vino más caro este mes?")}>¿Por qué subió?</button><button onClick={() => setQuestion("¿Qué me están cobrando?")}>Ver cobros</button><button onClick={() => setQuestion("Quiero hablar con un asesor")}>Hablar con asesor</button></div>
-          {(inputTranscript || outputTranscript) && <div className="live-transcript" aria-live="polite">{inputTranscript && <p><strong>Usted:</strong> {inputTranscript}</p>}{outputTranscript && <p><strong>Gemini Live:</strong> {outputTranscript}</p>}</div>}
           <form onSubmit={submit}><input aria-label="Consulta" value={question} maxLength={2000} onChange={(event) => setQuestion(event.target.value)} /><button disabled={!token || explain.isPending}>{explain.isPending ? "Verificando…" : "Explicar"}</button></form>
         </section>
         <aside className="governance panel"><div className="panel-heading"><div><p className="eyebrow">Gobernanza en tiempo real</p><h2>Cada cifra tiene respaldo</h2></div><span className={`verdict ${governance?.verificacion_numerica === "PASS" ? "pass" : "idle"}`}>{governance?.verificacion_numerica ?? "ESPERANDO"}</span></div>
@@ -323,14 +270,9 @@ export default function App() {
         </aside>
       </div>
     </main>}
-    <footer>Recibo Explicado · Las cifras se calculan en el backend y nunca en el navegador.</footer>
   </div>;
 }
 
 function message(cause: unknown) {
   return cause instanceof ApiError ? `${cause.code}: ${cause.message}` : cause instanceof Error ? cause.message : "Ocurrió un error inesperado";
-}
-
-function liveLabel(status: LiveStatus) {
-  return ({ idle: "Voz inactiva", connecting: "Conectando…", listening: "Escuchando", consulting: "Consultando recibo", speaking: "Respondiendo", error: "Error de voz" })[status];
 }
