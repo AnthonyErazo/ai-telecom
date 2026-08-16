@@ -48,11 +48,8 @@ describe("login de cuenta", () => {
   // «Asesor 104»— y el login dejó de ser un destino propio: es un paso dentro de Mi
   // Movistar. Lo que estas pruebas custodian no ha cambiado: sin token no se ve el
   // asistente, y cerrar sesión devuelve a la pantalla de acceso.
-  // El acceso de Mi Movistar cambió al integrar `BenFran13`: ya no es un campo con la
-  // cuenta precargada, sino un flujo de varias pantallas (splash → selector → documento
-  // con teclado numérico). Estas pruebas dejan de conducir ESA pantalla y comprueban la
-  // garantía, que es la que no puede romperse y no depende del diseño: sin token LOA2 no
-  // se emite ninguno ni se piden hechos, y al cerrar sesión se vuelve al principio.
+  // Mi Movistar usa un único acceso por cuenta cliente. La cuenta sugerida viene del
+  // backend de demo y solo se intercambia por un token LOA2 al pulsar Continuar.
   it("no pide hechos ni emite token hasta que el cliente se identifica", async () => {
     renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
@@ -63,19 +60,34 @@ describe("login de cuenta", () => {
     expect(api.facts).not.toHaveBeenCalled();
   });
 
-  it("avanzar en el acceso no emite token por el camino", async () => {
+  it("muestra directamente el acceso unificado por cuenta cliente", async () => {
     renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
     await screen.findByRole("heading", { name: "App Mi Movistar" });
 
-    // El botón «Cerrar sesión» de la barra ni siquiera existe todavía, porque no hay
-    // sesión: esa es justamente la garantía. Y avanzar por el flujo de acceso no emite
-    // token ni pide hechos hasta que el cliente termina de identificarse.
     fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
 
+    expect(await screen.findByRole("heading", { name: "Ingresa a tu cuenta" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Cuenta cliente")).toHaveTextContent("C-DEMO-01");
+    expect(screen.queryByText("Todos mis productos")).toBeNull();
+    expect(screen.queryByText("Solo con mi móvil")).toBeNull();
     await waitFor(() => expect(api.token).not.toHaveBeenCalled());
     expect(api.facts).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Cerrar sesión" })).toBeNull();
+  });
+
+  it("valida la cuenta cliente y carga sus hechos facturados", async () => {
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
+    await screen.findByRole("heading", { name: "App Mi Movistar" });
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
+    await screen.findByRole("heading", { name: "Ingresa a tu cuenta" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    await waitFor(() => expect(api.token).toHaveBeenCalledWith("C-DEMO-01"));
+    expect(api.facts).toHaveBeenCalledWith("jwt-loa2");
+    expect((await screen.findAllByText("ADELANTADA")).length).toBeGreaterThan(0);
   });
 
   it("no abre BillSense con un prompt automático ni con un saludo preescrito", async () => {

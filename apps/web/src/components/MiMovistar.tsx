@@ -2,7 +2,7 @@
  * MiMovistar — App Mi Movistar completa
  *
  * Flujo de 7 pantallas:
- *   splash → selector → loginDNI/registroDNI → productos? → dashboard → recibo → chat
+ *   splash → loginCuenta/registroCuenta → dashboard → recibo → chat
  *
  * La pantalla "chat" tiene DOS modos seleccionables:
  *   ① Chat  — texto puro, sin audio. Incluye ReceiptDetailCard dentro
@@ -18,7 +18,7 @@ import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertCircle, ArrowLeft, Bot, Clock, CreditCard, Gift, Home as HomeIcon,
-  Key, Layers, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
+  Layers, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
   ShoppingBag, Smartphone, Star, ThumbsDown, ThumbsUp, TrendingDown, TrendingUp,
   User as UserIcon, Wallet, Wifi,
 } from "lucide-react";
@@ -57,14 +57,12 @@ const liveLabelShort = (s: LiveStatus): string =>
   ({ idle:"Voz", connecting:"Conectando…", listening:"Escuchando…", consulting:"Consultando…", speaking:"Respondiendo…", error:"Error" })[s];
 
 // ── Types ─────────────────────────────────────────────────────────────
-type TipoDoc  = "DNI" | "CE" | "Pasaporte";
-type Pantalla = "splash"|"selector"|"loginDNI"|"registroDNI"|"productos"|"dashboard"|"recibo"|"mejorarPlan"|"comoFunciona"|"historial"|"chat";
+type Pantalla = "splash"|"loginCuenta"|"registroCuenta"|"dashboard"|"recibo"|"mejorarPlan"|"comoFunciona"|"historial"|"chat";
 type ChatModo = "chat" | "voz";
 /** Un mensaje del historial del chat. Los del asistente guardan los `bloques`
  * estructurados que ya trajo el backend (no un texto aplanado) para pintarlos con
  * formato rico; esRecibo muestra la tarjeta de factura inline en su lugar. */
 type Mensaje  = { rol: "cliente"|"asistente"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean };
-interface Producto { id: string; tipo: "movil"|"hogar"; etiqueta: string; numero: string }
 
 // ── Numpad grid ───────────────────────────────────────────────────────
 const PAD: string[][] = [
@@ -84,9 +82,7 @@ export function MiMovistar({
 }) {
   // ── Pantalla / nav ──────────────────────────────────────────────
   const [pantalla,      setPantalla]      = useState<Pantalla>("splash");
-  const [modoSoloMovil, setModoSoloMovil] = useState(false);
   const [aceptaTC,      setAceptaTC]      = useState(false);
-  const [esRegistro,    setEsRegistro]    = useState(false);
   const [bottomTab,     setBottomTab]     = useState("inicio");
   const [chatModo,      setChatModo]      = useState<ChatModo>("chat");
   const [mostrarPago,   setMostrarPago]   = useState(false);
@@ -101,8 +97,7 @@ export function MiMovistar({
   const [errorPeriodo,   setErrorPeriodo]   = useState("");
 
   // ── Auth ────────────────────────────────────────────────────────
-  const [tipoDoc,   setTipoDoc]   = useState<TipoDoc>("DNI");
-  const [documento, setDocumento] = useState("");
+  const [cuentaEntrada, setCuentaEntrada] = useState("");
   const [cuenta,    setCuenta]    = useState("");
   const [token,     setToken]     = useState("");
   const [hechos,    setHechos]    = useState<FactSet | null>(null);
@@ -114,9 +109,6 @@ export function MiMovistar({
   const [ultima,       setUltima]       = useState<Explanation | null>(null);
   const [opinion,      setOpinion]      = useState<"arriba"|"abajo"|null>(null);
   const [chatError,    setChatError]    = useState("");
-
-  // ── Productos ───────────────────────────────────────────────────
-  const [productosSim, setProductosSim] = useState<Producto[]>([]);
 
   // ── BillSense Voz ───────────────────────────────────────────────
   const [liveStatus, setLiveStatus] = useState<LiveStatus>("idle");
@@ -145,7 +137,7 @@ export function MiMovistar({
   }, [liveMsgs]);
 
   // ── Derived ─────────────────────────────────────────────────────
-  const cuentaElegida = (documento || sugerida).trim();
+  const cuentaElegida = (cuentaEntrada || sugerida).trim();
   const liveActivo    = Boolean(liveRef.current);
   const liveIsVisible = liveActivo || ["connecting","listening","consulting","speaking"].includes(liveStatus);
   const oferta        = ultima?.acciones.find((a) => a.id === "VER_ALTERNATIVAS");
@@ -188,18 +180,7 @@ export function MiMovistar({
     },
     onSuccess: ({ id, token: tk, factset }) => {
       setCuenta(id); setToken(tk); setHechos(factset); setChatError(""); onSesion(id, tk);
-      const todas = cuentas.data?.demo ?? [];
-      if (todas.length > 1 && pantalla === "registroDNI") {
-        setProductosSim(todas.slice(0, 3).map((c, i) => ({
-          id: c,
-          tipo: (i % 2 === 0 ? "movil" : "hogar") as "movil"|"hogar",
-          etiqueta: i % 2 === 0 ? `Línea móvil ${i+1}` : `Movistar Hogar ${i+1}`,
-          numero:   i % 2 === 0 ? `+51 9${c.slice(-8)}`  : `Jr. Los Olivos ${100+i}, Lima`,
-        })));
-        setPantalla("productos");
-      } else {
-        setPantalla("dashboard");
-      }
+      setPantalla("dashboard");
     },
     onError: (e) => setChatError(err(e)),
   });
@@ -284,8 +265,8 @@ export function MiMovistar({
     explicar.mutate("¿Qué alternativas de plan tengo disponibles según mi cuenta?");
 
   const pad = (key: string) => {
-    if (key === "⌫") setDocumento((p) => p.slice(0, -1));
-    else if (key) setDocumento((p) => p + key);
+    if (key === "⌫") setCuentaEntrada((p) => p.slice(0, -1));
+    else if (key) setCuentaEntrada((p) => p + key);
   };
 
   const stopLive = async () => {
@@ -434,8 +415,8 @@ export function MiMovistar({
           </div>
         </div>
         <div className="mm-splash-actions">
-          <button className="mm-btn-primary" onClick={() => { setEsRegistro(false); setPantalla("selector"); }}>Iniciar sesión</button>
-          <button className="mm-btn-outline" onClick={() => { setEsRegistro(true); setAceptaTC(false); setPantalla("selector"); }}>
+          <button className="mm-btn-primary" onClick={() => { setCuentaEntrada(""); setChatError(""); setPantalla("loginCuenta"); }}>Iniciar sesión</button>
+          <button className="mm-btn-outline" onClick={() => { setAceptaTC(false); setCuentaEntrada(""); setChatError(""); setPantalla("registroCuenta"); }}>
             Registrarme
           </button>
         </div>
@@ -447,71 +428,26 @@ export function MiMovistar({
   );
 
   // ════════════════════════════════════════════════════════════════
-  // SELECTOR — Vista 1 (dos tarjetas)
+  // ACCESO UNIFICADO POR CUENTA CLIENTE
   // ════════════════════════════════════════════════════════════════
-  if (pantalla === "selector") return (
-    <div className={F}>
-      {hdr("Iniciar sesión", () => setPantalla("splash"))}
-      <div className="mm-selector-body">
-        <div className="mm-selector-hero">
-          <div className="mm-selector-hero-icon">
-            <div className="mm-selector-phone-shadow" />
-            <div className="mm-selector-phone-body"><Smartphone size={40} className="text-white" /></div>
-          </div>
-        </div>
-        <h2 className="mm-selector-titulo">Elige tu forma de ingreso</h2>
-        <p className="mm-selector-sub">Selecciona cómo deseas gestionar tus servicios Movistar</p>
-        <div className="mm-selector-cards">
-          <button id="btn-todos-productos" className="mm-selector-card"
-            onClick={() => { setModoSoloMovil(false); setDocumento(""); setChatError(""); setPantalla(esRegistro ? "registroDNI" : "loginDNI"); }}>
-            <div className="mm-sc-icon" style={{ background:"#e4f7fd" }}><Key size={24} className="text-[#019DF4]" /></div>
-            <div className="mm-sc-body">
-              <strong>{esRegistro ? "Soy titular" : "Todos mis productos"}</strong>
-              <span>Gestiona todos tus productos y beneficios como titular</span>
-            </div>
-            <span className="mm-sc-arrow">›</span>
-          </button>
-          <button id="btn-solo-movil" className="mm-selector-card"
-            onClick={() => { setModoSoloMovil(true); setDocumento(""); setChatError(""); setPantalla(esRegistro ? "registroDNI" : "loginDNI"); }}>
-            <div className="mm-sc-icon" style={{ background:"#edfae1" }}><Smartphone size={24} className="text-[#5BC500]" /></div>
-            <div className="mm-sc-body">
-              <strong>Solo con mi móvil</strong>
-              <span>Podrás ver y gestionar solo una línea móvil</span>
-            </div>
-            <span className="mm-sc-arrow">›</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ════════════════════════════════════════════════════════════════
-  // LOGIN DNI (Vista 2) / REGISTRO DNI (Vista 4)
-  // ════════════════════════════════════════════════════════════════
-  if (pantalla === "loginDNI" || pantalla === "registroDNI") {
-    const esReg = pantalla === "registroDNI";
+  if (pantalla === "loginCuenta" || pantalla === "registroCuenta") {
+    const esReg = pantalla === "registroCuenta";
     const puede = cuentaElegida.length > 0 && (!esReg || aceptaTC);
     return (
       <div className={F}>
-        {hdr(esReg ? "Registrarme" : "Iniciar sesión",
-             () => setPantalla(esReg ? "splash" : "selector"))}
+        {hdr(esReg ? "Registrarme" : "Iniciar sesión", () => setPantalla("splash"))}
         <div className="mm-dni-body">
           <div className="mm-dni-illustration">
             <div className="mm-dni-ilu-circle"><UserIcon size={38} className="text-[#019DF4]" /></div>
             {esReg && <div className="mm-dni-ilu-badge"><ShieldCheck size={14} className="text-white" /></div>}
           </div>
-          <h2 className="mm-dni-titulo">¡Genial!</h2>
-          <p className="mm-dni-sub">Solo ingresa tu documento de identidad</p>
+          <h2 className="mm-dni-titulo">Ingresa a tu cuenta</h2>
+          <p className="mm-dni-sub">Escribe tu cuenta cliente asociada a tus recibos</p>
           <div className="mm-dni-form">
-            <select className="mm-dni-select" value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value as TipoDoc)}>
-              <option value="DNI">DNI</option>
-              <option value="CE">Carnet Ext.</option>
-              <option value="Pasaporte">Pasaporte</option>
-            </select>
-            <div className="mm-dni-display" aria-label="Número de documento">
-              {documento
-                ? <span className="mm-dni-number">{documento}</span>
-                : <span className="mm-dni-placeholder">{sugerida || "N° de documento"}</span>}
+            <div className="mm-dni-display" aria-label="Cuenta cliente">
+              {cuentaEntrada
+                ? <span className="mm-dni-number">{cuentaEntrada}</span>
+                : <span className="mm-dni-placeholder">{sugerida || "N.º de cuenta cliente"}</span>}
             </div>
           </div>
           {chatError && <p className="mm-error-msg">{chatError}</p>}
@@ -546,32 +482,6 @@ export function MiMovistar({
   }
 
   // ════════════════════════════════════════════════════════════════
-  // PRODUCTOS
-  // ════════════════════════════════════════════════════════════════
-  if (pantalla === "productos") return (
-    <div className={F}>
-      {hdr("Mis Productos", () => setPantalla("registroDNI"))}
-      <div className="mm-productos-body">
-        <p className="mm-productos-intro">
-          Tienes <strong>{productosSim.length} productos</strong> a tu nombre. Selecciona el que deseas gestionar:
-        </p>
-        <div className="mm-productos-lista">
-          {productosSim.map((p) => (
-            <button key={p.id} className="mm-producto-item"
-              onClick={() => p.id !== cuenta ? entrar.mutate(p.id) : setPantalla("dashboard")}>
-              <div className={`mm-producto-icon ${p.tipo}`}>
-                {p.tipo === "movil" ? <Smartphone size={22} /> : <HomeIcon size={22} />}
-              </div>
-              <div className="mm-producto-info"><strong>{p.etiqueta}</strong><span>{p.numero}</span></div>
-              <div className="mm-producto-arrow">›</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  // ════════════════════════════════════════════════════════════════
   // DASHBOARD — Vista 3 (con bottom nav)
   // ════════════════════════════════════════════════════════════════
   if (pantalla === "dashboard") return (
@@ -583,7 +493,7 @@ export function MiMovistar({
         </div>
         <button className="mm-dash-line-pill" onClick={() => navTo("recibo")}>
           <Smartphone size={13} />
-          <span>{modoSoloMovil ? "Solo móvil" : hechos?.modalidad_renta ?? "Mi Plan"}</span>
+          <span>{hechos?.modalidad_renta ?? "Cuenta cliente"}</span>
         </button>
       </div>
       <div className="mm-dash-scroll">
