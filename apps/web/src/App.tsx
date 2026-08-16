@@ -260,7 +260,7 @@ export default function App() {
           try { setAudit(await api.audit(token || "", resultado.trace_id)); } catch { setAudit(null); }
         }}
       />
-    </main> : view === "guiado" ? <main className="canal-completo canal-ancho">
+    </main> : view === "guiado" ? <main className="canal-completo">
       {/* Misma app, con el recibo delante: cada frase enciende la línea de la que habla.
           La pantalla no interpreta el texto, lee los `fact_ids` que el motor ya puso. */}
       <ReciboGuiado

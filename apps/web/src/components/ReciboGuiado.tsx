@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Pause, Play, Send, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, Pause, Play, Send, Sparkles, Volume2, VolumeX } from "lucide-react";
 import MovistarLogo from "./MovistarLogo";
 import { api, ApiError } from "../api/client";
 import type { Block, Explanation, FactSet, LineaFactSet } from "../api/types";
@@ -100,11 +100,16 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
   const [conversacion, setConversacion] = useState<string | undefined>();
   const [error, setError] = useState("");
   const finPasos = useRef<HTMLDivElement | null>(null);
+  const lineaEncendida = useRef<HTMLLIElement | null>(null);
 
   const cuentas = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, retry: 1 });
   const sugerida = cuentas.data?.demo?.[0] ?? "";
   useEffect(() => { if (!documento && sugerida) setDocumento(sugerida); }, [sugerida, documento]);
   const cuentaElegida = (documento || sugerida).trim();
+  // `guion` mapea cuenta -> caso del reto que ejemplifica. Sale de qué grupos de cargo
+  // tiene la cuenta en su último ciclo, así que no es una etiqueta puesta a mano.
+  const casos = Object.entries(cuentas.data?.guion ?? {});
+  const casoActual = cuentas.data?.guion?.[cuenta] ?? "";
 
   const entrar = useMutation({
     mutationFn: async (id: string) => {
@@ -184,7 +189,11 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
   // está delante, que es de las cosas más desconcertantes que puede hacer una interfaz.
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
-  useEffect(() => { finPasos.current?.scrollIntoView?.({ behavior: "smooth", block: "end" }); }, [indice]);
+  // En un móvil el recibo no cabe entero, así que resaltar una línea que está fuera de la
+  // pantalla es no resaltar nada: se la trae a la vista antes de que se lea la frase.
+  useEffect(() => {
+    lineaEncendida.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [indice]);
 
   const preguntar = (texto: string) => {
     const limpio = texto.trim();
@@ -195,41 +204,71 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
   };
 
   // ------------------------------------------------------------------ acceso
+  //
+  // No es un formulario de login, es un elector de casos. Un número de cuenta no le dice
+  // nada a nadie —«604511549» no anuncia que ahí hay una reconexión—, y el reto pide
+  // enseñar cinco situaciones distintas. La API ya devuelve qué caso ejemplifica cada
+  // cuenta, así que elegir cuenta es elegir qué se quiere ver explicado.
   if (pantalla === "acceso") {
     return (
-      <div className="min-h-full flex items-center justify-center bg-gray-50 p-6">
-        <form
-          className="w-full max-w-sm bg-white rounded-3xl shadow-card border border-gray-100 p-8 space-y-6"
-          onSubmit={(e) => { e.preventDefault(); if (cuentaElegida) entrar.mutate(cuentaElegida); }}
-        >
+      <div className="min-h-full bg-gray-50 px-4 py-8 flex justify-center">
+        <div className="w-full max-w-md space-y-5">
           <div className="text-center space-y-3">
             <div className="bg-sky-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
               <MovistarLogo className="h-10 w-auto" />
             </div>
             <h1 className="text-xl font-bold text-gray-800 m-0">Recibo guiado</h1>
-            <p className="text-sm text-gray-500">Le señalamos en el recibo lo que le vamos contando.</p>
+            <p className="text-sm text-gray-500 m-0">
+              Le señalamos en el recibo lo que le vamos contando.
+            </p>
           </div>
-          <div className="space-y-2">
-            <label htmlFor="cuenta-guiada" className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Número de cuenta
-            </label>
-            <input
-              id="cuenta-guiada" list="cuentas-guiadas" value={documento} autoFocus
-              onChange={(e) => setDocumento(e.target.value)}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-[#019DF4] outline-none"
-            />
-            <datalist id="cuentas-guiadas">
-              {(cuentas.data?.demo ?? []).map((id) => <option key={id} value={id} />)}
-            </datalist>
-          </div>
-          {error && <p className="text-sm text-rose-600">{error}</p>}
-          <button
-            type="submit" disabled={!cuentaElegida || entrar.isPending}
-            className="w-full bg-[#019DF4] hover:bg-[#0089d8] disabled:opacity-50 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
-          >
-            {entrar.isPending ? <Loader2 size={18} className="animate-spin" /> : null} Entrar
-          </button>
-        </form>
+
+          {casos.length > 0 && (
+            <ul className="space-y-2 m-0 p-0 list-none">
+              {casos.map(([id, caso]) => (
+                <li key={id}>
+                  <button
+                    onClick={() => entrar.mutate(id)}
+                    disabled={entrar.isPending}
+                    className="w-full text-left bg-white border border-gray-200 rounded-2xl px-4 py-3.5 hover:border-[#019DF4] disabled:opacity-50 flex items-center gap-3"
+                  >
+                    <span className="flex-1 flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-gray-800">{caso}</span>
+                      <span className="text-xs text-gray-400 mt-0.5">Cuenta {id}</span>
+                    </span>
+                    {entrar.isPending && entrar.variables === id
+                      ? <Loader2 size={16} className="animate-spin text-[#019DF4]" />
+                      : <ChevronRight size={18} className="text-gray-300" />}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <details className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+            <summary className="text-sm text-gray-600 cursor-pointer">Usar otra cuenta</summary>
+            <form
+              className="flex gap-2 mt-3"
+              onSubmit={(e) => { e.preventDefault(); if (cuentaElegida) entrar.mutate(cuentaElegida); }}
+            >
+              <input
+                id="cuenta-guiada" list="cuentas-guiadas" value={documento}
+                onChange={(e) => setDocumento(e.target.value)}
+                className="flex-1 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-[#019DF4] outline-none min-w-0"
+              />
+              <datalist id="cuentas-guiadas">
+                {(cuentas.data?.demo ?? []).map((id) => <option key={id} value={id} />)}
+              </datalist>
+              <button
+                type="submit" disabled={!cuentaElegida || entrar.isPending}
+                className="bg-[#019DF4] disabled:opacity-50 text-white font-semibold px-5 rounded-xl text-sm"
+              >
+                Entrar
+              </button>
+            </form>
+          </details>
+          {error && <p className="text-sm text-rose-600 text-center">{error}</p>}
+        </div>
       </div>
     );
   }
@@ -242,19 +281,29 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
   const deuda = hechos?.deuda_anterior_cent ?? 0;
   const totalAPagar = (hechos?.total_actual_cent ?? 0) + deuda;
   return (
-    <div className="min-h-full bg-gray-50 flex flex-col">
-      <div className="bg-white px-5 py-4 flex items-center gap-3 border-b border-gray-100">
-        <button onClick={() => setPantalla("acceso")} className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600" aria-label="Volver">
+    // Una sola columna, siempre, y alta fija: el recibo se desplaza por dentro y el
+    // narrador se queda pegado abajo. Las dos columnas de antes obligaban a partir la
+    // atención entre dos sitios, y en un móvil directamente no caben: la explicación
+    // acababa debajo del recibo, fuera de pantalla, justo cuando señala una línea.
+    <div className="mx-auto w-full max-w-md h-[calc(100dvh-200px)] min-h-[520px] flex flex-col bg-white sm:rounded-2xl sm:shadow-card sm:border sm:border-gray-100 overflow-hidden">
+      <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100 shrink-0">
+        <button onClick={() => { window.speechSynthesis?.cancel(); setPantalla("acceso"); }}
+                className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600" aria-label="Volver a los casos">
           <ArrowLeft size={20} />
         </button>
-        <MovistarLogo className="h-6 w-auto" />
-        <h1 className="font-bold text-lg text-gray-800 m-0">Recibo guiado</h1>
-        <span className="ml-auto text-xs text-gray-400">{cuenta}</span>
+        <MovistarLogo className="h-5 w-auto shrink-0" />
+        <span className="min-w-0 flex flex-col">
+          <span className="font-bold text-sm text-gray-800 truncate">
+            {casoActual || "Recibo guiado"}
+          </span>
+          <span className="text-[11px] text-gray-400">Cuenta {cuenta}</span>
+        </span>
       </div>
 
-      <div className="flex-1 grid lg:grid-cols-2 gap-5 p-5 items-start">
-        {/* ------------------------------------------------------ el recibo */}
-        <section className="bg-white rounded-2xl shadow-card border border-gray-100 overflow-hidden">
+      {/* Lo único que se desplaza. El narrador de abajo no se mueve nunca, así que la
+          frase que se está leyendo siempre está a la vista aunque el recibo sea largo. */}
+      <div className="flex-1 overflow-y-auto chat-scroll">
+        <section>
           {/* «Información general del recibo», la primera sección del recibo real: total
               a pagar, último día de pago y la cuenta. Es lo que el cliente busca primero,
               así que va arriba y en grande, como en la app. */}
@@ -298,6 +347,7 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
               return (
                 <li
                   key={linea.concepto_id}
+                  ref={encendida ? lineaEncendida : undefined}
                   className={`flex items-center justify-between gap-3 px-5 py-3 transition-all duration-500 ${
                     encendida ? "bg-amber-50 ring-2 ring-inset ring-amber-400" : ""
                   } ${apagada ? "opacity-35" : "opacity-100"}`}
@@ -331,40 +381,38 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
           </ul>
         </section>
 
-        {/* ------------------------------------------------- la explicación */}
-        <section className="bg-white rounded-2xl shadow-card border border-gray-100 flex flex-col min-h-[420px]">
-          <div className="flex-1 p-5 space-y-3 overflow-y-auto chat-scroll">
-            {!pasos.length && !explicar.isPending && (
-              <button
-                onClick={() => preguntar("¿Por qué me vino más caro este mes?")}
-                className="w-full bg-[#019DF4] hover:bg-[#0089d8] text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2"
-              >
-                <Sparkles size={18} /> Explícame este recibo
-              </button>
-            )}
-            {explicar.isPending && (
-              <p className="text-sm text-gray-400 flex items-center gap-2">
-                <Loader2 size={16} className="animate-spin" /> Revisando su recibo…
-              </p>
-            )}
-            {pasos.slice(0, indice + 1).map((item, posicion) => (
-              <p
-                key={posicion}
-                onClick={() => { setIndice(posicion); setReproduciendo(false); }}
-                className={`text-sm leading-relaxed rounded-xl px-4 py-3 cursor-pointer transition-all duration-300 ${
-                  posicion === indice
-                    ? "bg-sky-50 text-gray-800 ring-1 ring-sky-200"
-                    : "text-gray-400 hover:text-gray-600"
-                }`}
-              >
-                {item.texto}
-              </p>
-            ))}
-            <div ref={finPasos} />
-          </div>
+      </div>
 
-          {pasos.length > 1 && (
-            <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-3">
+      {/* ---------------------------------------------------- el narrador ---
+          Fijo abajo y con UNA sola frase: la que se está leyendo. El historial de la
+          explicación se quitó a propósito. En una pantalla de móvil, apilar las frases
+          anteriores empuja hacia arriba la que importa y obliga a leer un muro para
+          encontrarla; y la que importa es siempre la última, porque es la que señala. Los
+          puntos de progreso dejan volver atrás para quien quiera repasar. */}
+      <div className="shrink-0 border-t border-gray-100 bg-white">
+        {!pasos.length && !explicar.isPending && (
+          <div className="p-4">
+            <button
+              onClick={() => preguntar("¿Por qué cambió mi recibo este mes?")}
+              className="w-full bg-[#019DF4] hover:bg-[#0089d8] text-white font-semibold py-3.5 rounded-2xl flex items-center justify-center gap-2"
+            >
+              <Sparkles size={18} /> Explícame este recibo
+            </button>
+          </div>
+        )}
+
+        {explicar.isPending && (
+          <p className="px-5 py-5 text-sm text-gray-400 flex items-center gap-2 m-0">
+            <Loader2 size={16} className="animate-spin" /> Revisando su recibo…
+          </p>
+        )}
+
+        {paso && !explicar.isPending && (
+          <>
+            <p className="px-5 pt-4 pb-3 text-[15px] leading-relaxed text-gray-800 m-0 min-h-[76px]">
+              {paso.texto}
+            </p>
+            <div className="px-4 pb-3 flex items-center gap-2">
               <button
                 onClick={() => setReproduciendo((previo) => !previo)}
                 className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
@@ -384,8 +432,9 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
                 {pasos.map((_, posicion) => (
                   <button
                     key={posicion}
-                    onClick={() => { setIndice(posicion); setReproduciendo(false); }}
+                    onClick={() => { window.speechSynthesis?.cancel(); setIndice(posicion); }}
                     aria-label={`Paso ${posicion + 1}`}
+                    aria-current={posicion === indice}
                     className={`h-1.5 flex-1 rounded-full transition-colors ${
                       posicion <= indice ? "bg-[#019DF4]" : "bg-gray-200"
                     }`}
@@ -394,28 +443,29 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
               </div>
               <span className="text-xs text-gray-400 tabular-nums">{indice + 1}/{pasos.length}</span>
             </div>
-          )}
+          </>
+        )}
 
-          <form
-            className="p-4 border-t border-gray-100 flex gap-2"
-            onSubmit={(evento: FormEvent) => { evento.preventDefault(); preguntar(borrador); }}
+        <form
+          className="px-4 pb-4 pt-1 flex gap-2"
+          onSubmit={(evento: FormEvent) => { evento.preventDefault(); preguntar(borrador); }}
+        >
+          <input
+            value={borrador} onChange={(e) => setBorrador(e.target.value)}
+            placeholder="Pregunte otra cosa sobre su recibo"
+            className="flex-1 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-[#019DF4] outline-none min-w-0"
+          />
+          <button
+            type="submit" disabled={!borrador.trim() || explicar.isPending}
+            className="bg-[#019DF4] hover:bg-[#0089d8] disabled:opacity-40 text-white px-4 rounded-xl shrink-0"
+            aria-label="Enviar"
           >
-            <input
-              value={borrador} onChange={(e) => setBorrador(e.target.value)}
-              placeholder="Pregunte otra cosa sobre su recibo"
-              className="flex-1 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-[#019DF4] outline-none"
-            />
-            <button
-              type="submit" disabled={!borrador.trim() || explicar.isPending}
-              className="bg-[#019DF4] hover:bg-[#0089d8] disabled:opacity-40 text-white px-4 rounded-xl"
-              aria-label="Enviar"
-            >
-              <Send size={18} />
-            </button>
-          </form>
-          {error && <p className="px-5 pb-4 text-sm text-rose-600 m-0">{error}</p>}
-        </section>
+            <Send size={18} />
+          </button>
+        </form>
+        {error && <p className="px-5 pb-4 text-sm text-rose-600 m-0">{error}</p>}
       </div>
+      <div ref={finPasos} />
     </div>
   );
 }

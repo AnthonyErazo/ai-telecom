@@ -63,6 +63,26 @@ VAR_DSN = "SUPABASE_DB_URL"
 #: que se anulan (164 524 de 297 002 filas): sumarlos duplicaría cargos.
 GRUPO_EXCLUIDO = "NO CONSIDERAR"
 
+#: Los escenarios que pide el reto, cada uno con el grupo de cargo que lo delata en el
+#: dataset y cómo se le nombra al que elige la cuenta.
+#:
+#: El nombre del grupo hace la mitad del trabajo: el facturador ya separa el prorrateo de
+#: renta adelantada del de renta vencida con el sufijo «VENCIDO», así que las dos
+#: modalidades que exige el reto salen del propio dato y no de una suposición nuestra.
+#:
+#: «Cambio de plan» no está, y es a propósito. En el CRM hay 11 648 órdenes «Pedido de
+#: Cliente | Cambiar» que no dicen QUÉ se cambió; ofrecerlas como cambios de plan sería
+#: prometer un escenario que después la explicación no puede sostener. Cuando el negocio
+#: confirme qué significa ese código, esto es una línea más.
+ESCENARIOS: tuple[tuple[str, str], ...] = (
+    ("CARGO FIJO PROPORCIONAL VENCIDO", "Prorrateo · renta vencida"),
+    ("CARGO FIJO PROPORCIONAL", "Prorrateo · renta adelantada"),
+    ("DESCUENTO CARGO RECURRENTE", "Fin de descuento"),
+    ("CARGO POR RECONEXION", "Reconexión tras suspensión"),
+    ("PAQUETES", "Compra de paquetes"),
+)
+
+
 #: Familia canónica según el GRUPO del facturador. El orden de comprobación importa:
 #: primero lo que el dato afirma, nunca el prefijo del código (una heurística sobre el
 #: prefijo «FR» resultó ser falsa en los 221 códigos que empiezan así).
@@ -268,6 +288,74 @@ class TransporteSupabase:
             _LOG.warning("no se pudieron listar cuentas de Supabase: %s", error)
             return []
         return [str(fila[0]) for fila in filas]
+
+    def cuentas_por_escenario(self, por_escenario: int = 2) -> dict[str, str]:
+        """Cuentas elegidas porque **ejemplifican** un caso del reto, no por su tamaño.
+
+        El criterio anterior —mayor variación entre los dos últimos ciclos— parecía el
+        más demostrativo y resultó ser el peor. Las variaciones más grandes del dataset
+        son bajas de servicios caros, y una baja no trae orden en el CRM: las diez cuentas
+        que salían tenían 21 de 27 líneas sin causa, ningún prorrateo, ningún fin de
+        descuento. El motor sabía explicar cinco escenarios y la demo solo podía enseñar
+        uno, no porque faltara el dato sino porque el selector miraba lo que no era.
+
+        Ahora se pregunta por el caso: para cada escenario se buscan cuentas cuyo **último
+        ciclo** contenga ese grupo de cargo, que es la garantía de que el concepto está en
+        el recibo que se va a explicar y no en uno viejo. Se sigue exigiendo variación
+        entre ciclos —sin ella la pantalla dice que no pasó nada— y se ordena por tamaño
+        dentro de cada escenario.
+
+        Args:
+            por_escenario: cuántas cuentas se ofrecen de cada caso. Dos bastan para poder
+                enseñar otra si la primera resulta poco clara.
+
+        Returns:
+            ``{cuenta: descripción del escenario}``, en el orden de ``ESCENARIOS``. Una
+            cuenta puede ejemplificar dos casos; se queda con el primero, porque lo que
+            se está eligiendo es qué mirar primero, no clasificando la cuenta.
+        """
+        elegidas: dict[str, str] = {}
+        for grupo, etiqueta in ESCENARIOS:
+            try:
+                filas = self._conexion.execute(
+                    """
+                    WITH por_ciclo AS (
+                        SELECT financial_account_key AS cuenta,
+                               ciclo,
+                               SUM(charge_total_amount) AS total,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY financial_account_key ORDER BY ciclo DESC
+                               ) AS puesto
+                        FROM cargo_facturado
+                        WHERE grupo <> %s
+                        GROUP BY financial_account_key, ciclo
+                    ),
+                    con_caso AS (
+                        SELECT DISTINCT financial_account_key AS cuenta, ciclo
+                        FROM cargo_facturado
+                        WHERE grupo = %s
+                    )
+                    SELECT actual.cuenta
+                    FROM por_ciclo AS actual
+                    JOIN por_ciclo AS previo
+                      ON previo.cuenta = actual.cuenta AND previo.puesto = 2
+                    JOIN con_caso
+                      ON con_caso.cuenta = actual.cuenta AND con_caso.ciclo = actual.ciclo
+                    WHERE actual.puesto = 1
+                      AND ABS(actual.total - previo.total) >= 1
+                    ORDER BY ABS(actual.total - previo.total) DESC
+                    LIMIT %s
+                    """,
+                    (GRUPO_EXCLUIDO, grupo, max(1, por_escenario)),
+                ).fetchall()
+            except Exception as error:
+                # Un escenario que falla no puede dejar la pantalla de entrada vacía: se
+                # pierde ese caso del recorrido y los demás siguen ofreciéndose.
+                _LOG.warning("no se pudieron listar cuentas de «%s»: %s", etiqueta, error)
+                continue
+            for fila in filas:
+                elegidas.setdefault(str(fila[0]), etiqueta)
+        return elegidas
 
     # -- construcción del documento ------------------------------------------ #
     def _documento(self, cuenta_id: str, ciclos: int) -> dict[str, Any]:

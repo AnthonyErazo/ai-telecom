@@ -251,17 +251,27 @@ def cuentas(ajustes: AjustesDep, repositorio: RepositorioDep) -> dict[str, Any]:
     transporte = getattr(repositorio.brainybill, "transporte", None)
     enumerar = getattr(transporte, "cuentas", None)
     if callable(enumerar):
-        reales = list(enumerar(10))
+        # Primero se pide el recorrido por escenarios; si el transporte no sabe hacerlo,
+        # se cae a la lista por tamaño de variación, que es lo que había.
+        #
+        # El guion dejó de estar vacío, y la razón es que la premisa anterior era falsa.
+        # Se dijo aquí que «describir el caso de una cuenta real exigiría abrir su
+        # recibo», y no: el grupo de cargo lo dice sin abrir nada. Con el criterio de
+        # mayor variación la demo enseñaba diez cuentas dominadas por bajas de servicio,
+        # sin causa y sin prorrateo, así que de los cinco casos del reto solo se podía ver
+        # uno. El dato estaba; el selector miraba lo que no era.
+        por_caso = getattr(transporte, "cuentas_por_escenario", None)
+        guion: dict[str, str] = dict(por_caso()) if callable(por_caso) else {}
+        reales = list(guion) or list(enumerar(10))
         return {
             "raiz": f"{getattr(transporte, 'nombre', 'externo')}:cargo_facturado",
             "total": len(reales),
             # Van en ``demo`` porque es la clave que lee la interfaz para poblar el
-            # desplegable. No son cuentas de guion —el dataset real no trae guion— pero
-            # sí son las únicas que la pantalla puede ofrecer sin mentir.
+            # desplegable.
             "demo": reales,
-            # Sin guion: describir el caso de una cuenta real exigiría abrir su recibo, y
-            # este endpoint no explica nada, solo dice a quién se puede preguntar.
-            "guion": {},
+            # Qué caso del reto ejemplifica cada una. La interfaz lo enseña para que
+            # elegir cuenta sea elegir qué se quiere ver explicado.
+            "guion": guion,
             "muestra": reales,
         }
 
