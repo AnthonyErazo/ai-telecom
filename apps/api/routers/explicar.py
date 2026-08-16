@@ -950,6 +950,15 @@ def _explicar_directo(
     )
     if oferta is not None and all(accion.id is not oferta.id for accion in acciones):
         acciones.append(oferta)
+    # Ofrecer pagar es tan de rutina como ofrecer el detalle: no hace falta que el
+    # cliente lo pida, basta con que tenga algo pendiente. A diferencia de
+    # DERIVAR_ASESOR (último recurso) esta acción se agrega siempre que hay saldo,
+    # sea cual sea la causa que se explicó.
+    if factset.total_a_pagar_cent > 0 and all(
+        accion.id is not AccionSiguiente.PAGAR for accion in acciones
+    ):
+        etiqueta, riesgo = ETIQUETAS_ACCION[AccionSiguiente.PAGAR]
+        acciones.append(Accion(id=AccionSiguiente.PAGAR, etiqueta=etiqueta, riesgo=riesgo))  # type: ignore[arg-type]
 
     gobernanza = resultado.gobernanza.model_copy(
         update={

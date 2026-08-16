@@ -66,9 +66,17 @@ _PATRONES_JITTER: tuple[tuple[re.Pattern[str], tuple[str, str, str]], ...] = tup
 _DIGITOS = re.compile(r"\d+")
 
 
-def semilla_de(factset_id: str) -> int:
-    """Semilla determinística del jitter: los 64 bits altos de ``sha256(factset_id)``."""
-    digest = hashlib.sha256(str(factset_id).encode("utf-8")).hexdigest()
+def semilla_de(factset_id: str, turno_numero: int = 0) -> int:
+    """Semilla determinística del jitter: los 64 bits altos de ``sha256(factset_id)``.
+
+    ``turno_numero`` (0 en el primer turno) se mezcla en la semilla a partir del
+    segundo turno, para que la segunda pregunta sobre el mismo recibo no elija
+    exactamente los mismos sinónimos —y por tanto no repita el mismo texto— que la
+    primera. En el turno 0 la semilla es **idéntica** a como era antes de esto: no
+    se le agrega sufijo, para no invalidar ninguna salida ya fijada como golden.
+    """
+    base = str(factset_id) if turno_numero <= 0 else f"{factset_id}#{turno_numero}"
+    digest = hashlib.sha256(base.encode("utf-8")).hexdigest()
     return int(digest[:16], 16)
 
 
@@ -113,18 +121,23 @@ class MockProvider:
                 inventa nada: el generador degradará a la plantilla determinística).
         """
         del esquema, timeout_s  # la salida se valida contra ExplicacionLLM, no hay red
-        datos = self._datos_del_prompt(prompt)
+        datos, turno_numero = self._datos_del_prompt(prompt)
         explicacion = renderizar_explicacion(datos)
         if self.jitter:
-            explicacion = self._aplicar_jitter(explicacion, datos)
+            explicacion = self._aplicar_jitter(explicacion, datos, turno_numero)
         # La salida SIEMPRE es válida: se revalida antes de devolverla.
         return ExplicacionLLM.model_validate(explicacion.model_dump()).model_dump(mode="json")
 
     # ------------------------------------------------------------------ #
     # Interno
     # ------------------------------------------------------------------ #
-    def _datos_del_prompt(self, prompt: str) -> DatosPlantilla:
-        """Reconstruye los datos de plantilla leyendo los bloques del prompt."""
+    def _datos_del_prompt(self, prompt: str) -> tuple[DatosPlantilla, int]:
+        """Reconstruye los datos de plantilla leyendo los bloques del prompt.
+
+        Devuelve también ``turno_numero`` (0 en el primer turno de la conversación),
+        que ``construir_prompt`` ya deja en ``PARAMETROS`` — es cuántas respuestas
+        previas del asistente había al armar el prompt.
+        """
         bruto_factset = extraer_bloque(prompt, "FACTSET")
         if not bruto_factset:
             raise ErrorRespuestaInvalida(
@@ -143,15 +156,19 @@ class MockProvider:
         except json.JSONDecodeError:
             parametros = {}
 
-        return construir_datos(
+        datos = construir_datos(
             resumen,
             verbosidad=parametros.get("verbosidad", "CORTO"),
             factset_id=str(parametros.get("factset_id", "")),
         )
+        turno_numero = int(parametros.get("turno_numero") or 0)
+        return datos, turno_numero
 
-    def _aplicar_jitter(self, explicacion: ExplicacionLLM, datos: DatosPlantilla) -> ExplicacionLLM:
+    def _aplicar_jitter(
+        self, explicacion: ExplicacionLLM, datos: DatosPlantilla, turno_numero: int = 0
+    ) -> ExplicacionLLM:
         """Aplica el jitter al resumen y a cada frase, con una única semilla."""
-        azar = random.Random(semilla_de(datos.factset_id))
+        azar = random.Random(semilla_de(datos.factset_id, turno_numero))
         return explicacion.model_copy(
             update={
                 "resumen": recortar_seguro(aplicar_jitter(explicacion.resumen, azar), 180),

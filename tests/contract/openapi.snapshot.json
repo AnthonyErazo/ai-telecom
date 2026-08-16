@@ -2750,6 +2750,57 @@
         "title": "ResumenConcepto",
         "type": "object"
       },
+      "ResumenRecibo": {
+        "additionalProperties": false,
+        "description": "Una fila de ``GET /v1/historial``: lo justo para listar un periodo, sin el\ndetalle línea a línea que sí trae el ``FactSet`` de ``GET /v1/hechos``.",
+        "properties": {
+          "deuda_anterior_cent": {
+            "title": "Deuda Anterior Cent",
+            "type": "integer"
+          },
+          "es_actual": {
+            "description": "Si es el periodo que hoy ve el cliente en Mi Recibo",
+            "title": "Es Actual",
+            "type": "boolean"
+          },
+          "estado_servicio": {
+            "title": "Estado Servicio",
+            "type": "string"
+          },
+          "fecha_emision": {
+            "title": "Fecha Emision",
+            "type": "string"
+          },
+          "fecha_vencimiento": {
+            "title": "Fecha Vencimiento",
+            "type": "string"
+          },
+          "modalidad_renta": {
+            "title": "Modalidad Renta",
+            "type": "string"
+          },
+          "periodo": {
+            "title": "Periodo",
+            "type": "string"
+          },
+          "total_cent": {
+            "title": "Total Cent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "periodo",
+          "total_cent",
+          "fecha_emision",
+          "fecha_vencimiento",
+          "modalidad_renta",
+          "deuda_anterior_cent",
+          "estado_servicio",
+          "es_actual"
+        ],
+        "title": "ResumenRecibo",
+        "type": "object"
+      },
       "TipoMovimiento": {
         "description": "Evento del historial de órdenes (Amdocs) capaz de explicar una variación.",
         "enum": [
@@ -4074,6 +4125,37 @@
         "summary": "FactSet conciliado del periodo (409 si el recibo no cuadra)",
         "tags": [
           "hechos"
+        ]
+      }
+    },
+    "/v1/historial": {
+      "get": {
+        "description": "Lista el periodo actual y hasta 5 anteriores, del más reciente al más antiguo.",
+        "operationId": "obtener_historial_v1_historial_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResumenRecibo"
+                  },
+                  "title": "Response Obtener Historial V1 Historial Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Hasta 5 recibos anteriores de la cuenta, resumidos",
+        "tags": [
+          "historial"
         ]
       }
     },

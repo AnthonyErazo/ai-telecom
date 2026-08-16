@@ -8,6 +8,7 @@ Router                     Nivel   Ruta
 ``explicar``               LOA1    ``POST /v1/explicar``
 ``derivacion``             LOA1    ``POST /v1/derivacion``
 ``hechos``                 LOA2    ``GET /v1/hechos``
+``historial``              LOA2    ``GET /v1/historial``
 ``evidencia``              LOA2    ``GET /v1/evidencia/{explicacion_id}``
 ``auditoria``              LOA2    ``GET /v1/auditoria``
 ``dev``                    —       ``POST /dev/token``, ``/dev/alucinar`` (solo dev)
@@ -22,6 +23,7 @@ from apps.api.routers import (
     evidencia,
     explicar,
     hechos,
+    historial,
     salud,
 )
 
@@ -33,5 +35,6 @@ __all__ = [
     "evidencia",
     "explicar",
     "hechos",
+    "historial",
     "salud",
 ]

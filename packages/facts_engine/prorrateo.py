@@ -15,11 +15,12 @@ Contenido:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from fractions import Fraction
+from typing import Any
 
 from packages.core_domain.dinero import Centimos, prorratear, redondear_banca, repartir_mayor_resto
 from packages.core_domain.enums import ConvencionProrrateo, EstadoServicio, ModalidadRenta
@@ -40,6 +41,7 @@ __all__ = [
     "dias_30_360",
     "dias_para_prorrateo",
     "distribuir_renta_por_tramos",
+    "promocion_a_parametros",
     "recibos_de_alta",
     "renta_del_ciclo",
     "total_adelantada",
@@ -757,3 +759,48 @@ def cronograma_frances(
         cronograma=cronograma,
         movimiento_id=movimiento_id,
     )
+
+
+def promocion_a_parametros(promocion: Mapping[str, Any]) -> dict[str, Any]:
+    """Traduce lo que devuelve el transporte a los argumentos de :func:`recibos_de_alta`.
+
+    Es el último tramo que faltaba. Las fórmulas del vídeo estaban implementadas con los
+    valores del ejemplo —50 % durante 90 días— porque no había de dónde sacar los del
+    cliente; ``v_descuento_cuota`` los trae medidos uno a uno y esto los pone en la forma
+    que la fórmula espera.
+
+    Tres conversiones, y ninguna es trivial:
+
+    * **Porcentaje a fracción exacta.** Llega como ``50.0`` y la fórmula quiere
+      ``Fraction(1, 2)``. Se pasa por ``Fraction(str(...))`` sobre centésimas: un
+      ``float`` convertido directo arrastra su error binario a una aritmética que el
+      resto del módulo mantiene exacta a propósito.
+    * **Meses a días.** La promoción se mide en meses en el CRM (``PromotionDuration``)
+      y en DÍAS en el recibo, que es lo que produce el recibo mixto. Se multiplica por
+      los días del ciclo en vez de usar los 90 fijos: una promoción de 6 meses son 180
+      días, no 90, y con el valor por defecto el cuarto recibo saldría partido cuando en
+      realidad quedan tres meses enteros de descuento.
+    * **Días ya consumidos.** El cliente no empieza de cero: lleva ``dias_consumidos``
+      gastados, así que la bolsa que queda es la duración menos lo consumido. Sin esto se
+      le prometerían días de descuento que ya disfrutó.
+
+    Devuelve solo las claves que constan. Lo que no venga se queda fuera y la fórmula usa
+    su valor por defecto, que es el comportamiento correcto: un dato ausente no debe
+    convertirse en un cero.
+    """
+    parametros: dict[str, Any] = {}
+
+    porcentaje = promocion.get("porcentaje_promocion")
+    if porcentaje is not None:
+        parametros["tasa_descuento"] = Fraction(str(porcentaje)) / 100
+
+    meses = promocion.get("meses_promocion")
+    if meses is not None:
+        dias_ciclo = int(promocion.get("dias_ciclo") or 30)
+        consumidos = int(promocion.get("dias_consumidos") or 0)
+        parametros["dias_promocion"] = max(0, int(meses) * dias_ciclo - consumidos)
+
+    modalidad = promocion.get("modalidad_renta")
+    if modalidad:
+        parametros["modalidad"] = ModalidadRenta(modalidad)
+    return parametros

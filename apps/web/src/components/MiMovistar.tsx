@@ -17,15 +17,19 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, ArrowLeft, Bot, CreditCard, Gift, Home as HomeIcon,
-  Key, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
+  AlertCircle, ArrowLeft, Bot, Clock, CreditCard, Gift, Home as HomeIcon,
+  Key, Layers, Loader2, MessageSquare, Mic, MicOff, Send, ShieldCheck,
   ShoppingBag, Smartphone, Star, ThumbsDown, ThumbsUp, TrendingDown, TrendingUp,
-  User as UserIcon, Phone, Wifi,
+  User as UserIcon, Wallet, Wifi,
 } from "lucide-react";
 import MovistarLogo from "./MovistarLogo";
+import { PagoModal } from "./PagoModal";
 import { ReceiptDetailCard } from "./ReceiptDetailCard";
+import { RentaExplicativa } from "./RentaExplicativa";
+import { RichMessage } from "./RichMessage";
 import { api, ApiError } from "../api/client";
 import type { Block, Explanation, FactSet } from "../api/types";
+import { agruparLineas } from "../lib/recibo";
 import { GeminiLiveClient, type LiveStatus } from "../live/client";
 import { microphoneSupportError } from "../live/audio";
 
@@ -38,17 +42,6 @@ const billsenseLogo = `${import.meta.env.BASE_URL}billsense-logo.png`;
 
 const soles = (c: number) =>
   new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(c / 100);
-
-const narrativa = (bloques: Block[]) =>
-  bloques
-    .filter((b) => b.tipo === "texto" || b.tipo === "aviso")
-    .map((b) => (b as { texto: string }).texto.trim())
-    .filter(Boolean)
-    // Un espacio, no un salto de párrafo. Cada causa viaja en su propio bloque
-    // —para poder señalarla en el recibo guiado— y con el salto el chat pintaba
-    // cuatro párrafos donde hay una idea: el mismo texto con el triple de alto y
-    // con pinta de informe. Se lee de un vistazo.
-    .join(" ");
 
 const liveLabel = (s: LiveStatus): string =>
   ({
@@ -65,10 +58,12 @@ const liveLabelShort = (s: LiveStatus): string =>
 
 // ── Types ─────────────────────────────────────────────────────────────
 type TipoDoc  = "DNI" | "CE" | "Pasaporte";
-type Pantalla = "splash"|"selector"|"loginDNI"|"registroDNI"|"productos"|"dashboard"|"recibo"|"chat";
+type Pantalla = "splash"|"selector"|"loginDNI"|"registroDNI"|"productos"|"dashboard"|"recibo"|"mejorarPlan"|"comoFunciona"|"historial"|"chat";
 type ChatModo = "chat" | "voz";
-/** Un mensaje del historial del chat. esRecibo muestra la tarjeta de factura inline. */
-type Mensaje  = { rol: "cliente"|"asistente"; texto: string; esVoz?: boolean; esRecibo?: boolean };
+/** Un mensaje del historial del chat. Los del asistente guardan los `bloques`
+ * estructurados que ya trajo el backend (no un texto aplanado) para pintarlos con
+ * formato rico; esRecibo muestra la tarjeta de factura inline en su lugar. */
+type Mensaje  = { rol: "cliente"|"asistente"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean };
 interface Producto { id: string; tipo: "movil"|"hogar"; etiqueta: string; numero: string }
 
 // ── Numpad grid ───────────────────────────────────────────────────────
@@ -94,6 +89,16 @@ export function MiMovistar({
   const [esRegistro,    setEsRegistro]    = useState(false);
   const [bottomTab,     setBottomTab]     = useState("inicio");
   const [chatModo,      setChatModo]      = useState<ChatModo>("chat");
+  const [mostrarPago,   setMostrarPago]   = useState(false);
+
+  // ── Historial ───────────────────────────────────────────────────
+  // `periodoActivo` es el periodo sobre el que BillSense está contestando en el
+  // chat: `null` significa "el periodo actual", tal como ya funcionaba. Se activa
+  // solo al entrar a un recibo del historial y se limpia al volver.
+  const [periodoActivo,  setPeriodoActivo]  = useState<string | null>(null);
+  const [hechosPeriodo,  setHechosPeriodo]  = useState<FactSet | null>(null);
+  const [cargandoPeriodo,setCargandoPeriodo]= useState(false);
+  const [errorPeriodo,   setErrorPeriodo]   = useState("");
 
   // ── Auth ────────────────────────────────────────────────────────
   const [tipoDoc,   setTipoDoc]   = useState<TipoDoc>("DNI");
@@ -144,6 +149,9 @@ export function MiMovistar({
   const liveActivo    = Boolean(liveRef.current);
   const liveIsVisible = liveActivo || ["connecting","listening","consulting","speaking"].includes(liveStatus);
   const oferta        = ultima?.acciones.find((a) => a.id === "VER_ALTERNATIVAS");
+  // Igual que la oferta de arriba: BillSense la sugiere sola (backend, `explicar.py`)
+  // cuando queda saldo por pagar; el chat solo pinta el botón si está en la lista.
+  const puedePagar    = Boolean(ultima?.acciones.some((a) => a.id === "PAGAR"));
   const derivada      = ultima?.derivacion.requerida;
   const sube          = (hechos?.delta_total_cent ?? 0) >= 0;
   const nombreCliente = cuenta
@@ -155,12 +163,21 @@ export function MiMovistar({
   // que el frontend calcula (días restantes), y es aritmética sobre un dato real, no
   // un importe nuevo.
   const deudaPendienteCent = (hechos?.deuda_anterior_cent as number | undefined) ?? 0;
-  const alDia              = deudaPendienteCent <= 0;
+  const tieneDeudaAnterior = deudaPendienteCent > 0;
   const vencimiento        = hechos?.fecha_vencimiento ? new Date(hechos.fecha_vencimiento) : null;
   const diasParaVencer     = vencimiento ? Math.ceil((vencimiento.getTime() - Date.now()) / 86_400_000) : null;
+  const reciboVencido      = diasParaVencer !== null && diasParaVencer < 0;
+  // "Cuenta al día" solo si NINGÚN indicador está en rojo. Antes se calculaba mirando
+  // únicamente la deuda arrastrada de ciclos previos, así que un cliente sin deuda
+  // anterior pero con el recibo del propio mes vencido veía "Cuenta al día" y "Recibo
+  // vencido" en la misma tarjeta —dos badges contradictorios sobre el mismo estado.
+  const alDia              = !tieneDeudaAnterior && !reciboVencido;
   const pctDelta           = hechos && hechos.total_previo_cent > 0
     ? Math.round(Math.abs(hechos.delta_total_cent) / hechos.total_previo_cent * 100)
     : null;
+  const totalLineas        = hechos?.lineas?.length ?? 0;
+  const lineasVariaron     = hechos?.lineas?.filter((l) => l.delta_cent !== 0).length ?? 0;
+  const pctLineasVariaron  = totalLineas > 0 ? Math.round((lineasVariaron / totalLineas) * 100) : 0;
 
   // ── Mutations ───────────────────────────────────────────────────
   const entrar = useMutation({
@@ -189,15 +206,49 @@ export function MiMovistar({
 
   const explicar = useMutation({
     mutationFn: (texto: string) =>
-      api.explain(token, { conversation_id: conversacion, cuenta_id: cuenta, verbosidad: detail, utterance: texto }),
+      api.explain(token, {
+        conversation_id: conversacion, cuenta_id: cuenta, verbosidad: detail, utterance: texto,
+        // Si el cliente está viendo un recibo del historial, BillSense contesta
+        // sobre ESE periodo; si no, `periodo` va vacío y el backend usa el actual.
+        periodo: periodoActivo ?? undefined,
+      }),
     onSuccess: (res) => {
       setConversacion(res.conversation_id);
       setUltima(res); setOpinion(null);
-      setMensajes((p) => [...p, { rol: "asistente", texto: narrativa(res.bloques) }]);
+      setMensajes((p) => [...p, { rol: "asistente", bloques: res.bloques }]);
       onExplicacion(res);
     },
     onError: (e) => setChatError(err(e)),
   });
+
+  // Hasta 5 recibos anteriores al actual (`GET /v1/historial`), cargados solo
+  // cuando el cliente entra a la pantalla de historial.
+  const historial = useQuery({
+    queryKey: ["historial", cuenta],
+    queryFn: () => api.historial(token),
+    enabled: pantalla === "historial" && Boolean(token),
+  });
+
+  /** Carga el `FactSet` de un periodo pasado para verlo y, si el cliente quiere,
+   * preguntarle a BillSense por él. El periodo más antiguo del historial puede no
+   * tener uno anterior con el que compararse (`SIN_RECIBO_PREVIO`, 422) — se
+   * muestra como aviso, no como error roto. */
+  const verPeriodo = async (periodo: string) => {
+    setCargandoPeriodo(true); setErrorPeriodo(""); setHechosPeriodo(null);
+    try {
+      setHechosPeriodo(await api.facts(token, periodo));
+    } catch (e) {
+      setErrorPeriodo(
+        e instanceof ApiError && e.code === "SIN_RECIBO_PREVIO"
+          ? "Este es el recibo más antiguo disponible: no hay uno previo con el que compararlo todavía."
+          : err(e)
+      );
+    } finally {
+      setCargandoPeriodo(false);
+    }
+  };
+
+  const volverAlPeriodoActual = () => { setPeriodoActivo(null); setChatError(""); };
 
   // ── Handlers ────────────────────────────────────────────────────
   const preguntar = (texto: string) => {
@@ -223,6 +274,14 @@ export function MiMovistar({
       setBorrador(q);
     }
   };
+
+  /** "Ver opciones" en Mejorar mi plan. No hay catálogo de planes con precio/GB en el
+   * FactSet —lo confirma el propio backend (VER_ALTERNATIVAS no lleva cifras, ver
+   * explicar.py)—, así que esta pantalla no inventa ninguna. Si ya se preguntó algo en
+   * la sesión se reusa esa respuesta; si no, hay que pedirla explícitamente. */
+  const abrirMejorarPlan = () => setPantalla("mejorarPlan");
+  const consultarAlternativas = () =>
+    explicar.mutate("¿Qué alternativas de plan tengo disponibles según mi cuenta?");
 
   const pad = (key: string) => {
     if (key === "⌫") setDocumento((p) => p.slice(0, -1));
@@ -264,7 +323,7 @@ export function MiMovistar({
             const pregunta = current.filter((m) => m.role === "user").map((m) => m.text).join(" ").trim();
             setMensajes((p) => {
               const conPregunta = pregunta ? [...p, { rol:"cliente" as const, texto:pregunta, esVoz:true }] : p;
-              return [...conPregunta, { rol:"asistente" as const, texto:narrativa(res.bloques), esVoz:true }];
+              return [...conPregunta, { rol:"asistente" as const, bloques:res.bloques, esVoz:true }];
             });
             return [];
           });
@@ -291,15 +350,18 @@ export function MiMovistar({
   };
 
   /** Genera un PDF imprimible del recibo en una ventana nueva */
-  const generarPDF = () => {
-    if (!hechos) return;
-    const base = Math.round(hechos.total_actual_cent / 1.18);
-    const igv  = hechos.total_actual_cent - base;
-    const saldoAnt  = (hechos.deuda_anterior_cent as number|undefined) ?? 0;
-    const prorrateo = (hechos.prorrateo_cent      as number|undefined) ?? 0;
-    const reconexion= (hechos.reconexion_cent     as number|undefined) ?? 0;
+  const generarPDF = (fs: FactSet | null = hechos) => {
+    if (!fs) return;
+    const deudaAnterior = fs.deuda_anterior_cent ?? 0;
+    const totalAPagar = fs.total_a_pagar_cent ?? (fs.total_actual_cent + deudaAnterior);
+    // Mismo agrupamiento que la tarjeta en pantalla (`ReceiptDetailCard`): cada fila
+    // es una suma real de líneas del FactSet, nunca un cálculo inventado en el
+    // navegador (ni IGV al 18%, ni ningún otro porcentaje).
+    const filas = agruparLineas(fs.lineas)
+      .map((g) => `<tr><td>${g.etiqueta}</td><td${g.aFavor ? ' style="color:#5BC500"' : ""}>${g.aFavor ? "− " : ""}${soles(Math.abs(g.monto_cent))}</td></tr>`)
+      .join("");
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Factura Movistar ${hechos.periodo_actual}</title>
+<title>Factura Movistar ${fs.periodo_actual}</title>
 <style>
   body{font-family:Arial,sans-serif;max-width:580px;margin:0 auto;padding:24px;color:#172033}
   .top{background:#019DF4;color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px}
@@ -310,28 +372,26 @@ export function MiMovistar({
   table{width:100%;border-collapse:collapse;margin-bottom:16px}
   td{padding:10px 8px;border-bottom:1px solid #edf0f4;font-size:13px}
   td:last-child{text-align:right;font-weight:600}
-  .tax td{background:#f8fafc;color:#68768a}
+  .alert td{background:#fff2f2;color:#cc4c3d}
   .total td{background:#e4f7fd;font-weight:800;font-size:15px}
   .footer{font-size:11px;color:#9fb1c4;text-align:center;margin-top:20px}
   @media print{.no-print{display:none}}
 </style></head><body>
-<div class="top"><h1>App Mi Movistar</h1><p>Detalle de Facturación — ${hechos.periodo_actual}</p></div>
+<div class="top"><h1>App Mi Movistar</h1><p>Detalle de Facturación — ${fs.periodo_actual}</p></div>
 <div class="hero">
   <p style="margin:0;font-size:12px;color:#68768a;text-transform:uppercase;letter-spacing:.1em">Total a Pagar</p>
-  <p class="amt">${soles(hechos.total_actual_cent)}</p>
-  ${hechos.fecha_vencimiento ? `<p class="due">⚠ Vence: ${String(hechos.fecha_vencimiento)}</p>` : ""}
+  <p class="amt">${soles(totalAPagar)}</p>
+  ${fs.fecha_vencimiento ? `<p class="due">⚠ Vence: ${String(fs.fecha_vencimiento)}</p>` : ""}
 </div>
 <table>
-  <tr><td>Saldo mes anterior</td><td>${soles(saldoAnt)}</td></tr>
-  <tr><td>Servicios del mes actual (base imponible)</td><td>${soles(base)}</td></tr>
-  <tr class="tax"><td>IGV 18%</td><td>${soles(igv)}</td></tr>
-  ${prorrateo ? `<tr><td>Prorrateo</td><td>${soles(prorrateo)}</td></tr>` : ""}
-  ${reconexion ? `<tr><td>Cargo por reconexión</td><td style="color:#cc4c3d">${soles(reconexion)}</td></tr>` : ""}
-  <tr class="total"><td>Total a pagar servicio</td><td>${soles(hechos.total_actual_cent)}</td></tr>
+  ${filas}
+  ${deudaAnterior > 0 ? `<tr class="alert"><td>Deuda pasada</td><td>${soles(deudaAnterior)}</td></tr>` : ""}
+  <tr class="total"><td>Total a pagar</td><td>${soles(totalAPagar)}</td></tr>
 </table>
 <table>
-  <tr><td>Mes anterior</td><td>${soles(hechos.total_previo_cent)}</td></tr>
-  <tr><td>Modalidad</td><td>${hechos.modalidad_renta}</td></tr>
+  <tr><td>Mes anterior</td><td>${soles(fs.total_previo_cent)}</td></tr>
+  <tr><td>Modalidad</td><td>${fs.modalidad_renta}</td></tr>
+  <tr><td>Código de pago</td><td>${cuenta}</td></tr>
 </table>
 <p class="footer">Movistar Perú · Cuenta ${cuenta} · Generado: ${new Date().toLocaleDateString("es-PE")}</p>
 <button class="no-print" onclick="window.print()" style="margin-top:16px;width:100%;padding:12px;background:#019DF4;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button>
@@ -533,12 +593,18 @@ export function MiMovistar({
             <div className="mm-situacion-row">
               <span className={`mm-situacion-badge ${alDia ? "ok" : "alerta"}`}>
                 {alDia ? <ShieldCheck size={13}/> : <AlertCircle size={13}/>}
-                {alDia ? "Cuenta al día" : `Deuda anterior: ${soles(deudaPendienteCent)}`}
+                {tieneDeudaAnterior
+                  ? `Deuda anterior: ${soles(deudaPendienteCent)}`
+                  : reciboVencido
+                  ? "Recibo vencido"
+                  : "Cuenta al día"}
               </span>
+              {/* Detalle de fecha aparte del badge de estado: da el número de días sin
+                  repetir la misma frase ("Recibo vencido") que ya dijo el badge de arriba. */}
               {diasParaVencer !== null && (
                 <span className={`mm-situacion-venc${diasParaVencer <= 3 ? " urgente" : ""}`}>
                   {diasParaVencer < 0
-                    ? "Recibo vencido"
+                    ? `Vencido hace ${Math.abs(diasParaVencer)} día${Math.abs(diasParaVencer) === 1 ? "" : "s"}`
                     : diasParaVencer === 0
                     ? "Vence hoy"
                     : `Vence en ${diasParaVencer} día${diasParaVencer === 1 ? "" : "s"}`}
@@ -554,6 +620,9 @@ export function MiMovistar({
             </div>
             <div className="mm-situacion-row">
               <span className="mm-situacion-plan"><Smartphone size={13}/> {hechos.modalidad_renta}</span>
+              <button className="mm-situacion-link" onClick={() => setPantalla("comoFunciona")}>
+                <Layers size={12}/> ¿Cómo se calcula?
+              </button>
             </div>
             {oferta ? (
               <button className="mm-situacion-promo" onClick={() => abrirChat(`Cuéntame más sobre: ${oferta.etiqueta}`)}>
@@ -566,22 +635,23 @@ export function MiMovistar({
             )}
           </div>
         )}
-        {/* Banner */}
-        <div className="mm-dash-banner">
+        {/* Banner — antes era un anuncio fijo de "35 GB" sin ningún respaldo en el
+            FactSet. Se reemplaza por algo real: una invitación a que BillSense
+            explique los descuentos, que sí sabe explicar con datos verificados. */}
+        <button className="mm-dash-banner" onClick={() => abrirChat("Explícame cómo funcionan mis descuentos y cuándo terminan")}>
           <div>
-            <p className="mm-dash-banner-kicker">🎉 Oferta exclusiva</p>
-            <p className="mm-dash-banner-text">¡Disfruta de <strong>35 GB</strong> + velocidad máxima!</p>
+            <p className="mm-dash-banner-kicker">💡 ¿Sabías esto?</p>
+            <p className="mm-dash-banner-text">Los descuentos <strong>bajan o terminan</strong> con el tiempo — pregúntale a BillSense cuándo vence el tuyo.</p>
           </div>
-          <button className="mm-dash-banner-btn">Ver</button>
-        </div>
+          <span className="mm-dash-banner-btn">Ver</span>
+        </button>
         {/* Mejorar plan */}
         <div className="mm-dash-card">
           <div className="mm-dash-card-icon" style={{ background:"#f3eeff", color:"#7c3aed" }}><Star size={22} /></div>
           <div className="mm-dash-card-info">
             <strong>Mejorar mi plan</strong><span>Encuentra el plan perfecto para ti</span>
           </div>
-          <button className="mm-dash-card-cta"
-            onClick={() => abrirChat("¿Cuáles son los planes disponibles para mejorar mi servicio?")}>
+          <button className="mm-dash-card-cta" onClick={abrirMejorarPlan}>
             Ver opciones
           </button>
         </div>
@@ -606,13 +676,44 @@ export function MiMovistar({
             </button>
           </div>
         </div>
-        {/* Consumos */}
-        <p className="mm-dash-section-title">Mis consumos</p>
+        {/* PAGOS — apartado propio en el inicio, con su código de pago y pasos, sin
+            derivar a ningún canal externo. */}
+        <div className="mm-dash-card">
+          <div className="mm-dash-card-icon" style={{ background:"#edfae1", color:"#3a7a10" }}><Wallet size={22} /></div>
+          <div className="mm-dash-card-info">
+            <strong>Pagar mi recibo</strong><span>Código de pago y pasos para pagar</span>
+          </div>
+          <button id="btn-pagar-inicio" className="mm-dash-card-cta" onClick={() => setMostrarPago(true)} disabled={!hechos}>
+            Pagar
+          </button>
+        </div>
+        {/* Resumen de mi recibo — el dataset del desafío describe facturación
+            (líneas, deuda, variación), no consumo de red (GB/minutos usados); esos
+            campos no existen en el FactSet, así que mostrarlos sería inventar cifras
+            que ningún endpoint respalda. Estos tres indicadores sí salen de `hechos`. */}
+        <p className="mm-dash-section-title">Resumen de mi recibo</p>
         <div className="mm-consumos">
           {[
-            { icon:<Wifi size={18}/>,  label:"Bono datos", val:"35 GB", pct:42,  color:"#019DF4", bg:"#e4f7fd" },
-            { icon:<Phone size={18}/>, label:"Minutos",    val:"Ilim.", pct:100, color:"#5BC500", bg:"#edfae1" },
-            { icon:<Bot size={18}/>,   label:"BillSense",  val:"Activo",pct:100, color:"#d99b1c", bg:"#fff8e8" },
+            {
+              icon:<Wifi size={18}/>, label:"Conceptos en tu recibo",
+              val: `${totalLineas} línea${totalLineas === 1 ? "" : "s"}`,
+              pct: pctLineasVariaron, color:"#019DF4", bg:"#e4f7fd",
+            },
+            {
+              icon:<AlertCircle size={18}/>, label:"Deuda anterior",
+              val: soles(deudaPendienteCent),
+              pct: tieneDeudaAnterior ? 100 : 0,
+              color: tieneDeudaAnterior ? "#cc4c3d" : "#5BC500",
+              bg:   tieneDeudaAnterior ? "#fff2f2" : "#edfae1",
+            },
+            {
+              icon: sube ? <TrendingUp size={18}/> : <TrendingDown size={18}/>,
+              label:"Variación vs. mes anterior",
+              val: `${sube ? "+" : "-"}${soles(Math.abs(hechos?.delta_total_cent ?? 0))}`,
+              pct: pctDelta ?? 0,
+              color: sube ? "#cc4c3d" : "#5BC500",
+              bg:   sube ? "#fff2f2" : "#edfae1",
+            },
           ].map((c) => (
             <div key={c.label} className="mm-consumo">
               <div className="mm-consumo-icon" style={{ background:c.bg, color:c.color }}>{c.icon}</div>
@@ -642,6 +743,7 @@ export function MiMovistar({
           </button>
         ))}
       </nav>
+      {mostrarPago && hechos && <PagoModal hechos={hechos} cuentaId={cuenta} onClose={() => setMostrarPago(false)} />}
     </div>
   );
 
@@ -659,28 +761,18 @@ export function MiMovistar({
             {sube?"▲":"▼"} {soles(Math.abs(hechos?.delta_total_cent ?? 0))} respecto del mes anterior
           </p>
         </div>
-        <div className="mm-recibo-detail">
-          {[
-            ["Mes anterior", soles(hechos?.total_previo_cent ?? 0)],
-            ["Este mes",     soles(hechos?.total_actual_cent ?? 0), true],
-            ["Modalidad",    hechos?.modalidad_renta ?? "—"],
-            hechos?.prorrateo_cent  ? ["Prorrateo",      soles(Number(hechos.prorrateo_cent))]  : null,
-            hechos?.reconexion_cent ? ["Reconexión",     soles(Number(hechos.reconexion_cent))]  : null,
-            hechos?.deuda_anterior_cent ? ["⚠️ Deuda ant.", soles(hechos.deuda_anterior_cent as number), false, true] : null,
-            hechos?.fecha_vencimiento   ? ["Vencimiento",  String(hechos.fecha_vencimiento)]     : null,
-          ].filter((f): f is (string | boolean)[] => Boolean(f)).map(([k,v,bold,danger],i) => (
-            <div key={i} className={`mm-recibo-row${danger?" danger":""}`}>
-              <span>{k as string}</span>
-              <span style={{ fontWeight:bold?700:undefined, color:danger?"#cc4c3d":undefined }}>{v as string}</span>
-            </div>
-          ))}
-        </div>
         {hechos && (
           <div style={{ marginBottom:12 }}>
-            <ReceiptDetailCard hechos={hechos} onDownload={generarPDF} />
+            <ReceiptDetailCard hechos={hechos} cuentaId={cuenta} onDownload={() => generarPDF()} />
           </div>
         )}
-        <button className="mm-btn-primary" onClick={() => abrirChat("Explícame mi recibo detalladamente")}>
+        <button className="mm-btn-outline" onClick={() => setPantalla("comoFunciona")}>
+          <Layers size={18} /> ¿Cómo se calculó mi recibo?
+        </button>
+        <button className="mm-btn-outline" style={{ marginTop:12 }} onClick={() => { setHechosPeriodo(null); setErrorPeriodo(""); setPantalla("historial"); }}>
+          <Clock size={18} /> Ver mis recibos anteriores
+        </button>
+        <button className="mm-btn-primary" style={{ marginTop:12 }} onClick={() => abrirChat("Explícame mi recibo detalladamente")}>
           <Bot size={18} /> Explícame este recibo con BillSense
         </button>
         <button className="mm-btn-outline" style={{ marginTop:12 }} onClick={() => setPantalla("dashboard")}>
@@ -689,6 +781,136 @@ export function MiMovistar({
       </div>
     </div>
   );
+
+  // ════════════════════════════════════════════════════════════════
+  // HISTORIAL — hasta 5 recibos anteriores (GET /v1/historial)
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "historial") return (
+    <div className={F}>
+      {hdr("Recibos anteriores", () => setPantalla("recibo"))}
+      <div className="mm-historial-body">
+        {!hechosPeriodo && !errorPeriodo && !cargandoPeriodo && (
+          <>
+            <p className="mm-historial-intro">Hasta 5 recibos antes del actual. Toca uno para verlo o preguntarle a BillSense.</p>
+            {historial.isPending && <div className="mm-plan-loading"><Loader2 size={16} className="animate-spin"/> Cargando tu historial…</div>}
+            {historial.isError && <p className="mm-error-msg">{err(historial.error)}</p>}
+            <div className="mm-historial-lista">
+              {historial.data?.map((r) => (
+                <button key={r.periodo} className="mm-historial-item" disabled={r.es_actual}
+                  onClick={() => void verPeriodo(r.periodo)}>
+                  <div className="mm-historial-item-info">
+                    <strong>{r.periodo}</strong>
+                    <span>{r.modalidad_renta === "ADELANTADA" ? "Renta Adelantada" : "Renta Vencida"}</span>
+                  </div>
+                  <div className="mm-historial-item-cifras">
+                    <strong>{soles(r.total_cent)}</strong>
+                    <span>Vence {r.fecha_vencimiento}</span>
+                  </div>
+                  {r.es_actual ? <span className="mm-historial-badge">Actual</span> : <span className="mm-historial-arrow">›</span>}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {cargandoPeriodo && <div className="mm-plan-loading"><Loader2 size={16} className="animate-spin"/> Cargando ese recibo…</div>}
+        {errorPeriodo && (
+          <div className="mm-plan-empty-card">
+            <p>{errorPeriodo}</p>
+            <button className="mm-btn-outline" onClick={() => setErrorPeriodo("")}>‹ Volver a la lista</button>
+          </div>
+        )}
+        {hechosPeriodo && !cargandoPeriodo && (
+          <>
+            <button className="mm-btn-outline" style={{ marginBottom:12 }} onClick={() => setHechosPeriodo(null)}>‹ Volver a la lista</button>
+            <ReceiptDetailCard hechos={hechosPeriodo} cuentaId={cuenta} onDownload={() => generarPDF(hechosPeriodo)} />
+            <button className="mm-btn-primary" style={{ marginTop:12 }} onClick={() => {
+              setPeriodoActivo(hechosPeriodo.periodo_actual);
+              abrirChat(`Explícame mi recibo de ${hechosPeriodo.periodo_actual}`);
+            }}>
+              <Bot size={18} /> Preguntar a BillSense sobre este periodo
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // CÓMO SE CALCULA TU RECIBO — tipo de renta, ciclo y prorrateo reales
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "comoFunciona") return (
+    <div className={F}>
+      {hdr("Cómo se calcula tu recibo", () => setPantalla("recibo"))}
+      {hechos
+        ? <RentaExplicativa hechos={hechos} onPreguntar={(q) => abrirChat(q)} />
+        : <div className="mm-plan-empty-card" style={{ margin:20 }}><p>Aún no hemos cargado tu recibo.</p></div>}
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // MEJORAR MI PLAN — plan actual (real) + recomendación de cross-selling
+  // (real, cuando una regla explícita la habilita). Sin catálogo de planes
+  // inventado: cualquier cifra de una alternativa la confirma BillSense,
+  // que sí pasa por el verificador.
+  // ════════════════════════════════════════════════════════════════
+  if (pantalla === "mejorarPlan") {
+    const motivoOferta = typeof oferta?.payload?.motivo === "string" ? oferta.payload.motivo : null;
+    return (
+      <div className={F}>
+        {hdr("Mejorar mi plan", () => setPantalla("dashboard"))}
+        <div className="mm-plan-body">
+          <div className="mm-plan-actual-card">
+            <p className="mm-plan-actual-label">Tu plan actual</p>
+            <div className="mm-plan-actual-row">
+              <Smartphone size={18}/><strong>{hechos?.modalidad_renta ?? "—"}</strong>
+            </div>
+            <p className="mm-plan-actual-price">
+              {soles(hechos?.total_actual_cent ?? 0)}
+              <span>/ {hechos?.periodo_actual ?? "mes"}</span>
+            </p>
+          </div>
+
+          <p className="mm-dash-section-title">Alternativa recomendada</p>
+
+          {explicar.isPending ? (
+            <div className="mm-plan-loading">
+              <Loader2 size={16} className="animate-spin"/> Consultando con BillSense…
+            </div>
+          ) : oferta ? (
+            <div className="mm-plan-oferta-card">
+              <div className="mm-plan-oferta-header"><Gift size={16}/><span>{oferta.etiqueta}</span></div>
+              {motivoOferta && <p className="mm-plan-oferta-motivo">{motivoOferta}</p>}
+              <p className="mm-plan-oferta-nota">
+                Los montos exactos se confirman en la conversación con BillSense, verificados contra tu recibo.
+              </p>
+              <button className="mm-btn-primary" onClick={() => abrirChat(`Cuéntame más sobre: ${oferta.etiqueta}`)}>
+                <Bot size={16}/> Ver detalle con BillSense
+              </button>
+            </div>
+          ) : ultima ? (
+            <div className="mm-plan-empty-card">
+              <p>Por ahora no encontramos una alternativa comercial que aplique a tu cuenta.</p>
+              <p className="mm-plan-empty-sub">
+                El cross-selling en BillSense solo se activa si hay una regla de negocio explícita para tu caso —no se
+                fuerza una oferta a todos los clientes.
+              </p>
+            </div>
+          ) : (
+            <div className="mm-plan-empty-card">
+              <p>Aún no hemos revisado tu cuenta en esta sesión.</p>
+              <button className="mm-btn-outline" onClick={consultarAlternativas}>
+                Consultar alternativas verificadas
+              </button>
+            </div>
+          )}
+
+          <button className="mm-btn-outline" onClick={() => abrirChat("¿Cuáles son los planes disponibles para mejorar mi servicio?")}>
+            <MessageSquare size={16}/> Preguntar directamente a BillSense
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ════════════════════════════════════════════════════════════════
   // CHAT / BILLSENSE — pantalla principal IA
@@ -735,6 +957,13 @@ export function MiMovistar({
           ════════════════════════════════════════════ */}
       {chatModo === "chat" && (
         <>
+          {/* Aviso de periodo — solo aparece si se entró desde el historial */}
+          {periodoActivo && (
+            <div className="mm-periodo-aviso">
+              <Clock size={13} /><span>Consultando tu recibo de {periodoActivo}</span>
+              <button onClick={volverAlPeriodoActual}>Volver al periodo actual</button>
+            </div>
+          )}
           {/* Strip de métricas */}
           {hechos && (
             <div className="mm-bill-strip">
@@ -775,7 +1004,7 @@ export function MiMovistar({
                 return (
                   <div key={i} className="mm-chat-turn assistant">
                     <div className="mm-chat-avatar-bot"><img src={billsenseLogo} alt="" /></div>
-                    <ReceiptDetailCard hechos={hechos} onDownload={generarPDF} />
+                    <ReceiptDetailCard hechos={hechos} cuentaId={cuenta} onDownload={() => generarPDF()} />
                   </div>
                 );
               }
@@ -787,7 +1016,9 @@ export function MiMovistar({
                       {m.esVoz ? <Mic size={14}/> : <img src={billsenseLogo} alt="" />}
                     </div>
                   )}
-                  <div className={`mm-chat-bubble ${esAsi?"assistant":"client"}`}>{m.texto}</div>
+                  <div className={`mm-chat-bubble ${esAsi?"assistant":"client"}`}>
+                    {esAsi && m.bloques ? <RichMessage bloques={m.bloques} /> : m.texto}
+                  </div>
                   {!esAsi && <div className="mm-chat-avatar-user"><UserIcon size={16}/></div>}
                 </div>
               );
@@ -818,6 +1049,17 @@ export function MiMovistar({
                 ].map((p) => (
                   <button key={p} onClick={() => preguntar(p)} className="mm-suggest-btn">{p}</button>
                 ))}
+              </div>
+            )}
+
+            {/* CTA de pago — BillSense la ofrece igual que ofrecería hablar con un
+                asesor: aparece sola cuando el backend la incluyó en `acciones`. */}
+            {puedePagar && !explicar.isPending && (
+              <div className="mm-chat-turn assistant">
+                <div className="mm-chat-avatar-bot"><img src={billsenseLogo} alt="" /></div>
+                <button className="mm-pagar-cta" onClick={() => setMostrarPago(true)}>
+                  <Wallet size={16}/> Pagar mi recibo
+                </button>
               </div>
             )}
 
@@ -913,7 +1155,7 @@ export function MiMovistar({
                     <span className="mm-voz-bubble-who"><Bot size={13}/> BillSense</span>
                     <span className="mm-voz-bubble-tag"><ShieldCheck size={11}/> Verificado</span>
                   </div>
-                  <span className="mm-voz-bubble-text">{m.texto}</span>
+                  <div className="mm-voz-bubble-text">{m.bloques ? <RichMessage bloques={m.bloques} /> : m.texto}</div>
                 </div>
               ) : (
                 <div key={`prev-${i}`} className="mm-voz-bubble user">
@@ -958,6 +1200,7 @@ export function MiMovistar({
           {chatError && <p className="mm-chat-error" style={{ margin:"0 20px 16px" }}>{chatError}</p>}
         </div>
       )}
+      {mostrarPago && hechos && <PagoModal hechos={hechos} cuentaId={cuenta} onClose={() => setMostrarPago(false)} />}
     </div>
   );
 }
