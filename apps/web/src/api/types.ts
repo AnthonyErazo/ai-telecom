@@ -5,6 +5,50 @@ export type Block =
   | { tipo: "tabla"; titulo?: string | null; columnas: string[]; filas: string[][]; nota?: string | null }
   | { tipo: "aviso"; titulo?: string | null; texto: string; severidad: string; fact_ids?: string[] };
 
+/** Fracción homogénea del ciclo: misma tarifa y mismo estado de servicio.
+ *
+ * Es la explicación del prorrateo tal como la calcula el backend (`Tramo` en
+ * `packages/core_domain/esquemas/recibo.py`): "del 1 al 12 de julio el Plan A, del
+ * 13 al 30 el Plan B". Ya viaja dentro de `GET /v1/hechos`, solo faltaba tipar. */
+export interface Tramo {
+  inicio: string;
+  fin: string;
+  dias: number;
+  tarifa_mensual_cent: number;
+  estado: "ACTIVO" | "SUSPENDIDO";
+  facturable: boolean;
+  monto_prorrateado_cent: number;
+  etiqueta: string;
+  concepto_id?: string | null;
+  plan?: string | null;
+  descuento_cent?: number;
+}
+
+/** Agrupación de deltas por causa, en el vocabulario del cliente (backend: `CausaAgregada`). */
+export interface CausaAgregada {
+  causa?: string | null;
+  causa_oficial?: string | null;
+  etiqueta_cliente: string;
+  monto_cent: number;
+  participacion_bp: number;
+}
+
+/** Una cuota del cronograma francés de un equipo financiado. */
+export interface CuotaFinanciamiento {
+  numero: number;
+  de_total: number;
+  monto_cent: number;
+  saldo_final_cent: number;
+}
+
+/** Cronograma completo de un equipo financiado (backend: `PlanFinanciamiento`). */
+export interface PlanFinanciamiento {
+  equipo: string;
+  principal_cent: number;
+  cuotas_totales: number;
+  cronograma: CuotaFinanciamiento[];
+}
+
 /** Una línea del recibo, tal como la devuelve `GET /v1/hechos`. */
 export interface LineaFactSet {
   concepto_id: string;
@@ -14,6 +58,25 @@ export interface LineaFactSet {
   monto_previo_cent: number;
   delta_cent: number;
   causa?: string | null;
+  familia?: string | null;
+  causa_oficial?: string | null;
+  dias_prorrateo?: number | null;
+  tramos?: Tramo[] | null;
+  cuota_numero?: number | null;
+  cuotas_totales?: number | null;
+  confianza?: number;
+}
+
+/** Una fila de `GET /v1/historial`: resumen de un periodo, sin el detalle línea a línea. */
+export interface ResumenRecibo {
+  periodo: string;
+  total_cent: number;
+  fecha_emision: string;
+  fecha_vencimiento: string;
+  modalidad_renta: string;
+  deuda_anterior_cent: number;
+  estado_servicio: string;
+  es_actual: boolean;
 }
 
 export interface FactSet {
@@ -22,11 +85,17 @@ export interface FactSet {
   total_previo_cent: number;
   total_actual_cent: number;
   delta_total_cent: number;
-  modalidad_renta: string;
+  modalidad_renta: "ADELANTADA" | "VENCIDA" | string;
   dias_ciclo?: number;
   periodo_previo?: string;
   deuda_anterior_cent?: number;
   fecha_vencimiento?: string;
+  ciclo_inicio?: string | null;
+  ciclo_fin?: string | null;
+  causas_agregadas?: CausaAgregada[];
+  beneficios_vigentes?: string[];
+  financiamientos?: PlanFinanciamiento[];
+  total_a_pagar_cent?: number;
   sha256: string;
   [key: string]: unknown;
 }
@@ -35,7 +104,7 @@ export interface Explanation {
   conversation_id: string;
   trace_id: string;
   bloques: Block[];
-  acciones: Array<{ id: string; etiqueta: string; riesgo: string }>;
+  acciones: Array<{ id: string; etiqueta: string; riesgo: string; payload?: Record<string, unknown> }>;
   derivacion: {
     requerida: boolean;
     motivo?: string | null;

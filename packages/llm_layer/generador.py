@@ -21,6 +21,7 @@ aprovecha la prosa, y esa prosa se audita cifra a cifra antes de salir.
 from __future__ import annotations
 
 import logging
+import random
 import re
 import time
 import uuid
@@ -58,6 +59,7 @@ from packages.core_domain.esquemas.respuesta import (
 from packages.llm_layer.plantillas import (
     DatosPlantilla,
     datos_de_factset,
+    recortar_seguro,
     renderizar_explicacion,
     renderizar_texto_libre,
 )
@@ -71,6 +73,7 @@ from packages.llm_layer.providers.base import (
     timeout_por_defecto,
     version_modelo_de,
 )
+from packages.llm_layer.providers.mock import aplicar_jitter, semilla_de
 from packages.llm_layer.verificador import (
     ConjuntoPermitido,
     ResultadoVerificacion,
@@ -434,6 +437,7 @@ def generar_explicacion(
     estricto: bool | None = None,
     timeout_s: float | None = None,
     permitidos: ConjuntoPermitido | None = None,
+    respuestas_previas: Sequence[str] | None = None,
 ) -> ResultadoGeneracion:
     """Genera la explicación aplicando la política LLM → verificar → reintento → plantilla.
 
@@ -447,6 +451,9 @@ def generar_explicacion(
         estricto: fuerza el modo del verificador (por defecto, ``VERIFICADOR_ESTRICTO``).
         timeout_s: timeout por llamada (por defecto, ``LLM_TIMEOUT_S``).
         permitidos: conjunto ``ALLOWED`` ya construido, para reutilizarlo entre turnos.
+        respuestas_previas: lo que el asistente ya contestó antes en esta conversación
+            (más reciente al final). Deja de repetir la misma redacción en la segunda
+            pregunta sobre el mismo recibo — ver ``construir_prompt``.
 
     Returns:
         :class:`ResultadoGeneracion` con el texto final, el modo realmente usado, el
@@ -489,6 +496,7 @@ def generar_explicacion(
                 verbosidad=Verbosidad(str(verbosidad)),
                 canal=canal,
                 correccion=correccion,
+                respuestas_previas=respuestas_previas,
             )
             bruto = proveedor.completar(prompt, ESQUEMA_EXPLICACION_V1, espera)
             explicacion = ExplicacionLLM.model_validate(bruto)
@@ -564,6 +572,22 @@ def generar_explicacion(
 
     # --- Ruta determinística ------------------------------------------------ #
     explicacion = renderizar_explicacion(datos)
+    # Mismo jitter léxico que `MockProvider` (útil aquí porque esta ruta se toma
+    # también cuando el proveedor configurado no está disponible de verdad —API key
+    # ausente o inválida, cuota agotada—, no solo cuando el LLM falla la
+    # verificación). Sin esto, cualquier pregunta sobre el mismo recibo produce el
+    # mismo texto byte a byte, con o sin LLM. La semilla varía con `turno_numero`
+    # igual que en el mock: en el primer turno es idéntica a como era antes de esto.
+    azar = random.Random(semilla_de(datos.factset_id, len(respuestas_previas or ())))
+    explicacion = explicacion.model_copy(
+        update={
+            "resumen": recortar_seguro(aplicar_jitter(explicacion.resumen, azar), 180),
+            "causas": [
+                causa.model_copy(update={"frase": aplicar_jitter(causa.frase, azar)})
+                for causa in explicacion.causas
+            ],
+        }
+    )
     bloques = componer_bloques(factset, explicacion, datos, verbosidad=verbosidad)
     texto = _texto_de(bloques)
     resultado = verificar(

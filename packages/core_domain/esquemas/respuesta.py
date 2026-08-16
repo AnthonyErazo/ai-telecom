@@ -44,6 +44,7 @@ __all__ = [
     "ItemKV",
     "PeticionDerivacion",
     "PeticionExplicacion",
+    "ResumenRecibo",
     "RespuestaCanalAgnostica",
     "RespuestaError",
 ]
@@ -316,6 +317,23 @@ class PeticionDerivacion(BaseModel):
     motivo_codigo: MotivoDerivacion = MotivoDerivacion.PETICION_HUMANO
     motivo: str | None = None
     utterance: str = Field(default="", max_length=2000)
+
+
+class ResumenRecibo(BaseModel):
+    """Una fila de ``GET /v1/historial``: lo justo para listar un periodo, sin el
+    detalle línea a línea que sí trae el ``FactSet`` de ``GET /v1/hechos``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    periodo: str
+    total_cent: Centimos
+    fecha_emision: str
+    fecha_vencimiento: str
+    modalidad_renta: str
+    deuda_anterior_cent: Centimos
+    estado_servicio: str
+    es_actual: bool = Field(description="Si es el periodo que hoy ve el cliente en Mi Recibo")
 
 
 class ItemEvidencia(BaseModel):

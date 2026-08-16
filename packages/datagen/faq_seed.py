@@ -604,6 +604,115 @@ def construir_faqs() -> list[FaqSeed]:
             canales=[Canal.APP, Canal.BOT, Canal.WHATSAPP, Canal.ASESOR],
             etiquetas=["reclamo", "derivación", "regulatorio"],
         ),
+        # --- Campaña Churn (retención de clientes con deuda) -------------------
+        # Conocimiento de POLÍTICA, no de cuenta: nunca dice si ESTA cuenta está en
+        # campaña ni cuánto le corresponde de descuento —eso no existe en ningún
+        # dato real todavía—. Por eso, a diferencia del resto del corpus, estas
+        # entradas no llevan `conceptos` ni `causas_oficiales`: no describen un
+        # cargo del recibo, describen un beneficio de retención aparte. Y por la
+        # misma regla que el resto del archivo, sin cifras: los montos de la
+        # campaña (S/1, S/5, los tramos porcentuales) se describen en palabras,
+        # nunca como números — un dígito aquí lo enmascararía el saneador antes de
+        # llegar al modelo, o lo bloquearía el verificador si igual apareciera.
+        FaqSeed(
+            faq_id="FAQ_CAMPANA_CHURN_QUE_ES",
+            pregunta="q es la campaña de descuento q me llego por sms de mi deuda",
+            respuesta=(
+                "Es una campaña de retención para clientes con al menos un recibo "
+                "pendiente de pago, vencido o por vencer. Busca ayudarle a ponerse al día "
+                "ofreciéndole un descuento especial sobre esa deuda. No todas las cuentas "
+                "entran: se activa para las que el sistema marca específicamente, y tiene "
+                "una fecha límite para aprovecharla."
+            ),
+            conceptos=[],
+            causas_oficiales=[],
+            etiquetas=["campaña churn", "descuento retención", "deuda vencida", "sms descuento"],
+        ),
+        FaqSeed(
+            faq_id="FAQ_CAMPANA_CHURN_TIPO_DESCUENTO",
+            pregunta="cuanto me descuentan en la campaña de mi deuda",
+            respuesta=(
+                "Depende del tipo de campaña que le asignaron. Si es de línea móvil, la "
+                "deuda baja a un monto simbólico muy pequeño. Si es de un servicio de "
+                "hogar, baja a un monto simbólico igual de bajo, aunque distinto al de "
+                "móvil. Y si le tocó la campaña regular, el descuento es un porcentaje "
+                "sobre el total de su deuda. El monto exacto que le corresponde a usted se "
+                "lo confirma la propia app o el mensaje que le llegó — no es el mismo para "
+                "todos los clientes."
+            ),
+            conceptos=[],
+            causas_oficiales=[],
+            etiquetas=["descuento deuda", "monto campaña", "cuanto me descuentan", "tipo de descuento"],
+        ),
+        FaqSeed(
+            faq_id="FAQ_CAMPANA_CHURN_MONTO_NO_CUADRA",
+            pregunta="el monto q me sale en la app de mi banco no es igual al del sms de movistar",
+            respuesta=(
+                "El monto del mensaje es referencial: se reparte entre todos sus recibos "
+                "pendientes para completar el descuento total que le corresponde, así que "
+                "cada recibo puede mostrar una parte distinta. Lo importante es pagar la "
+                "totalidad de la deuda que le figura en su banco antes de la fecha límite; "
+                "si paga eso, el descuento completo queda aplicado, aunque el número del "
+                "SMS no coincida exactamente con lo que ve ahí."
+            ),
+            conceptos=[],
+            causas_oficiales=[],
+            etiquetas=["monto distinto", "banco", "sms", "no cuadra", "campaña churn"],
+        ),
+        FaqSeed(
+            faq_id="FAQ_CAMPANA_CHURN_PAGO_TOTAL",
+            pregunta="tengo q pagar todos mis recibos para q valga el descuento de la campaña?",
+            respuesta=(
+                "Sí. El beneficio solo se hace efectivo si paga la totalidad de la deuda, "
+                "es decir, todos los recibos pendientes y no solo uno. El pago se hace por "
+                "canales digitales — la app Mi Movistar, su banca por internet o "
+                "billeteras digitales — antes de la fecha límite de la campaña. Si se pasa "
+                "de esa fecha, la campaña vence y hay que revisar qué otra opción tiene "
+                "disponible."
+            ),
+            conceptos=[],
+            causas_oficiales=[],
+            etiquetas=["pago total", "fecha limite", "requisito descuento", "campaña churn"],
+        ),
+        FaqSeed(
+            faq_id="FAQ_CAMPANA_CHURN_DESCUENTO_NO_APARECE",
+            pregunta="no me aparece el descuento de la campaña en la app de mi banco",
+            respuesta=(
+                "Puede tratarse de una intermitencia temporal del sistema al reflejar el "
+                "descuento. Espere un momento y vuelva a intentarlo en la misma app de su "
+                "banco o billetera. Si después de un rato sigue sin aparecer, con gusto lo "
+                "revisamos con más detalle."
+            ),
+            conceptos=[],
+            causas_oficiales=[],
+            etiquetas=["descuento no aparece", "banco", "intermitencia", "campaña churn"],
+        ),
+        FaqSeed(
+            faq_id="FAQ_CAMPANA_CHURN_PAGUE_SIN_SERVICIO",
+            pregunta="ya pague mi deuda con el descuento de la campaña y sigo sin servicio",
+            respuesta=(
+                "Antes que nada, confirme que pagó la totalidad de sus recibos pendientes "
+                "y no solo uno: si queda un recibo sin pagar, el servicio no se reconecta. "
+                "Si ya pagó todo y aun así sigue sin servicio, puede ser que el pago todavía "
+                "no se haya reflejado en el sistema. Con el comprobante a la mano, lo "
+                "revisamos para confirmar y reactivarle el servicio."
+            ),
+            conceptos=[],
+            causas_oficiales=[],
+            etiquetas=["pague y no tengo servicio", "reconexion", "campaña churn", "pago no reflejado"],
+        ),
+        FaqSeed(
+            faq_id="FAQ_CAMPANA_CHURN_DOS_CAMPANAS",
+            pregunta="me aparecen dos campañas de descuento distintas, cual es la q vale",
+            respuesta=(
+                "Vale únicamente la campaña vigente. Si el sistema le muestra una anterior "
+                "junto con una nueva, la que ya venció no aplica: solo se considera la "
+                "activa al momento de pagar, con su propio monto y su propia fecha límite."
+            ),
+            conceptos=[],
+            causas_oficiales=[],
+            etiquetas=["dos campañas", "campaña vigente", "campaña churn"],
+        ),
         FaqSeed(
             faq_id="FAQ_NO_ENTIENDO_NADA",
             pregunta="no entiendo nada de mi recibo, expliquemelo simple porfa",
