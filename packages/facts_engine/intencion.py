@@ -148,6 +148,7 @@ class Intencion(StrEnum):
     PEDIR_HUMANO = "PEDIR_HUMANO"
     VACIO = "VACIO"
     SALUDO = "SALUDO"
+    DESPEDIDA = "DESPEDIDA"
     EXPLICAR_RECIBO = "EXPLICAR_RECIBO"
     CONSULTA_CONCEPTO = "CONSULTA_CONCEPTO"
     PAGAR = "PAGAR"
@@ -356,11 +357,27 @@ PATRONES: dict[Intencion, tuple[str, ...]] = {
         "que tal",
         "hey",
         "saludos",
+    ),
+    # Cierre de conversación: el cliente agradece, se despide o da a entender que ya no
+    # necesita nada más. Antes vivía mezclado con SALUDO —el mismo cajón para "hola" y
+    # "chau"—, lo que hacía imposible distinguir una apertura de un cierre. Aquí sí
+    # importa distinguirlos: el cierre es el disparador del "efecto efervescente" (recordar
+    # los beneficios vigentes de la cuenta al despedirse, ver `apps/web/src/components/
+    # MiMovistar.tsx`).
+    Intencion.DESPEDIDA: (
         "gracias",
         "muchas gracias",
         "chau",
         "adios",
         "hasta luego",
+        "eso es todo",
+        "eso era todo",
+        "eso seria todo",
+        "nada mas gracias",
+        "no necesito nada mas",
+        "ya no necesito nada mas",
+        "gracias por su ayuda",
+        "gracias por tu ayuda",
     ),
     Intencion.EXPLICAR_RECIBO: (
         *PATRONES_DETALLE_CARGOS,
@@ -572,6 +589,10 @@ _PRIORIDAD: tuple[Intencion, ...] = (
     # explicación, y dársela sería contestar a otra pregunta.
     Intencion.DISPUTA_CARGO,
     Intencion.SALUDO,
+    # Mismo nivel que SALUDO: cortesía sin cifras, no deriva. Va justo después porque
+    # ambas comparten la naturaleza de "turno sin contenido de facturación" y el orden
+    # entre ellas no importa —sus patrones ya no se solapan tras separar el cierre.
+    Intencion.DESPEDIDA,
     # PAGAR y CONSUMO van antes que las de recibo porque comparten vocabulario con
     # ellas —«recibo», «cobro», «monto»— y sin este orden caerían en EXPLICAR_RECIBO,
     # que es justo el defecto que se está corrigiendo.

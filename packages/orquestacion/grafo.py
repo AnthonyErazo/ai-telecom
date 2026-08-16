@@ -118,6 +118,7 @@ PRIORIDAD_DE_RUTA: tuple[tuple[Intencion, str], ...] = (
     (Intencion.DISPUTA_CARGO, "responder_intencion"),
     (Intencion.VACIO, "responder_intencion"),
     (Intencion.SALUDO, "responder_intencion"),
+    (Intencion.DESPEDIDA, "responder_intencion"),
     (Intencion.PAGAR, "responder_intencion"),
     (Intencion.CONSUMO, "responder_intencion"),
     (Intencion.CONSULTA_CONCEPTO, "responder_intencion"),

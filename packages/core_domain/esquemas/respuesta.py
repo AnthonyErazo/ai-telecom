@@ -48,6 +48,7 @@ __all__ = [
     "ResumenRecibo",
     "RespuestaCanalAgnostica",
     "RespuestaError",
+    "SegmentoParcial",
 ]
 
 
@@ -165,7 +166,13 @@ class BloqueAviso(_BloqueBase):
 
 
 class CicloExplicado(BaseModel):
-    """Uno de los dos ciclos que puede comparar el componente visual."""
+    """Uno de los dos ciclos que puede comparar el componente visual.
+
+    El componente es deliberadamente genérico: sirve igual para el par (ciclo previo,
+    ciclo explicado) de una consulta sobre el recibo actual que para cualquier par de
+    periodos consecutivos que el cliente pida ver en su historial. Lo único que cambia
+    entre esos usos es *qué* ``FactSet`` los produjo, nunca la forma del bloque.
+    """
 
     model_config = ConfigDict(extra="forbid")
     periodo: str
@@ -174,6 +181,34 @@ class CicloExplicado(BaseModel):
     inicio: str | None = None
     cierre: str | None = None
     vencimiento: str | None = None
+    emision: str | None = Field(default=None, description="Fecha de facturación del ciclo")
+    es_mas_reciente: bool = Field(
+        default=False,
+        description=(
+            "Si este ciclo es el recibo más reciente que tiene la cuenta hoy (no solo "
+            "el lado derecho de la comparación): falso cuando el cliente está viendo un "
+            "par de ciclos del historial."
+        ),
+    )
+    completo: bool | None = Field(
+        default=None,
+        description=(
+            "Si el ciclo se facturó bajo las mismas condiciones de principio a fin "
+            "(``True``) o tuvo un tramo con condiciones distintas —alta, cambio de "
+            "plan, suspensión— que lo volvió parcial (``False``). ``None`` cuando no "
+            "hay tabla de tramos con la que saberlo: hoy solo el ciclo que se explica "
+            "la trae, nunca el ciclo previo."
+        ),
+    )
+    estado_pago: Literal["pagado", "pendiente", "por_pagar", "vencido"] | None = Field(
+        default=None,
+        description=(
+            "Estado de cobro del ciclo, derivado de campos reales del FactSet "
+            "(deuda_anterior_cent, fecha_vencimiento, total_a_pagar_cent), nunca "
+            "inventado: el dataset no modela una fecha de pago, así que 'pagado' en el "
+            "ciclo previo es una inferencia (no arrastra deuda), no un hecho registrado."
+        ),
+    )
 
 
 class HitoCiclo(BaseModel):
@@ -182,7 +217,29 @@ class HitoCiclo(BaseModel):
     model_config = ConfigDict(extra="forbid")
     fecha: str
     etiqueta: str
-    tipo: Literal["inicio", "cierre", "vencimiento", "prorrateo", "suspension", "reconexion"]
+    tipo: Literal[
+        "inicio", "cierre", "vencimiento", "prorrateo", "suspension", "reconexion", "facturacion"
+    ]
+    periodo: str = Field(description="Periodo (CicloExplicado.periodo) al que pertenece el hito")
+
+
+class SegmentoParcial(BaseModel):
+    """El tramo del ciclo que estuvo bajo condiciones distintas al resto.
+
+    Es la evidencia detrás de ``CicloExplicado.completo = False``: sale directo de la
+    tabla de tramos del ``FactSet`` (misma fuente que ya arma el desglose de
+    prorrateo), nunca de un cálculo nuevo en el frontend.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    periodo: str
+    inicio: str
+    fin: str = Field(description="Extremo derecho EXCLUSIVO del tramo, como en Tramo")
+    dias: int = Field(ge=0)
+    causa: str = Field(description='Motivo breve: "cambio de plan", "suspensión de servicio"…')
+    monto_cent: Centimos | None = Field(
+        default=None, description="Monto prorrateado de ese tramo, si aplica"
+    )
 
 
 class CausaVisual(BaseModel):
@@ -198,21 +255,39 @@ class BloqueCiclos(_BloqueBase):
     tipo: Literal["ciclos"] = "ciclos"
     modalidad: str
     ciclos: list[CicloExplicado] = Field(min_length=1, max_length=2)
-    hitos: list[HitoCiclo] = Field(default_factory=list, max_length=8)
+    hitos: list[HitoCiclo] = Field(default_factory=list, max_length=16)
+    segmentos_parciales: list[SegmentoParcial] = Field(default_factory=list, max_length=4)
     causas: list[CausaVisual] = Field(default_factory=list, max_length=8)
 
     def a_texto(self) -> str:
         partes = [self.titulo or "Comparación de ciclos", f"Modalidad: {self.modalidad}"]
         for ciclo in self.ciclos:
             linea = f"Ciclo {ciclo.periodo}: {formatear_soles(ciclo.total_cent)}"
+            if ciclo.es_mas_reciente:
+                linea += " (más reciente)"
+            if ciclo.completo is True:
+                linea += " (completo)"
+            elif ciclo.completo is False:
+                linea += " (parcial)"
+            if ciclo.estado_pago:
+                linea += f" [{ciclo.estado_pago}]"
             fechas = [
                 f"inicio {ciclo.inicio}" if ciclo.inicio else "",
                 f"cierre {ciclo.cierre}" if ciclo.cierre else "",
+                f"facturación {ciclo.emision}" if ciclo.emision else "",
                 f"vence {ciclo.vencimiento}" if ciclo.vencimiento else "",
             ]
             fechas = [fecha for fecha in fechas if fecha]
             partes.append(f"{linea} ({', '.join(fechas)})" if fechas else linea)
-        partes.extend(f"{hito.fecha}: {hito.etiqueta}" for hito in self.hitos)
+        partes.extend(f"{hito.periodo} · {hito.fecha}: {hito.etiqueta}" for hito in self.hitos)
+        for segmento in self.segmentos_parciales:
+            parte = (
+                f"Período parcial ({segmento.periodo}): {segmento.inicio} a {segmento.fin}, "
+                f"{segmento.dias} días, {segmento.causa}"
+            )
+            if segmento.monto_cent is not None:
+                parte += f", {formatear_soles(segmento.monto_cent)}"
+            partes.append(parte)
         partes.extend(
             f"{causa.etiqueta}: {formatear_soles(causa.monto_cent)} "
             f"({causa.participacion_bp / 100:g} %)"

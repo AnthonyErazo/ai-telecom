@@ -58,8 +58,13 @@ type Pantalla = "splash"|"loginCuenta"|"registroCuenta"|"dashboard"|"recibo"|"me
 type ChatModo = "chat" | "voz";
 /** Un mensaje del historial del chat. Los del asistente guardan los `bloques`
  * estructurados que ya trajo el backend (no un texto aplanado) para pintarlos con
- * formato rico; esRecibo muestra la tarjeta de factura inline en su lugar. */
-type Mensaje  = { rol: "cliente"|"asistente"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean };
+ * formato rico; esRecibo muestra la tarjeta de factura inline en su lugar.
+ * `beneficiosCierre` solo se llena cuando el turno fue una despedida y la cuenta
+ * tiene beneficios vigentes: dispara la tarjeta resaltada del "efecto efervescente". */
+type Mensaje  = {
+  rol: "cliente"|"asistente"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean;
+  beneficiosCierre?: string[];
+};
 
 // ── Numpad grid ───────────────────────────────────────────────────────
 const PAD: string[][] = [
@@ -169,6 +174,18 @@ export function MiMovistar({
   const lineasVariaron     = hechos?.lineas?.filter((l) => l.delta_cent !== 0).length ?? 0;
   const pctLineasVariaron  = totalLineas > 0 ? Math.round((lineasVariaron / totalLineas) * 100) : 0;
 
+  /** "Efecto efervescente" del cierre: solo cuando el turno fue una despedida
+   * (`Intencion.DESPEDIDA` en el backend, ver `apps/api/routers/explicar.py`) y la
+   * cuenta tiene beneficios vigentes. Los beneficios NUNCA salen del texto que redactó
+   * el modelo —ese turno no tiene FactSet y cualquier cifra suya sería una alucinación—
+   * sino del `FactSet` que ya se cargó al entrar (`hechos.beneficios_vigentes`). Si la
+   * cuenta no tiene ninguno, devuelve `undefined` y el cierre queda en el texto simple. */
+  const beneficiosDeCierre = (res: Explanation): string[] | undefined => {
+    if (String(res.telemetria?.intencion ?? "") !== "DESPEDIDA") return undefined;
+    const lista = hechos?.beneficios_vigentes ?? [];
+    return lista.length ? lista : undefined;
+  };
+
   // ── Mutations ───────────────────────────────────────────────────
   const entrar = useMutation({
     mutationFn: async (id: string) => {
@@ -194,7 +211,7 @@ export function MiMovistar({
     onSuccess: (res) => {
       setConversacion(res.conversation_id);
       setUltima(res); setOpinion(null);
-      setMensajes((p) => [...p, { rol: "asistente", bloques: res.bloques }]);
+      setMensajes((p) => [...p, { rol: "asistente", bloques: res.bloques, beneficiosCierre: beneficiosDeCierre(res) }]);
       onExplicacion(res);
       void historialChats.refetch();
     },
@@ -342,7 +359,7 @@ export function MiMovistar({
             const pregunta = current.filter((m) => m.role === "user").map((m) => m.text).join(" ").trim();
             setMensajes((p) => {
               const conPregunta = pregunta ? [...p, { rol:"cliente" as const, texto:pregunta, esVoz:true }] : p;
-              return [...conPregunta, { rol:"asistente" as const, bloques:res.bloques, esVoz:true }];
+              return [...conPregunta, { rol:"asistente" as const, bloques:res.bloques, esVoz:true, beneficiosCierre: beneficiosDeCierre(res) }];
             });
             return [];
           });
@@ -1084,8 +1101,18 @@ export function MiMovistar({
                       {m.esVoz ? <Mic size={14}/> : <img src={billsenseLogo} alt="" />}
                     </div>
                   )}
-                  <div className={`mm-chat-bubble ${esAsi?"assistant":"client"}`}>
-                    {esAsi && m.bloques ? <RichMessage bloques={m.bloques} /> : m.texto}
+                  <div className="mm-chat-bubble-col">
+                    <div className={`mm-chat-bubble ${esAsi?"assistant":"client"}`}>
+                      {esAsi && m.bloques ? <RichMessage bloques={m.bloques} /> : m.texto}
+                    </div>
+                    {esAsi && m.beneficiosCierre && (
+                      <div className="mm-chat-efervescente">
+                        <span className="mm-chat-efervescente-title"><Gift size={13}/> Recuerde que ya cuenta con:</span>
+                        <div className="mm-renta-chips">
+                          {m.beneficiosCierre.map((b) => <span className="mm-renta-chip" key={b}>{b}</span>)}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {!esAsi && <div className="mm-chat-avatar-user"><UserIcon size={16}/></div>}
                 </div>
@@ -1224,6 +1251,14 @@ export function MiMovistar({
                     <span className="mm-voz-bubble-tag"><ShieldCheck size={11}/> Verificado</span>
                   </div>
                   <div className="mm-voz-bubble-text">{m.bloques ? <RichMessage bloques={m.bloques} /> : m.texto}</div>
+                  {m.beneficiosCierre && (
+                    <div className="mm-chat-efervescente">
+                      <span className="mm-chat-efervescente-title"><Gift size={13}/> Recuerde que ya cuenta con:</span>
+                      <div className="mm-renta-chips">
+                        {m.beneficiosCierre.map((b) => <span className="mm-renta-chip" key={b}>{b}</span>)}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div key={`prev-${i}`} className="mm-voz-bubble user">

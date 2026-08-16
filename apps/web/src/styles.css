@@ -869,8 +869,13 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.mm-chat-bubble {
+.mm-chat-bubble-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   max-width: 82%;
+}
+.mm-chat-bubble {
   padding: 12px 15px;
   font-size: 13.5px;
   line-height: 1.55;
@@ -890,6 +895,32 @@
   border-radius: 18px 18px 4px 18px;
   box-shadow: 0 4px 14px rgba(1,157,244,0.28);
   font-weight: 600;
+}
+
+/* "Efecto efervescente": tarjeta resaltada que recuerda los beneficios vigentes de la
+   cuenta cuando el cliente se despide de BillSense (`Intencion.DESPEDIDA` en el backend).
+   Solo se pinta si hay beneficios que mostrar; si no, el cierre queda en texto simple. */
+.mm-chat-efervescente {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: linear-gradient(135deg, #edfae1, #f3fff0);
+  border: 1px solid #cdeeb0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  animation: mm-efervescer 320ms ease-out;
+}
+.mm-chat-efervescente-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #3a7d00;
+}
+@keyframes mm-efervescer {
+  from { opacity: 0; transform: scale(0.94) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* Indicador de escritura */
@@ -1818,9 +1849,15 @@
   display: grid; place-items: center; width: 30px; height: 30px;
   border-radius: 9px; background: rgba(255,255,255,.16);
 }
-.mm-cycle-header div { display: flex; flex-direction: column; min-width: 0; }
+.mm-cycle-header div { display: flex; flex-direction: column; min-width: 0; gap: 4px; }
 .mm-cycle-header strong { font-size: 12px; }
-.mm-cycle-header small { margin-top: 2px; font-size: 9px; opacity: .78; }
+.mm-cycle-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.mm-cycle-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 999px; background: rgba(255,255,255,.16); font-size: 8px;
+  font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+}
+.mm-cycle-badge.reciente { background: #5bc500; color: #0b3c59; }
 .mm-cycle-track {
   position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px; padding: 20px 12px 13px; background: #f6fff0;
@@ -1839,13 +1876,71 @@
 .mm-cycle-node > small { display: block; color: #68768a; font-size: 8px; text-transform: uppercase; }
 .mm-cycle-node > strong { display: block; margin-top: 1px; font-size: 11px; }
 .mm-cycle-node > b { display: block; margin-top: 2px; color: #007bc0; font-size: 14px; }
-.mm-cycle-node p, .mm-cycle-node em { display: block; margin: 2px 0 0; color: #68768a; font-size: 9px; font-style: normal; }
-.mm-cycle-events, .mm-cycle-causes { padding: 10px 12px; border-top: 1px solid #edf0f4; }
+.mm-cycle-node p, .mm-cycle-node em {
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  margin: 2px 0 0; color: #68768a; font-size: 9px; font-style: normal;
+}
+.mm-cycle-node em { color: #cc4c3d; font-weight: 700; }
+.mm-cycle-estado {
+  display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 999px;
+  font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em;
+  background: #edfae1; color: #3a7a10;
+}
+.mm-cycle-estado.parcial { background: #fff2f2; color: #cc4c3d; }
+.mm-cycle-timeline, .mm-cycle-causes { padding: 10px 12px; border-top: 1px solid #edf0f4; }
 .mm-cycle-section-title { margin: 0 0 7px; color: #52677d; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .07em; }
-.mm-cycle-event { display: flex; align-items: flex-start; gap: 7px; padding: 5px 0; color: #52677d; font-size: 10px; }
-.mm-cycle-event svg { flex-shrink: 0; color: #019df4; }
-.mm-cycle-event span { display: flex; flex-direction: column; gap: 1px; }
-.mm-cycle-event b { color: #172033; font-size: 9px; }
+
+/* Franja por ciclo — "Ciclo de facturación 1 / 2", con sus hitos dibujados a escala
+   real (posición = fecha) en vez de a distancias iguales, y el tramo parcial (si lo
+   tuvo) resaltado bajo la línea. */
+.mm-cycle-band { margin-bottom: 14px; }
+.mm-cycle-band:last-child { margin-bottom: 0; }
+.mm-cycle-band-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 4px 9px; margin-bottom: 7px; border-radius: 7px;
+  background: #e91e63; color: #fff; font-size: 9px; font-weight: 800;
+}
+.mm-cycle-band-tags { display: flex; align-items: center; gap: 6px; }
+.mm-cycle-band-tags em { display: inline-flex; align-items: center; gap: 3px; font-style: normal; opacity: .9; }
+.mm-cycle-band-tags em.parcial {
+  padding: 1px 6px; border-radius: 999px; background: #fff; color: #e91e63; opacity: 1;
+}
+.mm-cycle-band-line { position: relative; height: 54px; margin: 4px 26px 0; }
+.mm-cycle-band-rail {
+  position: absolute; top: 12px; left: 0; right: 0; height: 2px; background: #dce4ec; z-index: 0;
+}
+.mm-cycle-band-segmento {
+  position: absolute; top: 9px; height: 8px; border-radius: 4px; z-index: 0;
+  background: rgba(245,166,35,.32); border: 1px solid #f5a623;
+}
+.mm-cycle-hito {
+  position: absolute; top: 0; z-index: 1; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; width: 58px; text-align: center;
+}
+.mm-cycle-hito-dot {
+  display: grid; place-items: center; width: 24px; height: 24px; margin-bottom: 4px;
+  border-radius: 50%; border: 2px solid #fff; color: #fff; background: #68768a;
+  box-shadow: 0 1px 4px rgba(11,60,89,.2);
+}
+.mm-cycle-hito.tipo-inicio .mm-cycle-hito-dot, .mm-cycle-hito.tipo-cierre .mm-cycle-hito-dot { background: #f5a623; }
+.mm-cycle-hito.tipo-facturacion .mm-cycle-hito-dot { background: #5bc500; }
+.mm-cycle-hito.tipo-suspension .mm-cycle-hito-dot { background: #cc4c3d; }
+.mm-cycle-hito.tipo-reconexion .mm-cycle-hito-dot { background: #019df4; }
+.mm-cycle-hito.tipo-vencimiento .mm-cycle-hito-dot { background: #7c3aed; }
+.mm-cycle-hito b { font-size: 9px; color: #172033; }
+.mm-cycle-hito small { font-size: 8px; color: #68768a; max-width: 62px; line-height: 1.25; }
+.mm-cycle-band-nota {
+  margin: 6px 0 0; padding: 6px 8px; border-radius: 8px; background: #fff8ec;
+  border: 1px dashed #f5a623; font-size: 9px; color: #52677d; line-height: 1.45;
+}
+.mm-cycle-band-nota strong { color: #a15c00; }
+.mm-cycle-band-causa { display: inline-block; margin-top: 2px; color: #68768a; font-style: italic; }
+.mm-cycle-band-vencimiento {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px; padding-top: 7px;
+  border-top: 1px dashed #dce4ec; color: #7c3aed; font-size: 9px;
+}
+.mm-cycle-band-vencimiento b { color: #172033; }
+.mm-cycle-band-vencimiento small { margin-left: auto; color: #9fb1c4; font-style: italic; }
 .mm-cycle-causes > div { display: flex; justify-content: space-between; gap: 9px; padding: 5px 0; border-top: 1px solid #f2f5f7; font-size: 10px; }
 .mm-cycle-causes > div > span { min-width: 0; }
 .mm-cycle-causes > div > strong { white-space: nowrap; }

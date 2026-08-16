@@ -556,6 +556,9 @@ def generar(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dict[str, Any]:
         respuestas_previas=servicios.memoria.turnos_asistente(clave)
         if hasattr(servicios.memoria, "turnos_asistente")
         else None,
+        # Mismo criterio que la vía directa (`_explicar_directo`): sin periodo
+        # explícito en el estado, el turno es sobre el recibo más reciente.
+        es_mas_reciente=estado.get("periodo") is None,
     )
     degradado = resultado.modo is ModoGeneracion.PLANTILLA and servicios.proveedor is not None
 

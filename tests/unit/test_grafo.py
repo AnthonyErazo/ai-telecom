@@ -82,6 +82,7 @@ FRASES_POR_INTENCION: dict[Intencion, str] = {
     Intencion.PEDIR_HUMANO: "quiero hablar con un asesor",
     Intencion.VACIO: "",
     Intencion.SALUDO: "hola",
+    Intencion.DESPEDIDA: "muchas gracias, eso es todo",
     Intencion.CONSULTA_CONCEPTO: "que es un prorrateo",
     Intencion.FUERA_DE_DOMINIO: "cual es la capital de francia",
     Intencion.DISPUTA_CARGO: "este cobro esta mal, no lo reconozco",

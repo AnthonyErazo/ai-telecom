@@ -244,13 +244,21 @@
             "items": {
               "$ref": "#/components/schemas/HitoCiclo"
             },
-            "maxItems": 8,
+            "maxItems": 16,
             "title": "Hitos",
             "type": "array"
           },
           "modalidad": {
             "title": "Modalidad",
             "type": "string"
+          },
+          "segmentos_parciales": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentoParcial"
+            },
+            "maxItems": 4,
+            "title": "Segmentos Parciales",
+            "type": "array"
           },
           "tipo": {
             "const": "ciclos",
@@ -644,7 +652,7 @@
       },
       "CicloExplicado": {
         "additionalProperties": false,
-        "description": "Uno de los dos ciclos que puede comparar el componente visual.",
+        "description": "Uno de los dos ciclos que puede comparar el componente visual.\n\nEl componente es deliberadamente genérico: sirve igual para el par (ciclo previo,\nciclo explicado) de una consulta sobre el recibo actual que para cualquier par de\nperiodos consecutivos que el cliente pida ver en su historial. Lo único que cambia\nentre esos usos es *qué* ``FactSet`` los produjo, nunca la forma del bloque.",
         "properties": {
           "actual": {
             "default": false,
@@ -661,6 +669,54 @@
               }
             ],
             "title": "Cierre"
+          },
+          "completo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Si el ciclo se facturó bajo las mismas condiciones de principio a fin (``True``) o tuvo un tramo con condiciones distintas —alta, cambio de plan, suspensión— que lo volvió parcial (``False``). ``None`` cuando no hay tabla de tramos con la que saberlo: hoy solo el ciclo que se explica la trae, nunca el ciclo previo.",
+            "title": "Completo"
+          },
+          "emision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fecha de facturación del ciclo",
+            "title": "Emision"
+          },
+          "es_mas_reciente": {
+            "default": false,
+            "description": "Si este ciclo es el recibo más reciente que tiene la cuenta hoy (no solo el lado derecho de la comparación): falso cuando el cliente está viendo un par de ciclos del historial.",
+            "title": "Es Mas Reciente",
+            "type": "boolean"
+          },
+          "estado_pago": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pagado",
+                  "pendiente",
+                  "por_pagar",
+                  "vencido"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Estado de cobro del ciclo, derivado de campos reales del FactSet (deuda_anterior_cent, fecha_vencimiento, total_a_pagar_cent), nunca inventado: el dataset no modela una fecha de pago, así que 'pagado' en el ciclo previo es una inferencia (no arrastra deuda), no un hecho registrado.",
+            "title": "Estado Pago"
           },
           "inicio": {
             "anyOf": [
@@ -1263,6 +1319,19 @@
             "description": "Exclusivo",
             "title": "Ciclo Fin"
           },
+          "ciclo_fin_previo": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exclusivo",
+            "title": "Ciclo Fin Previo"
+          },
           "ciclo_inicio": {
             "anyOf": [
               {
@@ -1274,6 +1343,18 @@
               }
             ],
             "title": "Ciclo Inicio"
+          },
+          "ciclo_inicio_previo": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ciclo Inicio Previo"
           },
           "confianza_global": {
             "maximum": 1.0,
@@ -1309,6 +1390,31 @@
             "title": "Factset Id",
             "type": "string"
           },
+          "fecha_emision": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fecha de facturación del recibo actual",
+            "title": "Fecha Emision"
+          },
+          "fecha_emision_previo": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Emision Previo"
+          },
           "fecha_vencimiento": {
             "anyOf": [
               {
@@ -1320,6 +1426,18 @@
               }
             ],
             "title": "Fecha Vencimiento"
+          },
+          "fecha_vencimiento_previo": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento Previo"
           },
           "financiamientos": {
             "items": {
@@ -1634,6 +1752,11 @@
             "title": "Fecha",
             "type": "string"
           },
+          "periodo": {
+            "description": "Periodo (CicloExplicado.periodo) al que pertenece el hito",
+            "title": "Periodo",
+            "type": "string"
+          },
           "tipo": {
             "enum": [
               "inicio",
@@ -1641,7 +1764,8 @@
               "vencimiento",
               "prorrateo",
               "suspension",
-              "reconexion"
+              "reconexion",
+              "facturacion"
             ],
             "title": "Tipo",
             "type": "string"
@@ -1650,7 +1774,8 @@
         "required": [
           "fecha",
           "etiqueta",
-          "tipo"
+          "tipo",
+          "periodo"
         ],
         "title": "HitoCiclo",
         "type": "object"
@@ -3173,6 +3298,56 @@
           "es_actual"
         ],
         "title": "ResumenRecibo",
+        "type": "object"
+      },
+      "SegmentoParcial": {
+        "additionalProperties": false,
+        "description": "El tramo del ciclo que estuvo bajo condiciones distintas al resto.\n\nEs la evidencia detrás de ``CicloExplicado.completo = False``: sale directo de la\ntabla de tramos del ``FactSet`` (misma fuente que ya arma el desglose de\nprorrateo), nunca de un cálculo nuevo en el frontend.",
+        "properties": {
+          "causa": {
+            "description": "Motivo breve: \"cambio de plan\", \"suspensión de servicio\"…",
+            "title": "Causa",
+            "type": "string"
+          },
+          "dias": {
+            "minimum": 0.0,
+            "title": "Dias",
+            "type": "integer"
+          },
+          "fin": {
+            "description": "Extremo derecho EXCLUSIVO del tramo, como en Tramo",
+            "title": "Fin",
+            "type": "string"
+          },
+          "inicio": {
+            "title": "Inicio",
+            "type": "string"
+          },
+          "monto_cent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Monto prorrateado de ese tramo, si aplica",
+            "title": "Monto Cent"
+          },
+          "periodo": {
+            "title": "Periodo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "periodo",
+          "inicio",
+          "fin",
+          "dias",
+          "causa"
+        ],
+        "title": "SegmentoParcial",
         "type": "object"
       },
       "TipoMovimiento": {

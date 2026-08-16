@@ -897,6 +897,12 @@ def _explicar_directo(
         estricto=ajustes.verificador_estricto,
         timeout_s=ajustes.llm_timeout_s,
         permitidos=permitidos,
+        # `peticion.periodo` solo queda vacío cuando el cliente no pidió un mes
+        # concreto (ni desde la interfaz ni nombrándolo en la consulta): ese es
+        # exactamente el caso "su recibo de hoy". Cualquier otro valor significa que
+        # está revisando un par de ciclos de su historial, así que el bloque visual no
+        # debe rotular ese ciclo como el más reciente de la cuenta.
+        es_mas_reciente=peticion.periodo is None,
     )
     degradado = resultado.modo is ModoGeneracion.PLANTILLA and proveedor is not None
     for intento in resultado.intentos:
@@ -1182,6 +1188,10 @@ _COPY_INTENCION: dict[Intencion, tuple[str, str]] = {
         "info",
         "No recibí su consulta. Cuénteme qué necesita: puedo explicarle su recibo, "
         "aclararle un cargo o pasarlo con un asesor.",
+    ),
+    Intencion.DESPEDIDA: (
+        "info",
+        "Con gusto. Que tenga un buen día.",
     ),
     Intencion.FUERA_DE_DOMINIO: (
         "advertencia",

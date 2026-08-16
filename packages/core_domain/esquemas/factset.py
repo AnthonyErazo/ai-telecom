@@ -298,6 +298,17 @@ class FactSet(BaseModel):
     ciclo_inicio: date | None = None
     ciclo_fin: date | None = Field(default=None, description="Exclusivo")
     fecha_vencimiento: date | None = None
+    fecha_emision: date | None = Field(
+        default=None, description="Fecha de facturación del recibo actual"
+    )
+    # Fechas REALES del ciclo previo (no derivadas por álgebra): salen del mismo
+    # `Recibo` anterior que ya se carga para el diff, así que el componente visual de
+    # ciclos (`BloqueCiclos`) puede mostrar el rango completo de AMBOS ciclos sin que
+    # nadie —ni el LLM ni el frontend— tenga que inventar o calcular una fecha.
+    ciclo_inicio_previo: date | None = None
+    ciclo_fin_previo: date | None = Field(default=None, description="Exclusivo")
+    fecha_vencimiento_previo: date | None = None
+    fecha_emision_previo: date | None = None
     estado_servicio: EstadoServicio = EstadoServicio.ACTIVO
     plan_vigente: str | None = None
     financiamientos: list[PlanFinanciamiento] = Field(default_factory=list)
@@ -480,6 +491,11 @@ class FactSet(BaseModel):
         anotar_fecha(self.ciclo_inicio, "factset:ciclo_inicio")
         anotar_fecha(self.ciclo_fin, "factset:ciclo_fin")
         anotar_fecha(self.fecha_vencimiento, "factset:fecha_vencimiento")
+        anotar_fecha(self.fecha_emision, "factset:fecha_emision")
+        anotar_fecha(self.ciclo_inicio_previo, "factset:ciclo_inicio_previo")
+        anotar_fecha(self.ciclo_fin_previo, "factset:ciclo_fin_previo")
+        anotar_fecha(self.fecha_vencimiento_previo, "factset:fecha_vencimiento_previo")
+        anotar_fecha(self.fecha_emision_previo, "factset:fecha_emision_previo")
 
         # 9. Confianza global
         anotar(token_porcentaje(round(self.confianza_global * 100, 2)), "factset:confianza_global")

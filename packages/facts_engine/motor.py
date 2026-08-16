@@ -494,6 +494,13 @@ def construir_factset(
         ciclo_inicio=recibo_actual.ciclo_inicio,
         ciclo_fin=recibo_actual.ciclo_fin,
         fecha_vencimiento=recibo_actual.fecha_vencimiento,
+        fecha_emision=recibo_actual.fecha_emision,
+        # Fechas reales del recibo previo, ya cargado para el diff: el componente
+        # visual de ciclos las ancla sin derivar ni un día por álgebra de calendario.
+        ciclo_inicio_previo=previo.ciclo_inicio,
+        ciclo_fin_previo=previo.ciclo_fin,
+        fecha_vencimiento_previo=previo.fecha_vencimiento,
+        fecha_emision_previo=previo.fecha_emision,
         estado_servicio=recibo_actual.estado_servicio,
         plan_vigente=recibo_actual.plan_vigente,
         financiamientos=planes,

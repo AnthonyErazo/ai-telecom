@@ -109,6 +109,28 @@ GUION: dict[Intencion, _Guion] = {
             "Hola. Si quiere le reviso su recibo y le digo por qué le llegó ese monto.",
         ),
     ),
+    Intencion.DESPEDIDA: _Guion(
+        objetivo=(
+            "El cliente se está despidiendo o dando por terminada la conversación "
+            "(agradece, dice adiós, dice que eso era todo). Ciérrale con calidez, sin "
+            "alargar la conversación ni ofrecerle algo que no pidió."
+        ),
+        debe=(
+            "Ser breve: una frase, como mucho dos.",
+            "Sonar cálido y genuino, no a guion de call center.",
+            "Dejar la puerta abierta por si necesita algo más, sin insistir.",
+        ),
+        no_debe=(
+            "Ofrecer explicarle el recibo si no lo pidió en este turno.",
+            "Mencionar cifras, montos o beneficios: aquí no hay FactSet que los respalde.",
+            "Repetir la misma despedida si ya se despidió antes en esta conversación.",
+        ),
+        respaldos=(
+            "Con gusto. Que tenga un buen día.",
+            "Un gusto ayudarle. Aquí voy a estar si necesita algo más de su recibo.",
+            "De nada. Cualquier otra consulta sobre su recibo, aquí estoy.",
+        ),
+    ),
     Intencion.DISPUTA_CARGO: _Guion(
         objetivo=(
             "El cliente NO está preguntando qué es un cargo: está diciendo que ese cargo "

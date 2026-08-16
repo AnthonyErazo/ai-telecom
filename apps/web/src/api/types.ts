@@ -4,7 +4,10 @@ export type Block =
   | { tipo: "puente"; titulo?: string | null; barras: Array<{ etiqueta: string; monto_cent: number; tipo: string; fact_id?: string | null }> }
   | { tipo: "tabla"; titulo?: string | null; columnas: string[]; filas: string[][]; nota?: string | null }
   | { tipo: "aviso"; titulo?: string | null; texto: string; severidad: string; fact_ids?: string[] }
-  | { tipo: "ciclos"; titulo?: string | null; modalidad: string; ciclos: CicloExplicado[]; hitos: HitoCiclo[]; causas: CausaVisual[]; fact_ids?: string[] };
+  | {
+      tipo: "ciclos"; titulo?: string | null; modalidad: string; ciclos: CicloExplicado[];
+      hitos: HitoCiclo[]; segmentos_parciales: SegmentoParcial[]; causas: CausaVisual[]; fact_ids?: string[];
+    };
 
 export interface CicloExplicado {
   periodo: string;
@@ -13,12 +16,27 @@ export interface CicloExplicado {
   inicio?: string | null;
   cierre?: string | null;
   vencimiento?: string | null;
+  emision?: string | null;
+  es_mas_reciente: boolean;
+  /** `null` cuando no hay tabla de tramos con la que saberlo (el ciclo previo). */
+  completo?: boolean | null;
 }
 
 export interface HitoCiclo {
   fecha: string;
   etiqueta: string;
-  tipo: "inicio" | "cierre" | "vencimiento" | "prorrateo" | "suspension" | "reconexion";
+  tipo: "inicio" | "cierre" | "vencimiento" | "prorrateo" | "suspension" | "reconexion" | "facturacion";
+  periodo: string;
+}
+
+/** El tramo del ciclo que estuvo bajo condiciones distintas al resto (backend: `SegmentoParcial`). */
+export interface SegmentoParcial {
+  periodo: string;
+  inicio: string;
+  fin: string;
+  dias: number;
+  causa: string;
+  monto_cent?: number | null;
 }
 
 export interface CausaVisual {
