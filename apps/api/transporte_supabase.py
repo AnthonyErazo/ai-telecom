@@ -82,6 +82,12 @@ ESCENARIOS: tuple[tuple[str, str], ...] = (
     ("PAQUETES", "Compra de paquetes"),
 )
 
+#: El cambio de plan no se delata por un grupo de cargo —no existe uno— sino por la orden
+#: del CRM. Va aparte porque su consulta es otra: se buscan cuentas con una orden
+#: «Cambiar» a petición del cliente y con movimiento en la renta del último ciclo, que es
+#: donde un cambio de plan tiene que verse.
+ESCENARIO_CAMBIO_PLAN = "Cambio de plan"
+
 
 #: Familia canónica según el GRUPO del facturador. El orden de comprobación importa:
 #: primero lo que el dato afirma, nunca el prefijo del código (una heurística sobre el
@@ -355,6 +361,50 @@ class TransporteSupabase:
                 continue
             for fila in filas:
                 elegidas.setdefault(str(fila[0]), etiqueta)
+
+        try:
+            filas = self._conexion.execute(
+                """
+                WITH por_ciclo AS (
+                    SELECT financial_account_key AS cuenta,
+                           ciclo,
+                           SUM(charge_total_amount) AS total,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY financial_account_key ORDER BY ciclo DESC
+                           ) AS puesto
+                    FROM cargo_facturado
+                    WHERE grupo <> %s
+                    GROUP BY financial_account_key, ciclo
+                ),
+                con_renta AS (
+                    SELECT DISTINCT financial_account_key AS cuenta, ciclo
+                    FROM cargo_facturado
+                    WHERE grupo IN ('CARGO FIJO', 'CARGO FIJO VENCIDO')
+                ),
+                con_orden AS (
+                    SELECT DISTINCT financial_account AS cuenta
+                    FROM orden_servicio
+                    WHERE tipo_item ILIKE 'Cambiar%%' AND razon_desc ILIKE '%%liente%%'
+                )
+                SELECT actual.cuenta
+                FROM por_ciclo AS actual
+                JOIN por_ciclo AS previo
+                  ON previo.cuenta = actual.cuenta AND previo.puesto = 2
+                JOIN con_renta
+                  ON con_renta.cuenta = actual.cuenta AND con_renta.ciclo = actual.ciclo
+                JOIN con_orden ON con_orden.cuenta = actual.cuenta
+                WHERE actual.puesto = 1
+                  AND ABS(actual.total - previo.total) >= 1
+                ORDER BY ABS(actual.total - previo.total) DESC
+                LIMIT %s
+                """,
+                (GRUPO_EXCLUIDO, max(1, por_escenario)),
+            ).fetchall()
+        except Exception as error:
+            _LOG.warning("no se pudieron listar cuentas de cambio de plan: %s", error)
+            filas = []
+        for fila in filas:
+            elegidas.setdefault(str(fila[0]), ESCENARIO_CAMBIO_PLAN)
         return elegidas
 
     # -- construcción del documento ------------------------------------------ #

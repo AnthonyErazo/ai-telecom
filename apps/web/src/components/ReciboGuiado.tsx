@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ChevronRight, Loader2, Pause, Play, Send, Sparkles, Volume2, VolumeX } from "lucide-react";
 import MovistarLogo from "./MovistarLogo";
@@ -85,6 +85,18 @@ export function pasosDeExplicacion(bloques: Block[]): Paso[] {
 }
 
 type Pantalla = "acceso" | "recibo";
+
+/** Envuelve la pantalla en el marco del teléfono. Ver el tamaño real es parte del diseño. */
+function Telefono({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="telefono">
+      <div className="telefono-pantalla">
+        <div className="telefono-muesca" />
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: string) => void }) {
   const [pantalla, setPantalla] = useState<Pantalla>("acceso");
@@ -211,8 +223,8 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
   // cuenta, así que elegir cuenta es elegir qué se quiere ver explicado.
   if (pantalla === "acceso") {
     return (
-      <div className="min-h-full bg-gray-50 px-4 py-8 flex justify-center">
-        <div className="w-full max-w-md space-y-5">
+      <Telefono>
+        <div className="flex-1 overflow-y-auto chat-scroll px-5 pt-10 pb-6 space-y-5">
           <div className="text-center space-y-3">
             <div className="bg-sky-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
               <MovistarLogo className="h-10 w-auto" />
@@ -269,7 +281,7 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
           </details>
           {error && <p className="text-sm text-rose-600 text-center">{error}</p>}
         </div>
-      </div>
+      </Telefono>
     );
   }
 
@@ -285,7 +297,7 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
     // narrador se queda pegado abajo. Las dos columnas de antes obligaban a partir la
     // atención entre dos sitios, y en un móvil directamente no caben: la explicación
     // acababa debajo del recibo, fuera de pantalla, justo cuando señala una línea.
-    <div className="mx-auto w-full max-w-md h-[calc(100dvh-200px)] min-h-[520px] flex flex-col bg-white sm:rounded-2xl sm:shadow-card sm:border sm:border-gray-100 overflow-hidden">
+    <Telefono>
       <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100 shrink-0">
         <button onClick={() => { window.speechSynthesis?.cancel(); setPantalla("acceso"); }}
                 className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600" aria-label="Volver a los casos">
@@ -466,7 +478,7 @@ export function ReciboGuiado({ onSesion }: { onSesion?: (cuenta: string, token: 
         {error && <p className="px-5 pb-4 text-sm text-rose-600 m-0">{error}</p>}
       </div>
       <div ref={finPasos} />
-    </div>
+    </Telefono>
   );
 }
 

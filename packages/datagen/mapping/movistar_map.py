@@ -312,6 +312,23 @@ def tipo_desde_crm(razon: str | None, tipo_item: str | None) -> TipoMovimiento |
         return TipoMovimiento.SUSPENSION
     if r == "promociones":
         return TipoMovimiento.ALTA_PAQUETE
+
+    # «Cambiar» a petición del cliente -> CAMBIO_PLAN.
+    #
+    # Se mapea por decisión de producto, y con una red debajo que hace el riesgo mucho
+    # menor de lo que parece: el tipo no se convierte en la causa de cualquier línea. La
+    # atribución solo admite una causa si el concepto la acepta en `rules.yaml`, y
+    # CAMBIO_PLAN únicamente lo aceptan las líneas de renta y de prorrateo del plan
+    # (`RENTA_MOVISTAR_TOTAL`, `PRORRATEO_PLAN`, `AJUSTE_RETROACTIVO_RENTA`). Si el
+    # «cambiar» de esta orden era de SIM, de domicilio o de titularidad, no habrá una
+    # línea de renta que se haya movido y la orden se quedará sin usar.
+    #
+    # Lo que sigue sin poder descartarse es el caso en que la renta se movió por OTRO
+    # motivo y encima existe una orden «Cambiar» de SIM: ahí sí se le atribuiría al
+    # cambio de plan. Por eso esto es una decisión de negocio y no una deducción del
+    # dato, y por eso queda escrita aquí y no escondida en una tabla.
+    if i.startswith("cambiar") and ("pedido de cliente" in r or "cliente" in r):
+        return TipoMovimiento.CAMBIO_PLAN
     return None
 
 
