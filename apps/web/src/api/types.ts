@@ -20,6 +20,8 @@ export interface CicloExplicado {
   es_mas_reciente: boolean;
   /** `null` cuando no hay tabla de tramos con la que saberlo (el ciclo previo). */
   completo?: boolean | null;
+  /** Estado de cobro derivado en el backend; `null` si no hay con qué inferirlo. */
+  estado_pago?: "pagado" | "pendiente" | "por_pagar" | "vencido" | null;
 }
 
 export interface HitoCiclo {

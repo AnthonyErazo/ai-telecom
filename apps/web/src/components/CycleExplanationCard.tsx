@@ -1,7 +1,7 @@
 import {
   CalendarClock, CalendarRange, CheckCircle2, CircleDollarSign, PauseCircle, Receipt, Sparkles, Star,
 } from "lucide-react";
-import type { ExtractBlock, HitoCiclo } from "../api/types";
+import type { CicloExplicado, ExtractBlock, HitoCiclo } from "../api/types";
 
 type BloqueCiclos = ExtractBlock<"ciclos">;
 
@@ -41,6 +41,30 @@ function posicionPct(fechaIso: string, inicioIso: string, finIso: string): numbe
   return Math.min(100, Math.max(0, (diasEntre(inicioIso, fechaIso) / total) * 100));
 }
 
+/** Separación mínima (en % del ancho) entre dos etiquetas para no pisarse. Con
+ * ciclos cortos o hitos muy próximos (p. ej. cierre y vencimiento del mismo mes en
+ * cuentas con poca separación) dos posiciones a escala real pueden caer casi
+ * encima; en vez de dejarlas ilegibles, la segunda baja a una segunda fila. */
+const SEPARACION_MINIMA_PCT = 16;
+
+/** Reparte los hitos de una franja en dos filas quicando la posición real de cada
+ * uno choca con la del hito anterior en su misma fila — así ninguna etiqueta queda
+ * ilegible por superposición, sin mover ni inventar ninguna fecha. */
+function repartirEnFilas(
+  puntos: HitoCiclo[],
+  rango: { inicio: string; fin: string } | null,
+): Array<{ hito: HitoCiclo; left: number; fila: number }> {
+  const ultimoPorFila = [-Infinity, -Infinity];
+  return puntos.map((hito, indice) => {
+    const left = rango
+      ? posicionPct(hito.fecha, rango.inicio, rango.fin)
+      : (indice / Math.max(1, puntos.length - 1)) * 100;
+    const fila = left - ultimoPorFila[0] >= SEPARACION_MINIMA_PCT ? 0 : 1;
+    ultimoPorFila[fila] = left;
+    return { hito, left, fila };
+  });
+}
+
 /** Símbolo distintivo por tipo de hito, para que cada fecha se reconozca de un
  * vistazo sin leer la etiqueta: estrella para los bordes del ciclo, recibo con
  * monto para la facturación, pausa/check para el corte y la reconexión. */
@@ -67,28 +91,33 @@ const ETIQUETA_NODO: Record<HitoCiclo["tipo"], string> = {
   prorrateo: "Cambio",
 };
 
+type EstadoPago = NonNullable<CicloExplicado["estado_pago"]>;
+
+const ESTADO_PAGO: Record<EstadoPago, { etiqueta: string; clase: string }> = {
+  pagado: { etiqueta: "Pagado", clase: "ok" },
+  pendiente: { etiqueta: "Pendiente", clase: "alerta" },
+  por_pagar: { etiqueta: "Por pagar", clase: "info" },
+  vencido: { etiqueta: "Vencido", clase: "alerta" },
+};
+
 export function CycleExplanationCard({ bloque }: { bloque: BloqueCiclos }) {
   const ciclos = bloque.ciclos.slice(0, 2);
   const explicado = ciclos.find((c) => c.actual);
 
-  // Una franja por ciclo, con sus hitos en orden cronológico y su tramo parcial (si
-  // lo tuvo) — el mismo dato que ya trae el bloque, solo agrupado por `periodo` para
-  // dibujar el diagrama "Ciclo de facturación 1 / 2" a escala real en vez de una
-  // fila con los puntos a distancias iguales.
+  // Una franja por ciclo, con sus hitos en la secuencia cronológica real —
+  // Inicio → Cierre/Facturación → Vencimiento, ya resuelta y deduplicada por el
+  // backend— y su tramo parcial (si lo tuvo), agrupados por `periodo` para dibujar
+  // el diagrama "Ciclo de facturación 1 / 2" a escala real en una sola línea.
   const bandas = ciclos
     .map((ciclo) => ({
       ciclo,
-      // El vencimiento NO entra en la línea proporcional: es la fecha límite de
-      // pago, no un borde del ciclo, y suele caer días después del cierre — mezclarlo
-      // en la misma regla lo haría parecer el fin del ciclo.
       puntos: bloque.hitos
-        .filter((h) => h.periodo === ciclo.periodo && h.tipo !== "vencimiento")
+        .filter((h) => h.periodo === ciclo.periodo)
         .slice()
         .sort((a, b) => a.fecha.localeCompare(b.fecha)),
-      vencimiento: bloque.hitos.find((h) => h.periodo === ciclo.periodo && h.tipo === "vencimiento"),
       segmento: bloque.segmentos_parciales.find((s) => s.periodo === ciclo.periodo),
     }))
-    .filter((banda) => banda.puntos.length > 0 || banda.vencimiento);
+    .filter((banda) => banda.puntos.length > 0);
 
   return <section className="mm-cycle-card">
     <header className="mm-cycle-header">
@@ -110,11 +139,18 @@ export function CycleExplanationCard({ bloque }: { bloque: BloqueCiclos }) {
         <small>{ciclo.actual ? "Ciclo explicado" : "Ciclo anterior"}</small>
         <strong>{ciclo.periodo}</strong>
         <b>{money(ciclo.total_cent)}</b>
-        {ciclo.completo != null && (
-          <span className={`mm-cycle-estado${ciclo.completo ? "" : " parcial"}`}>
-            {ciclo.completo ? "Completo" : "Parcial"}
-          </span>
-        )}
+        <span className="mm-cycle-badges-row">
+          {ciclo.completo != null && (
+            <span className={`mm-cycle-estado${ciclo.completo ? "" : " parcial"}`}>
+              {ciclo.completo ? "Completo" : "Parcial"}
+            </span>
+          )}
+          {ciclo.estado_pago && (
+            <span className={`mm-cycle-estado ${ESTADO_PAGO[ciclo.estado_pago].clase}`}>
+              {ESTADO_PAGO[ciclo.estado_pago].etiqueta}
+            </span>
+          )}
+        </span>
         {(ciclo.inicio || ciclo.cierre) && (
           <p><CalendarRange size={10} /> {fechaCorta(ciclo.inicio)} → {fechaCorta(ciclo.cierre)}</p>
         )}
@@ -124,18 +160,25 @@ export function CycleExplanationCard({ bloque }: { bloque: BloqueCiclos }) {
 
     {bandas.length > 0 && <div className="mm-cycle-timeline">
       <p className="mm-cycle-section-title">Qué ocurrió en cada ciclo</p>
-      {bandas.map(({ ciclo, puntos, vencimiento, segmento }, indice) => {
-        const rango = ciclo.inicio && ciclo.cierre ? { inicio: ciclo.inicio, fin: ciclo.cierre } : null;
+      {bandas.map(({ ciclo, puntos, segmento }, indice) => {
+        // La línea cubre de punta a punta la secuencia real del ciclo: del inicio al
+        // hito más tardío que trajo el backend (normalmente el vencimiento, que cae
+        // después del cierre) — así los tres nodos quedan a su distancia real y no a
+        // espacios iguales.
+        const inicioRango = ciclo.inicio ?? puntos[0]?.fecha;
+        const finRango = ciclo.vencimiento ?? ciclo.cierre ?? puntos[puntos.length - 1]?.fecha;
+        const rango = inicioRango && finRango ? { inicio: inicioRango, fin: finRango } : null;
         return <div className="mm-cycle-band" key={ciclo.periodo}>
           <div className="mm-cycle-band-head">
             <span>Ciclo de facturación {indice + 1} · {ciclo.periodo}</span>
             <span className="mm-cycle-band-tags">
               {ciclo.completo === false && <em className="parcial">Parcial</em>}
+              {ciclo.estado_pago && <em>{ESTADO_PAGO[ciclo.estado_pago].etiqueta}</em>}
               {ciclo.es_mas_reciente && <em><Sparkles size={9} /> Más reciente</em>}
             </span>
           </div>
 
-          {puntos.length > 0 && <div className="mm-cycle-band-line">
+          <div className="mm-cycle-band-line">
             <div className="mm-cycle-band-rail" />
             {segmento && rango && <div
               className="mm-cycle-band-segmento"
@@ -148,30 +191,27 @@ export function CycleExplanationCard({ bloque }: { bloque: BloqueCiclos }) {
                 )}%`,
               }}
             />}
-            {puntos.map((hito, i) => {
+            {repartirEnFilas(puntos, rango).map(({ hito, left, fila }, i) => {
               const Icono = icono(hito.tipo);
-              const left = rango
-                ? posicionPct(hito.fecha, rango.inicio, rango.fin)
-                : (i / Math.max(1, puntos.length - 1)) * 100;
-              return <div className={`mm-cycle-hito tipo-${hito.tipo}`} style={{ left: `${left}%` }} key={`${hito.fecha}-${hito.tipo}-${i}`}>
+              return <div
+                className={`mm-cycle-hito tipo-${hito.tipo}`}
+                style={{ left: `${left}%` }}
+                key={`${hito.fecha}-${hito.tipo}-${i}`}
+              >
                 <span className="mm-cycle-hito-dot" title={ETIQUETA_NODO[hito.tipo]}><Icono size={13} /></span>
-                <b>{fechaCorta(hito.fecha)}</b>
-                <small>{hito.etiqueta}</small>
+                <span className={`mm-cycle-hito-texto${fila === 1 ? " fila-1" : ""}`}>
+                  <b>{fechaCorta(hito.fecha)}</b>
+                  <small>{hito.etiqueta}</small>
+                </span>
               </div>;
             })}
-          </div>}
+          </div>
 
           {segmento && <p className="mm-cycle-band-nota">
             <strong>Período parcial:</strong> {fechaCorta(segmento.inicio)}–{fechaCorta(ultimoDiaIncluido(segmento.fin))} · {segmento.dias} día{segmento.dias === 1 ? "" : "s"}
             {segmento.monto_cent != null && <> · {money(segmento.monto_cent)}</>}
             <br /><span className="mm-cycle-band-causa">{segmento.causa}</span>
           </p>}
-
-          {vencimiento && <div className="mm-cycle-band-vencimiento">
-            <CalendarClock size={12} />
-            <span><b>{fechaCorta(vencimiento.fecha)}</b> Vencimiento</span>
-            <small>no es fin de ciclo</small>
-          </div>}
         </div>;
       })}
     </div>}

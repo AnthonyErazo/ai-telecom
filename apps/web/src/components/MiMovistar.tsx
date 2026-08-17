@@ -147,6 +147,11 @@ export function MiMovistar({
   // Igual que la oferta de arriba: BillSense la sugiere sola (backend, `explicar.py`)
   // cuando queda saldo por pagar; el chat solo pinta el botón si está en la lista.
   const puedePagar    = Boolean(ultima?.acciones.some((a) => a.id === "PAGAR"));
+  // Misma idea que `puedePagar`: BillSense ya sugiere "Explíqueme mi recibo" en sus
+  // `acciones` (backend, `_acciones_de_intencion`) cuando el cliente no pidió nada
+  // concreto todavía. Antes esa acción no hacía nada en el chat de texto; ahora lleva
+  // a la pantalla de recibo que ya existe, en vez de duplicarla como otro turno de chat.
+  const puedeVerDetalle = Boolean(ultima?.acciones.some((a) => a.id === "VER_DETALLE"));
   const derivada      = ultima?.derivacion.requerida;
   const sube          = (hechos?.delta_total_cent ?? 0) >= 0;
   const nombreCliente = cuenta
@@ -1154,6 +1159,18 @@ export function MiMovistar({
                 <div className="mm-chat-avatar-bot"><img src={billsenseLogo} alt="" /></div>
                 <button className="mm-pagar-cta" onClick={() => setMostrarPago(true)}>
                   <Wallet size={16}/> Pagar mi recibo
+                </button>
+              </div>
+            )}
+
+            {/* CTA "Explíqueme mi recibo" — misma lógica que la de pago: aparece sola
+                cuando el backend la sugirió (`VER_DETALLE` en `acciones`) y lleva a la
+                pantalla de recibo ya implementada, no a otro turno de chat. */}
+            {puedeVerDetalle && !explicar.isPending && (
+              <div className="mm-chat-turn assistant">
+                <div className="mm-chat-avatar-bot"><img src={billsenseLogo} alt="" /></div>
+                <button className="mm-verdetalle-cta" onClick={() => navTo("recibo")}>
+                  <CreditCard size={16}/> Ver el detalle de mi recibo
                 </button>
               </div>
             )}
