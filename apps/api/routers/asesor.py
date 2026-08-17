@@ -118,21 +118,22 @@ class EstadoSala(BaseModel):
 class EstadoClienteSala(BaseModel):
     """Proyección de la sala que puede consultar el cliente.
 
-    El cliente necesita ver cuándo una persona entra y leer sus mensajes, pero no debe
-    recibir el identificador interno del asesor, el resumen operativo ni la cuenta que
-    el 104 usa para auditar la atención.
+    El cliente necesita ver cuándo una persona entra, el nombre con el que se presenta y
+    sus mensajes, pero no recibe el resumen operativo ni la cuenta usada para auditar la
+    atención.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     conversation_id: str
     modo: str
+    asesor_nombre: str | None = None
     derivada: bool = False
     turnos: list[TurnoCliente] = Field(default_factory=list)
 
 
 class TurnoCliente(BaseModel):
-    """Turno público: deliberadamente no expone el id interno del asesor."""
+    """Turno público: no expone detalles internos del asesor."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -239,6 +240,7 @@ def _sala_cliente(memoria: Any, conversation_id: str) -> EstadoClienteSala:
     return EstadoClienteSala(
         conversation_id=sala.conversation_id,
         modo=sala.modo,
+        asesor_nombre=sala.asesor,
         derivada=sala.derivada,
         turnos=[TurnoCliente(rol=turno.rol, texto=turno.texto, ts=turno.ts) for turno in sala.turnos],
     )
@@ -290,12 +292,31 @@ def unirse(
             estado=404,
         )
     asesor_id = _identificador(identidad)
+    presente = memoria.asesor_presente(conversation_id)
+    if presente == asesor_id:
+        # Recargar el dashboard no es una nueva entrada: no se duplica el saludo ni la
+        # bitácora y el cliente no recibe avisos repetidos.
+        return _sala(memoria, conversation_id)
+    if presente is not None:
+        raise ErrorApi(
+            codigo="SALA_OCUPADA",
+            detalle="otro asesor ya está atendiendo esta conversación",
+            estado=409,
+            datos={"asesor_actual": presente},
+        )
     if not memoria.unir_asesor(conversation_id, asesor_id):
         raise ErrorApi(
             codigo="SALA_OCUPADA",
             detalle="otro asesor ya está atendiendo esta conversación",
             estado=409,
             datos={"asesor_actual": memoria.asesor_presente(conversation_id)},
+        )
+    saludo_automatico = memoria.registrar_saludo_asesor(conversation_id, asesor_id)
+    if saludo_automatico:
+        saludo = f"Hola, mi nombre es {asesor_id} y vengo a ayudarle con su consulta."
+        memoria.anotar_turno(
+            conversation_id,
+            Turno(utterance=saludo, rol="asesor", ts=datetime.now(UTC), progreso=True),
         )
     auditoria.emitir(
         EtapaAuditoria.ROUTE,
@@ -306,6 +327,7 @@ def unirse(
             "conversation_id": conversation_id,
             "asesor": asesor_id,
             "modo": "ASISTIDA",
+            "saludo_automatico": saludo_automatico,
         },
         **identidad.contexto_auditoria(),
     )
@@ -323,7 +345,7 @@ def estado_cliente(
     identidad: Annotated[Identidad, Depends(identidad_actual)],
     memoria: MemoriaDep,
 ) -> EstadoClienteSala:
-    """Devuelve al titular los mensajes del asesor en su conversación.
+    """Devuelve al titular el nombre visible y los mensajes del asesor en su conversación.
 
     Es la otra mitad del hand-off: el asesor se une por la consola y el cliente ve sus
     respuestas en el mismo chat. El expediente interno nunca cruza esta frontera.

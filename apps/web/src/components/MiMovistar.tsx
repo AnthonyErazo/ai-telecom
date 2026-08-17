@@ -62,7 +62,7 @@ type ChatModo = "chat" | "voz";
  * `beneficiosCierre` solo se llena cuando el turno fue una despedida y la cuenta
  * tiene beneficios vigentes: dispara la tarjeta resaltada del "efecto efervescente". */
 type Mensaje  = {
-  rol: "cliente"|"asistente"|"asesor"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean;
+  rol: "cliente"|"asistente"|"asesor"|"sistema"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean; asesorNombre?: string;
   beneficiosCierre?: string[];
 };
 
@@ -124,6 +124,7 @@ export function MiMovistar({
   const fin      = useRef<HTMLDivElement | null>(null);
   const vozScroll= useRef<HTMLDivElement | null>(null);
   const mensajesAsesorVistos = useRef(new Set<string>());
+  const asesorEnSalaVisto = useRef<string | null>(null);
 
   // ── Demo accounts ───────────────────────────────────────────────
   const cuentas  = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, retry: 1 });
@@ -247,16 +248,20 @@ export function MiMovistar({
     refetchInterval: 3000,
   });
   useEffect(() => {
+    const asesorNombre = salaCliente.data?.asesor_nombre ?? null;
+    const seUnio = Boolean(asesorNombre && asesorEnSalaVisto.current !== asesorNombre);
+    asesorEnSalaVisto.current = asesorNombre;
     const nuevos = salaCliente.data?.turnos.filter((turno) => {
       const clave = `${turno.ts ?? ""}:${turno.texto}`;
       if (turno.rol !== "asesor" || mensajesAsesorVistos.current.has(clave)) return false;
       mensajesAsesorVistos.current.add(clave);
       return true;
     }) ?? [];
-    if (nuevos.length) {
+    if (seUnio || nuevos.length) {
       setMensajes((previos) => [
         ...previos,
-        ...nuevos.map((turno) => ({ rol: "asesor" as const, texto: turno.texto })),
+        ...(seUnio ? [{ rol: "sistema" as const, texto: `${asesorNombre} se unió a la conversación.` }] : []),
+        ...nuevos.map((turno) => ({ rol: "asesor" as const, texto: turno.texto, asesorNombre: asesorNombre ?? undefined })),
       ]);
     }
   }, [salaCliente.data]);
@@ -1114,6 +1119,9 @@ export function MiMovistar({
 
             {/* Mensajes */}
             {mensajes.map((m, i) => {
+              if (m.rol === "sistema") {
+                return <div key={i} className="mm-chat-system" role="status">{m.texto}</div>;
+              }
               if (m.esRecibo && hechos) {
                 return (
                   <div key={i} className="mm-chat-turn assistant">
@@ -1134,7 +1142,7 @@ export function MiMovistar({
                   {esAsesor && <div className="mm-chat-avatar-advisor"><UserIcon size={14}/></div>}
                   <div className="mm-chat-bubble-col">
                     <div className={`mm-chat-bubble ${esAsi || esAsesor ? "assistant" : "client"} ${esAsesor ? "advisor" : ""}`}>
-                      {esAsesor && <small className="mm-chat-advisor-label">Asesor Movistar</small>}
+                      {esAsesor && <small className="mm-chat-advisor-label">{m.asesorNombre ?? "Asesor Movistar"}</small>}
                       {esAsi && m.bloques ? <RichMessage bloques={m.bloques} /> : m.texto}
                     </div>
                     {esAsi && m.beneficiosCierre && (

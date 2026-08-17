@@ -104,21 +104,6 @@ export function CycleExplanationCard({ bloque }: { bloque: BloqueCiclos }) {
   const ciclos = bloque.ciclos.slice(0, 2);
   const explicado = ciclos.find((c) => c.actual);
 
-  // Una franja por ciclo, con sus hitos en la secuencia cronológica real —
-  // Inicio → Cierre/Facturación → Vencimiento, ya resuelta y deduplicada por el
-  // backend— y su tramo parcial (si lo tuvo), agrupados por `periodo` para dibujar
-  // el diagrama "Ciclo de facturación 1 / 2" a escala real en una sola línea.
-  const bandas = ciclos
-    .map((ciclo) => ({
-      ciclo,
-      puntos: bloque.hitos
-        .filter((h) => h.periodo === ciclo.periodo)
-        .slice()
-        .sort((a, b) => a.fecha.localeCompare(b.fecha)),
-      segmento: bloque.segmentos_parciales.find((s) => s.periodo === ciclo.periodo),
-    }))
-    .filter((banda) => banda.puntos.length > 0);
-
   return <section className="mm-cycle-card">
     <header className="mm-cycle-header">
       <span className="mm-cycle-header-icon"><CalendarRange size={17} /></span>
@@ -157,64 +142,6 @@ export function CycleExplanationCard({ bloque }: { bloque: BloqueCiclos }) {
         {ciclo.vencimiento && <em><CalendarClock size={10} /> Vence {fechaCorta(ciclo.vencimiento)}</em>}
       </div>)}
     </div>
-
-    {bandas.length > 0 && <div className="mm-cycle-timeline">
-      <p className="mm-cycle-section-title">Qué ocurrió en cada ciclo</p>
-      {bandas.map(({ ciclo, puntos, segmento }, indice) => {
-        // La línea cubre de punta a punta la secuencia real del ciclo: del inicio al
-        // hito más tardío que trajo el backend (normalmente el vencimiento, que cae
-        // después del cierre) — así los tres nodos quedan a su distancia real y no a
-        // espacios iguales.
-        const inicioRango = ciclo.inicio ?? puntos[0]?.fecha;
-        const finRango = ciclo.vencimiento ?? ciclo.cierre ?? puntos[puntos.length - 1]?.fecha;
-        const rango = inicioRango && finRango ? { inicio: inicioRango, fin: finRango } : null;
-        return <div className="mm-cycle-band" key={ciclo.periodo}>
-          <div className="mm-cycle-band-head">
-            <span>Ciclo de facturación {indice + 1} · {ciclo.periodo}</span>
-            <span className="mm-cycle-band-tags">
-              {ciclo.completo === false && <em className="parcial">Parcial</em>}
-              {ciclo.estado_pago && <em>{ESTADO_PAGO[ciclo.estado_pago].etiqueta}</em>}
-              {ciclo.es_mas_reciente && <em><Sparkles size={9} /> Más reciente</em>}
-            </span>
-          </div>
-
-          <div className="mm-cycle-band-line">
-            <div className="mm-cycle-band-rail" />
-            {segmento && rango && <div
-              className="mm-cycle-band-segmento"
-              style={{
-                left: `${posicionPct(segmento.inicio, rango.inicio, rango.fin)}%`,
-                width: `${Math.max(
-                  3,
-                  posicionPct(segmento.fin, rango.inicio, rango.fin)
-                    - posicionPct(segmento.inicio, rango.inicio, rango.fin),
-                )}%`,
-              }}
-            />}
-            {repartirEnFilas(puntos, rango).map(({ hito, left, fila }, i) => {
-              const Icono = icono(hito.tipo);
-              return <div
-                className={`mm-cycle-hito tipo-${hito.tipo}`}
-                style={{ left: `${left}%` }}
-                key={`${hito.fecha}-${hito.tipo}-${i}`}
-              >
-                <span className="mm-cycle-hito-dot" title={ETIQUETA_NODO[hito.tipo]}><Icono size={13} /></span>
-                <span className={`mm-cycle-hito-texto${fila === 1 ? " fila-1" : ""}`}>
-                  <b>{fechaCorta(hito.fecha)}</b>
-                  <small>{hito.etiqueta}</small>
-                </span>
-              </div>;
-            })}
-          </div>
-
-          {segmento && <p className="mm-cycle-band-nota">
-            <strong>Período parcial:</strong> {fechaCorta(segmento.inicio)}–{fechaCorta(ultimoDiaIncluido(segmento.fin))} · {segmento.dias} día{segmento.dias === 1 ? "" : "s"}
-            {segmento.monto_cent != null && <> · {money(segmento.monto_cent)}</>}
-            <br /><span className="mm-cycle-band-causa">{segmento.causa}</span>
-          </p>}
-        </div>;
-      })}
-    </div>}
 
     {bloque.causas.length > 0 && <div className="mm-cycle-causes">
       <p className="mm-cycle-section-title">Causas de la variación</p>

@@ -1145,6 +1145,17 @@
         "additionalProperties": false,
         "description": "Proyección de la sala que puede consultar el cliente.\n\nEl cliente necesita ver cuándo una persona entra y leer sus mensajes, pero no debe\nrecibir el identificador interno del asesor, el resumen operativo ni la cuenta que\nel 104 usa para auditar la atención.",
         "properties": {
+          "asesor_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asesor Nombre"
+          },
           "conversation_id": {
             "title": "Conversation Id",
             "type": "string"

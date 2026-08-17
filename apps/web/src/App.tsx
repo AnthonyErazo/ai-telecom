@@ -215,7 +215,7 @@ export default function App() {
         onSesion={(cuentaEntrada, tokenEmitido) => { setAccount(cuentaEntrada); setToken(tokenEmitido); }}
       />
     </main> : view === "asesor" ? <main className="canal-completo asesor-canal">
-      <Asesor cuentaSugerida={account} />
+      <Asesor />
     </main> : !token ? <main className="canal-completo">
       {/* Sin sesión esta vista era un callejón: el chat no podía preguntar y el botón de
           voz salía deshabilitado sin decir por qué. El acceso vive en Mi Movistar —es

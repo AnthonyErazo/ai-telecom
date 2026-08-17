@@ -279,6 +279,8 @@ class MemoriaConversaciones:
         self._derivadas: set[str] = set()
         #: conversation_id -> asesor que está dentro de la sala ahora mismo.
         self._asesores: OrderedDict[str, str] = OrderedDict()
+        #: conversation_id -> nombres que ya enviaron su saludo de entrada.
+        self._saludos_asesor: OrderedDict[str, set[str]] = OrderedDict()
 
     # -- explicaciones ------------------------------------------------------ #
     def guardar_explicacion(self, registro: RegistroExplicacion) -> RegistroExplicacion:
@@ -368,6 +370,21 @@ class MemoriaConversaciones:
         """El asesor abandona la sala; el asistente vuelve a atender en autónomo."""
         with self._cerrojo:
             self._asesores.pop(conversation_id, None)
+
+    def registrar_saludo_asesor(self, conversation_id: str, asesor_nombre: str) -> bool:
+        """Registra la primera entrada de una persona en un caso.
+
+        Devuelve ``True`` solo una vez por nombre y conversación. Así una reconexión o
+        salir y volver a entrar no llena el chat del cliente con el mismo saludo.
+        """
+        with self._cerrojo:
+            saludaron = self._saludos_asesor.setdefault(conversation_id, set())
+            self._saludos_asesor.move_to_end(conversation_id)
+            self._recortar(self._saludos_asesor)
+            if asesor_nombre in saludaron:
+                return False
+            saludaron.add(asesor_nombre)
+            return True
 
     def pendientes_de_atender(self) -> list[dict[str, Any]]:
         """Cola del 104: derivaciones abiertas que ningún asesor ha recogido aún.

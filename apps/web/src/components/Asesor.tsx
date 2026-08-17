@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
-import { money } from "./Blocks";
 import type { ElementoCola, PaqueteAsesor } from "../api/types";
 
 type FiltroCanal = "TODOS" | "APP" | "WHATSAPP";
@@ -9,30 +8,26 @@ type FiltroCanal = "TODOS" | "APP" | "WHATSAPP";
 const etiquetaCanal = (canal?: string | null) =>
   canal === "WHATSAPP" ? "WhatsApp" : canal === "APP" ? "App Mi Movistar" : canal || "Canal digital";
 
-/**
- * Consola del asesor del 104 (canal ASESOR).
- *
- * Las tres cosas que esta pantalla existe para demostrar
- * -----------------------------------------------------
- * 1. **El asesor no empieza de cero.** El expediente llega reconstruido desde la bitácora
- *    encadenada, no desde la memoria del proceso: trae el delta, las líneas que lo
- *    componen y **el texto que ya se le dijo al cliente**, para que no se lo repita.
- *
- * 2. **Lo que NO se pudo confirmar va primero.** Un asesor que recibe cifras sin saber
- *    cuáles son hipótesis las confirma al cliente, y entonces el error deja de ser del
- *    motor para pasar a ser de la operadora. Por eso las incertidumbres se pintan arriba
- *    y en rojo, no escondidas al final.
- *
- * 3. **El verificador numérico no se aplica a lo que escribe la persona.** El asesor
- *    responde de sus palabras; la máquina, de las suyas. Lo que sí queda es constancia
- *    nominal de cada turno en la bitácora.
- *
- * El token exige `acting_on_behalf_of`: un asesor siempre actúa a nombre de una cuenta, y
- * eso viaja en cada evento auditado.
- */
-export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
-  const [asesorId, setAsesorId] = useState("ASESOR-01");
-  const [cuenta, setCuenta] = useState(cuentaSugerida);
+const etiquetaMotivo = (motivo?: string | null) => ({
+  PETICION_HUMANO: "Solicita hablar con una persona",
+  INTENCION_REGULATORIA: "Requiere atención especializada",
+  INVARIANTE_ROTO: "Revisión de facturación",
+  VERIFICACION_FALLIDA: "Consulta por confirmar",
+}[motivo ?? ""] ?? "Consulta de facturación");
+
+const textoPendiente = (codigo?: string | null) => ({
+  SIN_HECHOS: "No hay información suficiente del recibo para confirmar la consulta todavía.",
+  INVARIANTE_ROTO: "El detalle del recibo necesita revisión antes de confirmar importes.",
+  LINEA_SIN_ATRIBUIR: "Hay cambios en el recibo cuya causa todavía no está identificada.",
+  CAUSA_POCO_FIABLE: "La causa del cambio debe confirmarse antes de comunicarla como definitiva.",
+  CIFRA_NO_ANCLADA: "Hay importes que requieren validación antes de compartirlos con el cliente.",
+  SIN_EXPLICACION_ENTREGADA: "El cliente aún no recibió una explicación de su caso.",
+  CADENA_ROTA: "El caso requiere una revisión interna antes de confirmar información.",
+}[codigo ?? ""] ?? "Hay información pendiente de confirmar antes de dar una respuesta definitiva.");
+
+/** Consola de atención para asesores del 104. */
+export function Asesor() {
+  const [asesorNombre, setAsesorNombre] = useState("");
   const [token, setToken] = useState("");
   const [caso, setCaso] = useState<ElementoCola | null>(null);
   const [paquete, setPaquete] = useState<PaqueteAsesor | null>(null);
@@ -41,11 +36,11 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
   const [filtroCanal, setFiltroCanal] = useState<FiltroCanal>("TODOS");
   const [llamadaSolicitada, setLlamadaSolicitada] = useState(false);
   const clienteConsultas = useQueryClient();
-
-  useEffect(() => { setCuenta(cuentaSugerida); }, [cuentaSugerida]);
+  const cuentas = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, retry: 1 });
+  const cuentaInicial = cuentas.data?.demo?.[0] ?? "";
 
   const entrar = useMutation({
-    mutationFn: () => api.tokenAsesor(asesorId.trim(), cuenta.trim()),
+    mutationFn: () => api.tokenAsesor(asesorNombre.trim(), cuentaInicial),
     onSuccess: (t) => { setToken(t.access_token); setError(""); },
     onError: (causa) => setError(mensajeDeError(causa)),
   });
@@ -91,11 +86,15 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
 
   const abrir = useMutation({
     mutationFn: async (elemento: ElementoCola) => {
-      const datos = await api.paquete(token, elemento.context_ref);
-      return { elemento, datos };
+      if (!elemento.cuenta_id) throw new Error("No se pudo abrir este caso.");
+      // La cuenta se resuelve desde el caso elegido; el asesor nunca tiene que conocerla
+      // ni escribirla para atender otro canal.
+      const sesionCaso = await api.tokenAsesor(asesorNombre.trim(), elemento.cuenta_id);
+      const datos = await api.paquete(sesionCaso.access_token, elemento.context_ref);
+      return { elemento, datos, token: sesionCaso.access_token };
     },
-    onSuccess: ({ elemento, datos }) => {
-      setCaso(elemento); setPaquete(datos); setLlamadaSolicitada(false); setError("");
+    onSuccess: ({ elemento, datos, token: tokenCaso }) => {
+      setToken(tokenCaso); setCaso(elemento); setPaquete(datos); setLlamadaSolicitada(false); setError("");
     },
     onError: (causa) => setError(mensajeDeError(causa)),
   });
@@ -135,18 +134,14 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
       <div className="login-copy">
         <p className="eyebrow">Call center 104 · Atención digital</p>
         <h1 id="asesor-title">Dashboard del asesor</h1>
-        <p>
-          Reciba los casos de la <b>App Mi Movistar y WhatsApp</b> con un resumen verificado,
-          entre al mismo chat del cliente o solicite una llamada. Cada acción queda auditada.
-        </p>
+        <p>Vea los casos de la App Mi Movistar y WhatsApp, conozca el resumen y únase a la atención en vivo.</p>
       </div>
       <form className="login-form" onSubmit={(e) => { e.preventDefault(); entrar.mutate(); }}>
-        <label htmlFor="asesor-id">Identificador del asesor</label>
-        <input id="asesor-id" value={asesorId} onChange={(e) => setAsesorId(e.target.value)} />
-        <label htmlFor="asesor-cuenta">Cuenta que va a atender</label>
-        <input id="asesor-cuenta" value={cuenta} onChange={(e) => setCuenta(e.target.value)} />
-        <button type="submit" disabled={!asesorId.trim() || !cuenta.trim() || entrar.isPending}>
-          {entrar.isPending ? "Validando…" : "Entrar a la consola"}
+        <label htmlFor="asesor-nombre">Nombre del asesor</label>
+        <input id="asesor-nombre" value={asesorNombre} placeholder="Ej. Ana Torres"
+               onChange={(e) => setAsesorNombre(e.target.value)} autoComplete="name" />
+        <button type="submit" disabled={!asesorNombre.trim() || !cuentaInicial || entrar.isPending}>
+          {entrar.isPending ? "Ingresando…" : cuentas.isLoading ? "Cargando…" : "Entrar a la consola"}
         </button>
         {error && <small className="asesor-error">{error}</small>}
       </form>
@@ -159,7 +154,7 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
     {aviso && <div className="asesor-aviso" role="alert">
       <div>
         <strong>Nuevo caso en la cola</strong>
-        <span>Cuenta {aviso.cuenta_id ?? "sin cuenta"} · {aviso.motivo_codigo ?? "sin motivo"}</span>
+        <span>{etiquetaMotivo(aviso.motivo_codigo)} · {etiquetaCanal(aviso.canal)}</span>
       </div>
       <div className="asesor-aviso-acciones">
         <button onClick={() => { abrir.mutate(aviso); setAviso(null); }}>Atender ahora</button>
@@ -196,9 +191,7 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
           <button className={caso?.context_ref === elemento.context_ref ? "activo" : ""}
                   onClick={() => abrir.mutate(elemento)} disabled={abrir.isPending}>
             <span className="asesor-canal-badge">{etiquetaCanal(elemento.canal)}</span>
-            <strong>{elemento.cuenta_id ?? "sin cuenta"}</strong>
-            <span>{elemento.motivo_codigo ?? "sin motivo"}</span>
-            <small>{elemento.context_ref}</small>
+            <strong>{etiquetaMotivo(elemento.motivo_codigo)}</strong>
           </button>
         </li>)}
       </ul>
@@ -207,86 +200,51 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
 
     <section className="panel asesor-expediente">
       {!paquete && <div className="welcome"><span>📄</span><h2>Elija un caso</h2>
-        <p>El expediente se reconstruye desde la bitácora encadenada, no desde la memoria del proceso.</p></div>}
+        <p>Seleccione un caso para ver el resumen y unirse a la atención.</p></div>}
 
       {paquete && <>
         <div className="asesor-cabecera">
           <div>
-            <p className="eyebrow">{paquete.motivo_codigo ?? "consulta"}</p>
-            <h2>Cuenta {paquete.cuenta_id} · {etiquetaCanal(paquete.canal)}</h2>
+            <p className="eyebrow">Resumen del caso</p>
+            <h2>Atención por {etiquetaCanal(paquete.canal)}</h2>
           </div>
-          <span className={`verdict ${paquete.evidencia.cadena_valida ? "pass" : ""}`}>
-            {paquete.evidencia.cadena_valida ? "CADENA ÍNTEGRA" : "CADENA ROTA"}
-          </span>
         </div>
 
-        {/* Lo primero que necesita quien se sienta: QUÉ HA PASADO. Antes de las cifras y
-            antes del desglose. El asesor va a hablar con una persona que ya ha contado su
-            problema una vez; empezar por «¿en qué puedo ayudarle?» es hacérselo repetir. */}
         <div className="asesor-resumen">
-          <strong>Resumen para atender</strong>
+          <strong>Resumen de la atención</strong>
           <p>
-            El cliente escribió «{paquete.consulta_cliente || "sin consulta registrada"}» por
-            {" "}{etiquetaCanal(paquete.canal)}.
-            {paquete.ya_explicado.hubo_explicacion
-              ? ` Ya se le explicó el recibo (${paquete.ya_explicado.cifras.length} cifras entregadas, verificación ${paquete.ya_explicado.veredicto ?? "n/d"}), así que no hay que repetírselo.`
-              : " Todavía no se le ha entregado ninguna explicación: usted empieza la conversación, no la retoma."}
-            {/* Solo la primera letra: `toLowerCase()` sobre toda la frase convertía los
-                códigos de concepto (`FRTOCH_003`) en algo que no se puede buscar en el
-                catálogo, que es justo lo que el asesor va a tener que hacer con ellos. */}
-            {paquete.motivo_detalle
-              ? ` Llega a usted porque ${paquete.motivo_detalle[0].toLowerCase()}${paquete.motivo_detalle.slice(1)}.`
-              : ""}
-            {paquete.incertidumbres.length > 0
-              ? ` Quedan ${paquete.incertidumbres.length} punto(s) sin confirmar; están abajo.`
-              : " Todas las cifras están respaldadas."}
+            El cliente solicitó atención humana por {etiquetaMotivo(paquete.motivo_codigo).toLowerCase()}.
           </p>
         </div>
-
-        {/* Lo que no se pudo confirmar va PRIMERO: es lo que evita que el asesor
-            confirme al cliente una hipótesis del motor como si fuera un hecho. */}
-        {paquete.incertidumbres.length > 0 && <div className="asesor-dudas">
-          <strong>No confirmado ({paquete.incertidumbres.length})</strong>
-          <ul>{paquete.incertidumbres.map((duda, i) => <li key={i}>{duda.detalle}</li>)}</ul>
-        </div>}
-
-        {paquete.delta_total_cent !== null && paquete.delta_total_cent !== undefined && <div className="summary">
-          <div><small>Anterior</small><strong>{money(paquete.total_previo_cent ?? 0)}</strong></div>
-          <div><small>Actual</small><strong>{money(paquete.total_actual_cent ?? 0)}</strong></div>
-          <div className={paquete.delta_total_cent >= 0 ? "up" : "down"}>
-            <small>Variación</small><strong>{money(paquete.delta_total_cent)}</strong>
-          </div>
-          <div><small>Periodo</small><strong>{paquete.periodo_actual ?? "n/d"}</strong></div>
-        </div>}
-
-        {paquete.lineas.length > 0 && <table className="asesor-lineas">
-          <thead><tr><th>Concepto</th><th>Variación</th><th>Causa</th></tr></thead>
-          <tbody>{paquete.lineas.map((linea) => <tr key={linea.concepto_id}>
-            <td>{linea.nombre_comercial || linea.concepto_id}</td>
-            <td className={linea.delta_cent >= 0 ? "up" : "down"}>{money(linea.delta_cent)}</td>
-            <td>{linea.atribuida ? linea.causa : <em>sin confirmar</em>}</td>
-          </tr>)}</tbody>
-        </table>}
-
-        {paquete.ya_explicado.hubo_explicacion && <details className="asesor-dicho">
-          <summary>Ya se le dijo al cliente ({paquete.ya_explicado.cifras.length} cifras)</summary>
-          <p>{paquete.ya_explicado.texto}</p>
-        </details>}
-
-        <div className="asesor-pendiente"><strong>Pendiente:</strong> {paquete.accion_pendiente}</div>
-
-        {paquete.brief && <details className="asesor-brief">
-          <summary>Ficha verificada · {paquete.verificacion_brief?.veredicto ?? "?"}</summary>
-          <pre>{paquete.brief}</pre>
-        </details>}
-
-        <small className="asesor-evidencia">{paquete.evidencia.consulta_auditoria} · {paquete.evidencia.eventos} eventos</small>
+        <div className="asesor-contexto">
+          <section>
+            <h3>El cliente consulta</h3>
+            <p>“{paquete.consulta_cliente || "No se registró una consulta inicial."}”</p>
+          </section>
+          <section>
+            <h3>Ya se le respondió</h3>
+            <p>{paquete.ya_explicado.hubo_explicacion
+              ? paquete.ya_explicado.texto || "Se entregó una explicación sobre su recibo."
+              : "Aún no recibió una explicación. Inicie la atención sin asumir una respuesta previa."}</p>
+          </section>
+          <section>
+            <h3>Antes de confirmar</h3>
+            {paquete.incertidumbres.length
+              ? <ul>{paquete.incertidumbres.map((pendiente, indice) =>
+                  <li key={indice}>{textoPendiente(pendiente.codigo)}</li>)}</ul>
+              : <p>La información revisada está lista para continuar con el cliente.</p>}
+          </section>
+          <section>
+            <h3>Siguiente paso sugerido</h3>
+            <p>{paquete.accion_pendiente || "Escuche al cliente y continúe la atención desde esta conversación."}</p>
+          </section>
+        </div>
       </>}
     </section>
 
     <section className="panel asesor-sala">
       <div className="asesor-cabecera">
-        <div><p className="eyebrow">Atención en vivo</p><h2>{sala.data?.modo ?? "—"}</h2></div>
+        <div><p className="eyebrow">Atención en vivo</p><h2>{sala.data?.asesor ? "Conversación activa" : "Lista para unirse"}</h2></div>
         {sala.data?.asesor
           ? <button className="danger" onClick={() => salir.mutate()} disabled={salir.isPending}>Salir</button>
           : <button onClick={() => unirse.mutate()} disabled={!caso || unirse.isPending}>
@@ -299,7 +257,7 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
           {sala.data?.turnos.map((turno, i) =>
             <div className={`turn ${turno.rol === "cliente" ? "client" : "agent"}`} key={i}>
               <p>{turno.texto}</p>
-              <small>{turno.rol}{turno.autor ? ` · ${turno.autor}` : ""}</small>
+              <small>{turno.rol === "asesor" ? `Tú · ${turno.autor}` : turno.rol === "cliente" ? "Cliente" : "BillSense"}</small>
             </div>)}
           {sala.data?.turnos.length === 0 && <p className="asesor-vacio">Sin turnos todavía.</p>}
         </div>
@@ -320,14 +278,9 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
             {llamadaSolicitada ? "Llamada solicitada" : solicitarLlamada.isPending ? "Solicitando…" : "Solicitar llamada"}
           </button>
           <small>
-            La solicitud queda en la bitácora para el conector de telefonía; el número no se
-            expone en este dashboard.
+            Coordinaremos una llamada con el cliente.
           </small>
         </div>
-        <small className="asesor-evidencia">
-          Lo que escribe una persona <b>no</b> pasa por el verificador numérico: usted responde de
-          sus palabras. Cada turno queda en la bitácora con su identificador.
-        </small>
       </>}
     </section>
   </div>;

@@ -81,6 +81,9 @@ RUTAS_INTERFAZ = ("/ui", "/docs")
 ENTORNO_SIN_INFRAESTRUCTURA = {
     "ENTORNO": "dev",
     "LLM_MODE": "mock",
+    # El índice consulta primero EMBED_MODE; fijarlo evita que un valor de .env active
+    # Gemini aunque el chat ya esté en modo mock durante una demo o una prueba local.
+    "EMBED_MODE": "mock",
     # El interruptor del que depende todo esto: ni una conexión a PostgreSQL.
     # Ojo: solo se impone si NO hay una base configurada. Ver `_modo_almacenamiento`.
     "MODO_ALMACENAMIENTO": "memoria",

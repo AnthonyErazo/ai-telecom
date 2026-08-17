@@ -238,6 +238,7 @@ export interface EstadoSala {
 export interface EstadoClienteSala {
   conversation_id: string;
   modo: string;
+  asesor_nombre?: string | null;
   derivada: boolean;
   turnos: TurnoSala[];
 }

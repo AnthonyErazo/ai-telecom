@@ -196,6 +196,11 @@ def test_el_asesor_entra_al_mismo_chat_y_el_cliente_ve_solo_su_mensaje(cliente, 
     assert entrada.status_code == 200, entrada.text
     assert entrada.json()["modo"] == "ASISTIDA"
 
+    salida = cliente.post(f"/v1/asesor/conversacion/{conversacion}/salir", headers=asesor)
+    assert salida.status_code == 200, salida.text
+    reingreso = cliente.post(f"/v1/asesor/conversacion/{conversacion}/unirse", headers=asesor)
+    assert reingreso.status_code == 200, reingreso.text
+
     llamada = cliente.post(
         f"/v1/asesor/conversacion/{conversacion}/solicitar-llamada", headers=asesor
     )
@@ -215,8 +220,15 @@ def test_el_asesor_entra_al_mismo_chat_y_el_cliente_ve_solo_su_mensaje(cliente, 
     assert sala_cliente.status_code == 200, sala_cliente.text
     estado = sala_cliente.json()
     assert estado["modo"] == "ASISTIDA"
+    assert estado["asesor_nombre"] == "ASESOR-02"
+    saludos = [
+        turno["rol"] == "asesor"
+        and turno["texto"] == "Hola, mi nombre es ASESOR-02 y vengo a ayudarle con su consulta."
+        for turno in estado["turnos"]
+    ]
+    assert sum(saludos) == 1, "el reingreso del mismo asesor no repite su saludo"
     assert any(turno["rol"] == "asesor" and turno["texto"] == texto for turno in estado["turnos"])
-    assert "asesor" not in estado, "el identificador interno no se entrega al cliente"
+    assert all("autor" not in turno for turno in estado["turnos"])
     assert "resumen_asesor" not in estado, "el brief solo pertenece a la consola"
 
     otra_cuenta = _token(cliente, cuenta_id="C-DEMO-02", nivel="LOA2")

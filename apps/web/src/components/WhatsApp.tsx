@@ -70,7 +70,7 @@ function conEnlaces(texto: string) {
   );
 }
 
-type Mensaje = { rol: "cliente" | "bot" | "asesor"; texto: string; explicacion?: Explanation };
+type Mensaje = { rol: "cliente" | "bot" | "asesor" | "sistema"; texto: string; explicacion?: Explanation; asesorNombre?: string };
 
 export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
   // WhatsApp **no tiene sesión**, y esa es justamente la premisa del canal: a un cliente
@@ -86,6 +86,7 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
   const [conversacion, setConversacion] = useState<string | undefined>();
   const fin = useRef<HTMLDivElement | null>(null);
   const mensajesAsesorVistos = useRef(new Set<string>());
+  const asesorEnSalaVisto = useRef<string | null>(null);
 
   // Si no llega cuenta sugerida —se entró directo a WhatsApp sin pasar por Mi Movistar—
   // se pregunta a la API cuál puede atender. El usuario no tiene que hacer nada.
@@ -130,16 +131,20 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
     refetchInterval: 3000,
   });
   useEffect(() => {
+    const asesorNombre = salaCliente.data?.asesor_nombre ?? null;
+    const seUnio = Boolean(asesorNombre && asesorEnSalaVisto.current !== asesorNombre);
+    asesorEnSalaVisto.current = asesorNombre;
     const nuevos = salaCliente.data?.turnos.filter((turno) => {
       const clave = `${turno.ts ?? ""}:${turno.texto}`;
       if (turno.rol !== "asesor" || mensajesAsesorVistos.current.has(clave)) return false;
       mensajesAsesorVistos.current.add(clave);
       return true;
     }) ?? [];
-    if (nuevos.length) {
+    if (seUnio || nuevos.length) {
       setMensajes((previos) => [
         ...previos,
-        ...nuevos.map((turno) => ({ rol: "asesor" as const, texto: turno.texto })),
+        ...(seUnio ? [{ rol: "sistema" as const, texto: `${asesorNombre} se unió a la conversación.` }] : []),
+        ...nuevos.map((turno) => ({ rol: "asesor" as const, texto: turno.texto, asesorNombre: asesorNombre ?? undefined })),
       ]);
     }
   }, [salaCliente.data]);
@@ -175,8 +180,10 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
           envían importes.
         </div>
         {mensajes.map((m, i) => (
-          <div className={`wa-msg ${m.rol === "asesor" ? "bot asesor" : m.rol}`} key={i}>
-            {m.rol === "asesor" && <small>Asesor Movistar</small>}
+          m.rol === "sistema"
+            ? <div className="wa-aviso wa-ingreso" key={i}>{m.texto}</div>
+            : <div className={`wa-msg ${m.rol === "asesor" ? "bot asesor" : m.rol}`} key={i}>
+            {m.rol === "asesor" && <small>{m.asesorNombre ?? "Asesor Movistar"}</small>}
             {conEnlaces(m.texto)}
           </div>
         ))}
