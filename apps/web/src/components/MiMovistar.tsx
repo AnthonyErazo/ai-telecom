@@ -62,7 +62,7 @@ type ChatModo = "chat" | "voz";
  * `beneficiosCierre` solo se llena cuando el turno fue una despedida y la cuenta
  * tiene beneficios vigentes: dispara la tarjeta resaltada del "efecto efervescente". */
 type Mensaje  = {
-  rol: "cliente"|"asistente"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean;
+  rol: "cliente"|"asistente"|"asesor"; texto?: string; bloques?: Block[]; esVoz?: boolean; esRecibo?: boolean;
   beneficiosCierre?: string[];
 };
 
@@ -123,6 +123,7 @@ export function MiMovistar({
   // ── Scroll ──────────────────────────────────────────────────────
   const fin      = useRef<HTMLDivElement | null>(null);
   const vozScroll= useRef<HTMLDivElement | null>(null);
+  const mensajesAsesorVistos = useRef(new Set<string>());
 
   // ── Demo accounts ───────────────────────────────────────────────
   const cuentas  = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, retry: 1 });
@@ -236,6 +237,29 @@ export function MiMovistar({
     queryFn: () => api.conversaciones(token),
     enabled: mostrarHistorialChats && Boolean(token),
   });
+
+  // El asesor trabaja sobre esta misma conversación. El cliente solo recibe el estado
+  // público de la sala y los mensajes humanos; nunca el brief ni las notas internas.
+  const salaCliente = useQuery({
+    queryKey: ["sala-cliente", token, conversacion],
+    queryFn: () => api.estadoCliente(token, conversacion!),
+    enabled: Boolean(token && conversacion),
+    refetchInterval: 3000,
+  });
+  useEffect(() => {
+    const nuevos = salaCliente.data?.turnos.filter((turno) => {
+      const clave = `${turno.ts ?? ""}:${turno.texto}`;
+      if (turno.rol !== "asesor" || mensajesAsesorVistos.current.has(clave)) return false;
+      mensajesAsesorVistos.current.add(clave);
+      return true;
+    }) ?? [];
+    if (nuevos.length) {
+      setMensajes((previos) => [
+        ...previos,
+        ...nuevos.map((turno) => ({ rol: "asesor" as const, texto: turno.texto })),
+      ]);
+    }
+  }, [salaCliente.data]);
 
   const nuevoChat = useMutation({
     mutationFn: () => api.nuevaConversacion(token, periodoActivo ?? undefined),
@@ -1099,15 +1123,18 @@ export function MiMovistar({
                 );
               }
               const esAsi = m.rol === "asistente";
+              const esAsesor = m.rol === "asesor";
               return (
-                <div key={i} className={`mm-chat-turn ${esAsi?"assistant":"client"}`}>
+                <div key={i} className={`mm-chat-turn ${esAsi || esAsesor ? "assistant" : "client"} ${esAsesor ? "advisor" : ""}`}>
                   {esAsi && (
                     <div className={`mm-chat-avatar-bot${m.esVoz?" voz":""}`}>
                       {m.esVoz ? <Mic size={14}/> : <img src={billsenseLogo} alt="" />}
                     </div>
                   )}
+                  {esAsesor && <div className="mm-chat-avatar-advisor"><UserIcon size={14}/></div>}
                   <div className="mm-chat-bubble-col">
-                    <div className={`mm-chat-bubble ${esAsi?"assistant":"client"}`}>
+                    <div className={`mm-chat-bubble ${esAsi || esAsesor ? "assistant" : "client"} ${esAsesor ? "advisor" : ""}`}>
+                      {esAsesor && <small className="mm-chat-advisor-label">Asesor Movistar</small>}
                       {esAsi && m.bloques ? <RichMessage bloques={m.bloques} /> : m.texto}
                     </div>
                     {esAsi && m.beneficiosCierre && (

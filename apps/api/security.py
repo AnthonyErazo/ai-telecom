@@ -72,8 +72,10 @@ from packages.core_domain.esquemas.respuesta import (
 from packages.retriever.saneador import sanear
 
 __all__ = [
+    "AVISO_LOA1",
     "NIVELES_CON_MONTOS",
     "ORDEN_NIVELES",
+    "URL_APP_MI_MOVISTAR",
     "Identidad",
     "cuenta_autorizada",
     "emitir_token",
@@ -98,12 +100,42 @@ NIVELES_CON_MONTOS: frozenset[NivelAseguramiento] = frozenset(
     {NivelAseguramiento.LOA2, NivelAseguramiento.LOA_ASESOR}
 )
 
+#: Ficha de la App Mi Movistar en Google Play.
+#:
+#: Se acompaña el aviso de LOA1 con el enlace porque el aviso **es** la única salida que
+#: este nivel le ofrece al cliente: si se le dice «ingrese a la App» sin decirle dónde
+#: está, la mitad del canal se convierte en un callejón. Por WhatsApp el enlace es
+#: accionable de un toque, que es exactamente el gesto que aquí sustituye a la llamada
+#: al 104.
+#:
+#: **Sin un solo dígito, y no por casualidad.** La URL canónica de la ficha
+#: (``?id=tdp.app.col&hl=es_PE``) no contiene ninguno, así que entra en el aviso sin
+#: romper la garantía de LOA1 —«el texto entregado no contiene ni un dígito», que
+#: comprueba ``scripts/probar_e2e.py`` paso 13—. El parámetro ``&pli=1`` de la URL que
+#: copia el navegador **se omite a propósito**: es una pista de sesión de Google Play,
+#: no cambia el destino, y su ``1`` sí rompería esa garantía.
+URL_APP_MI_MOVISTAR = "https://play.google.com/store/apps/details?id=tdp.app.col&hl=es_PE"
+
 #: Aviso que sustituye a las cifras en LOA1.
 AVISO_LOA1 = (
     "Por seguridad, en este canal puedo indicarle si su recibo subió o bajó y por qué, "
     "pero no los importes. Ingrese a la App Mi Movistar o autentíquese para ver el "
-    "detalle completo."
+    f"detalle completo. Descárguela aquí: {URL_APP_MI_MOVISTAR}"
 )
+
+#: Los únicos bloques que sobreviven a la redacción de LOA1.
+#:
+#: **Lista blanca, y no lista negra, a propósito.** Antes se enumeraban los bloques que
+#: había que quitar (``kv``, ``puente``, ``tabla``) y se trataba «todo lo demás» como
+#: párrafo. Cuando apareció ``ciclos`` —una línea de tiempo hecha de importes, fechas y
+#: porcentajes— el bucle intentó leerle un ``.texto`` que no tiene y ``POST /v1/explicar``
+#: empezó a responder **500 en todo el canal WhatsApp**.
+#:
+#: El fallo revela el problema de fondo: en una función cuyo trabajo es *quitar* datos
+#: sensibles, «lo que no reconozco lo dejo pasar» es la política equivocada. Con lista
+#: blanca, un bloque nuevo se cae del mensaje —se pierde texto, que es visible y
+#: reparable— en vez de colarse con sus cifras o de tumbar el endpoint.
+_BLOQUES_NARRATIVOS: frozenset[str] = frozenset({"texto", "aviso"})
 
 _esquema_bearer = HTTPBearer(auto_error=False, description="JWT HS256 emitido por /dev/token")
 
@@ -387,8 +419,11 @@ def redactar_para_nivel(
     ``LOA2`` y ``LOA_ASESOR`` la reciben íntegra. ``LOA1`` recibe una versión sin una
     sola cifra:
 
-    1. Los bloques ``kv``, ``puente`` y ``tabla`` se eliminan: son importes por
-       construcción y no hay forma de "resumirlos" sin números.
+    1. Sobreviven **solo** los bloques narrativos (:data:`_BLOQUES_NARRATIVOS`: ``texto``
+       y ``aviso``). Todos los demás —``kv``, ``puente``, ``tabla``, ``ciclos``— son
+       importes, fechas y porcentajes por construcción, y no hay forma de "resumirlos"
+       sin números. Es una lista **blanca**: un bloque nuevo se cae del mensaje en lugar
+       de colarse con sus cifras.
     2. Los bloques de texto y los avisos pasan por el saneador, que sustituye montos,
        fechas, porcentajes y cantidades por marcadores (``«un monto»``, ``«una fecha»``).
     3. Se antepone una frase con la **dirección** del cambio y la causa dominante, que
@@ -414,7 +449,7 @@ def redactar_para_nivel(
     bloques: list[Bloque] = [BloqueAviso(severidad="info", texto=AVISO_LOA1)]
     narrados: list[Bloque] = []
     for bloque in respuesta.bloques:
-        if bloque.tipo in {"kv", "puente", "tabla"}:
+        if bloque.tipo not in _BLOQUES_NARRATIVOS:
             continue
         titulo = _sanear_texto(bloque.titulo) if bloque.titulo else None
         if bloque.tipo == "aviso":

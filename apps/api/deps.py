@@ -388,6 +388,7 @@ class MemoriaConversaciones:
                     "conversation_id": conversacion,
                     "cuenta_id": contexto.get("cuenta_id"),
                     "motivo_codigo": contexto.get("motivo_codigo"),
+                    "canal": contexto.get("canal"),
                     "resumen_asesor": contexto.get("resumen_asesor"),
                     "creado_en": contexto.get("creado_en"),
                     "trace_id": contexto.get("trace_id"),

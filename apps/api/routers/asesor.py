@@ -52,13 +52,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from apps.api.deps import AuditoriaDep, MemoriaDep, nuevo_trace_id
 from apps.api.errores import ErrorApi, nivel_insuficiente
-from apps.api.security import Identidad, requiere_nivel
+from apps.api.security import Identidad, identidad_actual, requiere_nivel
 from packages.core_domain.enums import EtapaAuditoria, NivelAseguramiento
 from packages.core_domain.esquemas.paquete_asesor import PaqueteAsesor
 from packages.facts_engine.confianza import Turno
 from packages.governance.paquete_asesor import construir_paquete_asesor, traza_de_context_ref
 
-__all__ = ["EstadoSala", "MensajeAsesor", "TurnoPublicado", "router"]
+__all__ = [
+    "EstadoClienteSala",
+    "EstadoSala",
+    "MensajeAsesor",
+    "SolicitudLlamada",
+    "TurnoPublicado",
+    "router",
+]
 
 _LOG = logging.getLogger(__name__)
 
@@ -108,6 +115,41 @@ class EstadoSala(BaseModel):
     cuenta_id: str | None = None
 
 
+class EstadoClienteSala(BaseModel):
+    """Proyección de la sala que puede consultar el cliente.
+
+    El cliente necesita ver cuándo una persona entra y leer sus mensajes, pero no debe
+    recibir el identificador interno del asesor, el resumen operativo ni la cuenta que
+    el 104 usa para auditar la atención.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    modo: str
+    derivada: bool = False
+    turnos: list[TurnoCliente] = Field(default_factory=list)
+
+
+class TurnoCliente(BaseModel):
+    """Turno público: deliberadamente no expone el id interno del asesor."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rol: str
+    texto: str
+    ts: datetime | None = None
+
+
+class SolicitudLlamada(BaseModel):
+    """Constancia de que el asesor pidió una llamada desde la consola."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    estado: str = "SOLICITADA"
+
+
 class ElementoCola(BaseModel):
     """Una derivación esperando a que alguien la recoja."""
 
@@ -116,6 +158,7 @@ class ElementoCola(BaseModel):
     context_ref: str
     conversation_id: str
     cuenta_id: str | None = None
+    canal: str | None = None
     motivo_codigo: str | None = None
     resumen_asesor: str | None = None
     trace_id: str | None = None
@@ -190,6 +233,23 @@ def _sala(memoria: Any, conversation_id: str) -> EstadoSala:
     )
 
 
+def _sala_cliente(memoria: Any, conversation_id: str) -> EstadoClienteSala:
+    """Expone al titular solo los turnos y el estado que puede ver en su canal."""
+    sala = _sala(memoria, conversation_id)
+    return EstadoClienteSala(
+        conversation_id=sala.conversation_id,
+        modo=sala.modo,
+        derivada=sala.derivada,
+        turnos=[TurnoCliente(rol=turno.rol, texto=turno.texto, ts=turno.ts) for turno in sala.turnos],
+    )
+
+
+def _cliente_de_la_conversacion(memoria: Any, conversation_id: str) -> str | None:
+    """Cuenta propietaria de la sala, incluso después de que el asesor la tome."""
+    contexto = _contexto_de(memoria, conversation_id) or {}
+    return contexto.get("cuenta_id")
+
+
 # --------------------------------------------------------------------------- #
 # Endpoints
 # --------------------------------------------------------------------------- #
@@ -251,6 +311,76 @@ def unirse(
     )
     _LOG.info("asesor %s entra en la conversación %s", asesor_id, conversation_id)
     return _sala(memoria, conversation_id)
+
+
+@router.get(
+    "/conversacion/{conversation_id}/cliente",
+    response_model=EstadoClienteSala,
+    summary="Estado de la atención para la App o WhatsApp del titular",
+)
+def estado_cliente(
+    conversation_id: str,
+    identidad: Annotated[Identidad, Depends(identidad_actual)],
+    memoria: MemoriaDep,
+) -> EstadoClienteSala:
+    """Devuelve al titular los mensajes del asesor en su conversación.
+
+    Es la otra mitad del hand-off: el asesor se une por la consola y el cliente ve sus
+    respuestas en el mismo chat. El expediente interno nunca cruza esta frontera.
+    """
+    if not memoria.turnos(conversation_id):
+        raise ErrorApi(
+            codigo="CONVERSACION_NO_ENCONTRADA",
+            detalle="no hay ninguna conversación con ese identificador",
+            estado=404,
+        )
+    cuenta = _cliente_de_la_conversacion(memoria, conversation_id)
+    if cuenta and cuenta != identidad.cuenta_ref:
+        raise ErrorApi(
+            codigo="CUENTA_NO_AUTORIZADA",
+            detalle="la conversación pertenece a otra cuenta",
+            estado=403,
+        )
+    return _sala_cliente(memoria, conversation_id)
+
+
+@router.post(
+    "/conversacion/{conversation_id}/solicitar-llamada",
+    response_model=SolicitudLlamada,
+    summary="El asesor solicita una llamada desde el dashboard",
+)
+def solicitar_llamada(
+    conversation_id: str,
+    identidad: _AsesorDep,
+    memoria: MemoriaDep,
+    auditoria: AuditoriaDep,
+) -> SolicitudLlamada:
+    """Registra la derivación a voz sin copiar teléfonos al dashboard.
+
+    El marcador real pertenece a la plataforma de telefonía de Movistar y no está en
+    este prototipo. Esta operación deja la intención, el asesor y la conversación en
+    la bitácora para que el conector de voz la consuma sin volver a pedir contexto.
+    """
+    asesor_id = _identificador(identidad)
+    if memoria.asesor_presente(conversation_id) != asesor_id:
+        raise ErrorApi(
+            codigo="ASESOR_NO_EN_SALA",
+            detalle="únase a la conversación antes de solicitar una llamada",
+            estado=409,
+        )
+    auditoria.emitir(
+        EtapaAuditoria.ROUTE,
+        nuevo_trace_id(),
+        {
+            "etapa": "asesor",
+            "evento": "SOLICITUD_LLAMADA",
+            "conversation_id": conversation_id,
+            "asesor": asesor_id,
+            "integracion_voz": "PENDIENTE_CONECTOR_TELEFONIA",
+        },
+        **identidad.contexto_auditoria(),
+    )
+    return SolicitudLlamada(conversation_id=conversation_id)
 
 
 @router.post(

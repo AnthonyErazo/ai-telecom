@@ -4,6 +4,11 @@ import { api, ApiError } from "../api/client";
 import { money } from "./Blocks";
 import type { ElementoCola, PaqueteAsesor } from "../api/types";
 
+type FiltroCanal = "TODOS" | "APP" | "WHATSAPP";
+
+const etiquetaCanal = (canal?: string | null) =>
+  canal === "WHATSAPP" ? "WhatsApp" : canal === "APP" ? "App Mi Movistar" : canal || "Canal digital";
+
 /**
  * Consola del asesor del 104 (canal ASESOR).
  *
@@ -33,6 +38,8 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
   const [paquete, setPaquete] = useState<PaqueteAsesor | null>(null);
   const [borrador, setBorrador] = useState("");
   const [error, setError] = useState("");
+  const [filtroCanal, setFiltroCanal] = useState<FiltroCanal>("TODOS");
+  const [llamadaSolicitada, setLlamadaSolicitada] = useState(false);
   const clienteConsultas = useQueryClient();
 
   useEffect(() => { setCuenta(cuentaSugerida); }, [cuentaSugerida]);
@@ -49,6 +56,9 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
     enabled: Boolean(token),
     refetchInterval: 5000,
   });
+  const casosVisibles = (cola.data ?? []).filter((elemento) =>
+    filtroCanal === "TODOS" || elemento.canal === filtroCanal,
+  );
 
   // Aviso de caso nuevo. Un asesor no está mirando la cola: está atendiendo a alguien, o
   // mirando otra pantalla. Si el sistema deriva y nadie se entera, el hand-off «con
@@ -84,7 +94,9 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
       const datos = await api.paquete(token, elemento.context_ref);
       return { elemento, datos };
     },
-    onSuccess: ({ elemento, datos }) => { setCaso(elemento); setPaquete(datos); setError(""); },
+    onSuccess: ({ elemento, datos }) => {
+      setCaso(elemento); setPaquete(datos); setLlamadaSolicitada(false); setError("");
+    },
     onError: (causa) => setError(mensajeDeError(causa)),
   });
 
@@ -97,6 +109,12 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
   const salir = useMutation({
     mutationFn: () => api.salir(token, caso!.conversation_id),
     onSuccess: () => void clienteConsultas.invalidateQueries({ queryKey: ["sala"] }),
+    onError: (causa) => setError(mensajeDeError(causa)),
+  });
+
+  const solicitarLlamada = useMutation({
+    mutationFn: () => api.solicitarLlamada(token, caso!.conversation_id),
+    onSuccess: () => { setLlamadaSolicitada(true); setError(""); },
     onError: (causa) => setError(mensajeDeError(causa)),
   });
 
@@ -115,11 +133,11 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
   if (!token) {
     return <section className="login-panel" aria-labelledby="asesor-title">
       <div className="login-copy">
-        <p className="eyebrow">Call center 104</p>
-        <h1 id="asesor-title">Consola del asesor</h1>
+        <p className="eyebrow">Call center 104 · Atención digital</p>
+        <h1 id="asesor-title">Dashboard del asesor</h1>
         <p>
-          Un asesor siempre actúa <b>a nombre de una cuenta</b>. Ese dato es obligatorio en
-          el nivel <code>LOA_ASESOR</code> y queda registrado en cada evento de la bitácora.
+          Reciba los casos de la <b>App Mi Movistar y WhatsApp</b> con un resumen verificado,
+          entre al mismo chat del cliente o solicite una llamada. Cada acción queda auditada.
         </p>
       </div>
       <form className="login-form" onSubmit={(e) => { e.preventDefault(); entrar.mutate(); }}>
@@ -135,7 +153,7 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
     </section>;
   }
 
-  return <div className="workspace">
+  return <div className="workspace asesor-dashboard">
     {/* El aviso se queda hasta que el asesor actúa: un mensaje que se desvanece solo es
         un mensaje que no llegó si en ese momento no estabas mirando. */}
     {aviso && <div className="asesor-aviso" role="alert">
@@ -151,17 +169,33 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
 
     <section className="panel asesor-cola">
       <div className="asesor-cabecera">
-        <div><p className="eyebrow">Cola del 104</p><h2>Casos sin atender</h2></div>
+        <div><p className="eyebrow">Cola omnicanal</p><h2>Casos sin atender</h2></div>
         <span className="verdict">{cola.data?.length ?? 0}</span>
+      </div>
+      <div className="asesor-filtros" role="group" aria-label="Filtrar casos por canal">
+        {(["TODOS", "APP", "WHATSAPP"] as const).map((filtro) => (
+          <button
+            key={filtro}
+            type="button"
+            className={filtroCanal === filtro ? "activo" : ""}
+            onClick={() => setFiltroCanal(filtro)}
+          >
+            {filtro === "TODOS" ? "Todos" : etiquetaCanal(filtro)}
+          </button>
+        ))}
       </div>
       {cola.isLoading && <p className="asesor-vacio">Cargando…</p>}
       {cola.data?.length === 0 && <p className="asesor-vacio">
         No hay casos derivados. Pida un asesor desde la App o desde WhatsApp y aparecerá aquí.
       </p>}
+      {cola.data && casosVisibles.length === 0 && <p className="asesor-vacio">
+        No hay casos de {etiquetaCanal(filtroCanal)} en este momento.
+      </p>}
       <ul className="asesor-lista">
-        {cola.data?.map((elemento) => <li key={elemento.context_ref}>
+        {casosVisibles.map((elemento) => <li key={elemento.context_ref}>
           <button className={caso?.context_ref === elemento.context_ref ? "activo" : ""}
                   onClick={() => abrir.mutate(elemento)} disabled={abrir.isPending}>
+            <span className="asesor-canal-badge">{etiquetaCanal(elemento.canal)}</span>
             <strong>{elemento.cuenta_id ?? "sin cuenta"}</strong>
             <span>{elemento.motivo_codigo ?? "sin motivo"}</span>
             <small>{elemento.context_ref}</small>
@@ -179,7 +213,7 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
         <div className="asesor-cabecera">
           <div>
             <p className="eyebrow">{paquete.motivo_codigo ?? "consulta"}</p>
-            <h2>Cuenta {paquete.cuenta_id}</h2>
+            <h2>Cuenta {paquete.cuenta_id} · {etiquetaCanal(paquete.canal)}</h2>
           </div>
           <span className={`verdict ${paquete.evidencia.cadena_valida ? "pass" : ""}`}>
             {paquete.evidencia.cadena_valida ? "CADENA ÍNTEGRA" : "CADENA ROTA"}
@@ -190,10 +224,10 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
             antes del desglose. El asesor va a hablar con una persona que ya ha contado su
             problema una vez; empezar por «¿en qué puedo ayudarle?» es hacérselo repetir. */}
         <div className="asesor-resumen">
-          <strong>Qué ha pasado</strong>
+          <strong>Resumen para atender</strong>
           <p>
             El cliente escribió «{paquete.consulta_cliente || "sin consulta registrada"}» por
-            {" "}{paquete.canal === "APP" ? "la App Mi Movistar" : paquete.canal === "WHATSAPP" ? "WhatsApp" : paquete.canal}.
+            {" "}{etiquetaCanal(paquete.canal)}.
             {paquete.ya_explicado.hubo_explicacion
               ? ` Ya se le explicó el recibo (${paquete.ya_explicado.cifras.length} cifras entregadas, verificación ${paquete.ya_explicado.veredicto ?? "n/d"}), así que no hay que repetírselo.`
               : " Todavía no se le ha entregado ninguna explicación: usted empieza la conversación, no la retoma."}
@@ -252,10 +286,12 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
 
     <section className="panel asesor-sala">
       <div className="asesor-cabecera">
-        <div><p className="eyebrow">Sala compartida</p><h2>{sala.data?.modo ?? "—"}</h2></div>
+        <div><p className="eyebrow">Atención en vivo</p><h2>{sala.data?.modo ?? "—"}</h2></div>
         {sala.data?.asesor
           ? <button className="danger" onClick={() => salir.mutate()} disabled={salir.isPending}>Salir</button>
-          : <button onClick={() => unirse.mutate()} disabled={!caso || unirse.isPending}>Unirse</button>}
+          : <button onClick={() => unirse.mutate()} disabled={!caso || unirse.isPending}>
+              {paquete?.canal === "WHATSAPP" ? "Atender WhatsApp" : "Unirse al chat"}
+            </button>}
       </div>
       {!caso && <p className="asesor-vacio">Elija un caso para ver la conversación.</p>}
       {caso && <>
@@ -274,6 +310,20 @@ export function Asesor({ cuentaSugerida }: { cuentaSugerida: string }) {
                  onChange={(e) => setBorrador(e.target.value)} />
           <button disabled={!sala.data?.asesor || escribir.isPending}>Enviar</button>
         </form>
+        <div className="asesor-acciones">
+          <button
+            type="button"
+            className="secundario"
+            disabled={!sala.data?.asesor || solicitarLlamada.isPending || llamadaSolicitada}
+            onClick={() => solicitarLlamada.mutate()}
+          >
+            {llamadaSolicitada ? "Llamada solicitada" : solicitarLlamada.isPending ? "Solicitando…" : "Solicitar llamada"}
+          </button>
+          <small>
+            La solicitud queda en la bitácora para el conector de telefonía; el número no se
+            expone en este dashboard.
+          </small>
+        </div>
         <small className="asesor-evidencia">
           Lo que escribe una persona <b>no</b> pasa por el verificador numérico: usted responde de
           sus palabras. Cada turno queda en la bitácora con su identificador.

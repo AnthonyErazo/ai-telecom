@@ -179,6 +179,48 @@ def test_el_nivel_loa1_no_entrega_importes(cliente) -> None:
     assert "S/" not in modelo.texto, (
         "en LOA1 no puede viajar ningún importe: solo existencia y dirección del cambio"
     )
+    # La garantía dura del nivel, la que promete la sección 6.4 del README y comprueba
+    # `scripts/probar_e2e.py` paso 13: ni un dígito. Se afirma aquí además de allí porque
+    # el aviso de LOA1 lleva una URL, y una URL es exactamente la clase de texto donde un
+    # dígito se cuela sin que nadie lo note.
+    assert not any(caracter.isdigit() for caracter in modelo.texto), (
+        f"LOA1 entregó un dígito: {modelo.texto!r}"
+    )
+
+
+def test_loa1_dice_donde_esta_la_app_que_recomienda(cliente) -> None:
+    """Si el canal manda al cliente a la App, tiene que decirle dónde está.
+
+    En ``LOA1`` la única salida que se le ofrece al cliente es «ingrese a la App Mi
+    Movistar». Sin el enlace, esa instrucción es un callejón: el cliente está en WhatsApp
+    y no sabe qué app es ni de dónde bajarla. Se comprueba que el enlace viaja y que es
+    **el de la ficha oficial**, no una URL cualquiera.
+    """
+    from apps.api.security import URL_APP_MI_MOVISTAR
+
+    respuesta = cliente.post(
+        "/v1/explicar",
+        json={
+            "cuenta_id": "C-DEMO-01",
+            "periodo": "2026-07",
+            "utterance": "¿por qué me vino más caro?",
+            "canal": "WHATSAPP",
+        },
+        headers=_cabecera(cliente, nivel="LOA1"),
+    )
+    if respuesta.status_code in {401, 403}:
+        pytest.skip("la política de LOA1 rechaza el endpoint en vez de degradar la respuesta")
+    assert respuesta.status_code == 200, respuesta.text
+
+    modelo = RespuestaCanalAgnostica.model_validate(respuesta.json())
+    assert URL_APP_MI_MOVISTAR in modelo.texto, (
+        "el aviso de LOA1 manda a la App Mi Movistar: tiene que llevar su ficha de Google Play"
+    )
+    assert "tdp.app.col" in URL_APP_MI_MOVISTAR, "el paquete de la App Mi Movistar es tdp.app.col"
+    assert not any(caracter.isdigit() for caracter in URL_APP_MI_MOVISTAR), (
+        "la URL de la ficha entra en un texto LOA1: no puede llevar dígitos "
+        "(por eso se omite el parámetro &pli=1 de la URL que copia el navegador)"
+    )
 
 
 def test_el_error_declara_su_codigo(cliente) -> None:

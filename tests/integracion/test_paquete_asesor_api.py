@@ -183,3 +183,45 @@ def test_una_referencia_inexistente_es_un_404(cliente) -> None:
 
     assert respuesta.status_code == 404
     assert respuesta.json()["codigo"] == "CONTEXTO_NO_ENCONTRADO"
+
+
+def test_el_asesor_entra_al_mismo_chat_y_el_cliente_ve_solo_su_mensaje(cliente, expediente) -> None:
+    """El contexto es interno; la conversación humana vuelve al canal del cliente."""
+    asesor = _token(
+        cliente, cuenta_id="ASESOR-02", nivel="LOA_ASESOR", acting_on_behalf_of=CUENTA
+    )
+    conversacion = expediente["conversation_id"]
+
+    entrada = cliente.post(f"/v1/asesor/conversacion/{conversacion}/unirse", headers=asesor)
+    assert entrada.status_code == 200, entrada.text
+    assert entrada.json()["modo"] == "ASISTIDA"
+
+    llamada = cliente.post(
+        f"/v1/asesor/conversacion/{conversacion}/solicitar-llamada", headers=asesor
+    )
+    assert llamada.status_code == 200, llamada.text
+    assert llamada.json()["estado"] == "SOLICITADA"
+
+    texto = "Hola, soy su asesor. Ya reviso su caso con usted."
+    escrito = cliente.post(
+        f"/v1/asesor/conversacion/{conversacion}/mensaje", json={"texto": texto}, headers=asesor
+    )
+    assert escrito.status_code == 200, escrito.text
+
+    titular = _token(cliente, cuenta_id=CUENTA, nivel="LOA2")
+    sala_cliente = cliente.get(
+        f"/v1/asesor/conversacion/{conversacion}/cliente", headers=titular
+    )
+    assert sala_cliente.status_code == 200, sala_cliente.text
+    estado = sala_cliente.json()
+    assert estado["modo"] == "ASISTIDA"
+    assert any(turno["rol"] == "asesor" and turno["texto"] == texto for turno in estado["turnos"])
+    assert "asesor" not in estado, "el identificador interno no se entrega al cliente"
+    assert "resumen_asesor" not in estado, "el brief solo pertenece a la consola"
+
+    otra_cuenta = _token(cliente, cuenta_id="C-DEMO-02", nivel="LOA2")
+    rechazo = cliente.get(
+        f"/v1/asesor/conversacion/{conversacion}/cliente", headers=otra_cuenta
+    )
+    assert rechazo.status_code == 403
+    assert rechazo.json()["codigo"] == "CUENTA_NO_AUTORIZADA"

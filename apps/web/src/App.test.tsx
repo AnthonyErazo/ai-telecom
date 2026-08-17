@@ -97,6 +97,13 @@ describe("login de cuenta", () => {
     expect(api.facts).not.toHaveBeenCalled();
   });
 
+  it("expone el dashboard de asesor como canal independiente", async () => {
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Asesor 104" }));
+
+    expect(await screen.findByRole("heading", { name: "Dashboard del asesor" })).toBeInTheDocument();
+  });
+
   it("muestra directamente el acceso unificado por cuenta cliente", async () => {
     renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Mi Movistar" }));
@@ -105,7 +112,7 @@ describe("login de cuenta", () => {
     fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
 
     expect(await screen.findByRole("heading", { name: "Ingresa a tu cuenta" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Cuenta cliente")).toHaveTextContent("C-DEMO-01");
+    expect(screen.getByLabelText("Cuenta cliente")).toHaveValue("");
     expect(screen.queryByText("Todos mis productos")).toBeNull();
     expect(screen.queryByText("Solo con mi móvil")).toBeNull();
     await waitFor(() => expect(api.token).not.toHaveBeenCalled());

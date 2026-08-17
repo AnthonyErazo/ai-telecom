@@ -2276,8 +2276,11 @@ sabe **a qué nivel escalar** la autenticación en lugar de limitarse a fallar.
 la misma verificación, la misma auditoría— y se **redacta** la respuesta ya generada con
 `redactar_para_nivel`. Cinco pasos, todos auditables:
 
-1. **Elimina** los bloques `kv`, `puente` y `tabla`. Son importes por definición y no hay forma de
-   «resumirlos» sin números.
+1. **Conserva solo** los bloques narrativos (`texto` y `aviso`) y elimina el resto: `kv`, `puente`,
+   `tabla` y `ciclos`. Son importes por definición y no hay forma de «resumirlos» sin números. Es
+   una lista **blanca**, y eso importa: mientras fue negra —«quita estos tres, el resto es
+   párrafo»—, la llegada del bloque `ciclos` dejó todo el canal WhatsApp respondiendo `500`. En una
+   función cuyo trabajo es *quitar* datos sensibles, lo que no se reconoce se descarta.
 2. **Sanea** el texto de los bloques `texto` y `aviso`, y también `derivacion.motivo` y
    `derivacion.resumen_asesor`, con el mismo saneador del RAG, cuya garantía es que el resultado **no
    contiene ni un solo dígito**. Hay una prueba de contrato que lo comprueba contando caracteres
@@ -2293,8 +2296,15 @@ la misma verificación, la misma auditoría— y se **redacta** la respuesta ya 
    este nivel autoriza:
 
 > *«Por seguridad, en este canal puedo indicarle si su recibo subió o bajó y por qué, pero no los
-> importes. Ingrese a la App Mi Movistar o autentíquese para ver el detalle completo.»*
+> importes. Ingrese a la App Mi Movistar o autentíquese para ver el detalle completo. Descárguela
+> aquí: https://play.google.com/store/apps/details?id=tdp.app.col&hl=es_PE»*
 > *«Su recibo de este mes subió respecto del mes anterior. El motivo principal es cambio de plan.»*
+
+El aviso cierra con la ficha de Google Play de la App Mi Movistar. Es la única salida que este nivel
+le ofrece al cliente, y por WhatsApp una URL es accionable de un toque. **No contiene ningún
+dígito** —se omite a propósito el `&pli=1` de la URL que copia el navegador, que es una pista de
+sesión de Google Play y no cambia el destino—, así que el aviso puede llevarla sin romper la
+garantía del paso 2.
 
 Hacerlo así —una función de redacción sobre la respuesta final, en lugar de tres caminos de
 generación— tiene una consecuencia que compensa el trabajo: **la diferencia entre canales es una

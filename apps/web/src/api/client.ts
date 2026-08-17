@@ -2,6 +2,7 @@ import type {
   DemoAccounts,
   DetalleConversacionChat,
   ElementoCola,
+  EstadoClienteSala,
   EstadoSala,
   Explanation,
   FactSet,
@@ -9,6 +10,7 @@ import type {
   PaqueteAsesor,
   ResumenRecibo,
   ResumenConversacionChat,
+  SolicitudLlamada,
 } from "./types";
 
 const configuredBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
@@ -88,11 +90,16 @@ export const api = {
     request<PaqueteAsesor>(`/v1/asesor/paquete/${encodeURIComponent(contextRef)}`, authorized(token)),
   sala: (token: string, conversationId: string) =>
     request<EstadoSala>(`/v1/asesor/conversacion/${encodeURIComponent(conversationId)}`, authorized(token)),
+  estadoCliente: (token: string, conversationId: string) =>
+    request<EstadoClienteSala>(`/v1/asesor/conversacion/${encodeURIComponent(conversationId)}/cliente`, authorized(token)),
   unirse: (token: string, conversationId: string) =>
     request<EstadoSala>(`/v1/asesor/conversacion/${encodeURIComponent(conversationId)}/unirse`,
       authorized(token, { method: "POST" })),
   salir: (token: string, conversationId: string) =>
     request<EstadoSala>(`/v1/asesor/conversacion/${encodeURIComponent(conversationId)}/salir`,
+      authorized(token, { method: "POST" })),
+  solicitarLlamada: (token: string, conversationId: string) =>
+    request<SolicitudLlamada>(`/v1/asesor/conversacion/${encodeURIComponent(conversationId)}/solicitar-llamada`,
       authorized(token, { method: "POST" })),
   mensajeAsesor: (token: string, conversationId: string, texto: string) =>
     request<EstadoSala>(`/v1/asesor/conversacion/${encodeURIComponent(conversationId)}/mensaje`,

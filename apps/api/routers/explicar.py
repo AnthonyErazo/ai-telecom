@@ -86,7 +86,13 @@ from apps.api.routers.derivacion import (
     nuevo_context_ref,
 )
 from apps.api.routers.hechos import construir_hechos, payload_facts_built
-from apps.api.security import Identidad, cuenta_autorizada, redactar_para_nivel, requiere_nivel
+from apps.api.security import (
+    URL_APP_MI_MOVISTAR,
+    Identidad,
+    cuenta_autorizada,
+    redactar_para_nivel,
+    requiere_nivel,
+)
 from apps.api.settings import Ajustes
 from packages.core_domain.enums import (
     AccionSiguiente,
@@ -1235,6 +1241,52 @@ _COPY_INTENCION: dict[Intencion, tuple[str, str]] = {
     ),
 }
 
+# --------------------------------------------------------------------------- #
+# «Ingrese a la App» sin decir dónde está es un callejón
+# --------------------------------------------------------------------------- #
+#: Canales donde el enlace a Google Play tiene sentido.
+#:
+#: Solo WhatsApp. En la App el enlace sobra —el cliente ya está dentro— y en la consola
+#: del asesor sería ruido: quien lee ahí es un trabajador del 104, no alguien que tenga
+#: que instalar nada. WhatsApp es el único canal donde «ingrese a la App Mi Movistar» es
+#: una instrucción que el cliente no puede seguir sin salir de la conversación.
+_CANALES_CON_ENLACE_APP: frozenset[Canal] = frozenset({Canal.WHATSAPP})
+
+#: Señal de que el texto está mandando al cliente a la App.
+#:
+#: Se busca en el texto y no en la intención a propósito: estos turnos los **redacta el
+#: modelo** dentro del guion de ``packages.llm_layer.conversacional`` (que en ``PAGAR`` y
+#: ``CONSUMO`` le pide expresamente mencionar la App), así que la frase exacta no se
+#: conoce de antemano. Mirar el resultado cubre igual los respaldos deterministas y lo
+#: que escriba el modelo.
+_SENAL_APP = re.compile(r"\bapp\b|\baplicaci[oó]n\b", re.IGNORECASE)
+
+
+def enlazar_app_si_procede(texto: str, canal: Canal) -> str:
+    """Adjunta la ficha de Google Play cuando el texto manda al cliente a la App.
+
+    Tres condiciones, y las tres tienen que cumplirse: que el canal sea WhatsApp, que el
+    texto efectivamente mencione la App y que no lleve ya el enlace. Fuera de eso se
+    devuelve el texto intacto — un enlace de descarga pegado a cualquier respuesta es
+    publicidad, no ayuda.
+
+    El enlace **no lleva ni un dígito** (ver :data:`~apps.api.security.URL_APP_MI_MOVISTAR`),
+    así que se puede añadir en ``LOA1`` sin romper la garantía del nivel.
+
+    Args:
+        texto: la respuesta ya redactada, tal y como se le va a entregar al cliente.
+        canal: canal por el que se entrega.
+
+    Returns:
+        El texto, con el enlace al final si procede.
+    """
+    if canal not in _CANALES_CON_ENLACE_APP:
+        return texto
+    if URL_APP_MI_MOVISTAR in texto or not _SENAL_APP.search(texto):
+        return texto
+    return f"{texto} Aquí la encuentra: {URL_APP_MI_MOVISTAR}"
+
+
 #: Motivo legible que se guarda en la derivación, por intención.
 _MOTIVO_INTENCION: dict[Intencion, str] = {
     Intencion.REGULATORIA: (
@@ -1442,7 +1494,10 @@ def _responder_por_intencion(
             else None,
             timeout_s=float(getattr(ajustes, "llm_timeout_s", 12.0) or 12.0),
         )
-    bloques: list[Bloque] = [BloqueTexto(texto=conversacional.texto)]  # type: ignore[arg-type]
+    # Se calcula una sola vez y se usa en el bloque, en el historial y en la bitácora: lo
+    # que se le dijo al cliente tiene que ser UNA cadena, no tres versiones parecidas.
+    texto_cliente = enlazar_app_si_procede(conversacional.texto, canal)
+    bloques: list[Bloque] = [BloqueTexto(texto=texto_cliente)]  # type: ignore[arg-type]
 
     derivacion = Derivacion()
     context_ref: str | None = None
@@ -1514,9 +1569,7 @@ def _responder_por_intencion(
             "bloqueado_por_cifras": conversacional.bloqueado_por_cifras,
         },
     )
-    memoria.anotar_turno(
-        clave_conversacion, Turno(utterance=conversacional.texto, rol="asistente")
-    )
+    memoria.anotar_turno(clave_conversacion, Turno(utterance=texto_cliente, rol="asistente"))
     auditoria.emitir(
         EtapaAuditoria.RESPONSE,
         trace_id,

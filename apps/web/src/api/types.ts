@@ -209,6 +209,7 @@ export interface ElementoCola {
   context_ref: string;
   conversation_id: string;
   cuenta_id?: string | null;
+  canal?: string | null;
   motivo_codigo?: string | null;
   resumen_asesor?: string | null;
   trace_id?: string | null;
@@ -231,6 +232,19 @@ export interface EstadoSala {
   turnos: TurnoSala[];
   resumen_asesor?: string | null;
   cuenta_id?: string | null;
+}
+
+/** Vista reducida de la atención que recibe el titular en App o WhatsApp. */
+export interface EstadoClienteSala {
+  conversation_id: string;
+  modo: string;
+  derivada: boolean;
+  turnos: TurnoSala[];
+}
+
+export interface SolicitudLlamada {
+  conversation_id: string;
+  estado: string;
 }
 
 export interface LineaPaquete {

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
 import type { Block, Explanation } from "../api/types";
 
@@ -45,7 +45,32 @@ function aTextoPlano(bloques: Block[]): string {
     .join(" ");
 }
 
-type Mensaje = { rol: "cliente" | "bot"; texto: string; explicacion?: Explanation };
+/** Enlaces clicables, como en un WhatsApp de verdad.
+ *
+ * El servidor manda la ficha de Google Play de la App Mi Movistar en texto plano —es un
+ * canal de texto, no puede mandar otra cosa— y el cliente de WhatsApp la convierte en un
+ * enlace tocable. Aquí se hace lo mismo, porque si no, el gesto que la respuesta ofrece
+ * («ingrese a la App, aquí la encuentra») en la demo no se puede completar: quedaría una
+ * URL pintada que nadie puede tocar. No hay `dangerouslySetInnerHTML`: se parte la cadena
+ * y React pinta los trozos, así que el texto del servidor nunca se interpreta como HTML.
+ */
+// Dos patrones y no uno: `split` necesita el grupo de captura, y el `test` de cada trozo
+// tiene que hacerse SIN la bandera `g` —un regex global guarda `lastIndex` entre llamadas
+// y `test` devolvería `true`/`false` alternándose sobre el mismo texto.
+const _PARTIR_URL = /(https?:\/\/\S+)/g;
+const _ES_URL = /^https?:\/\/\S+$/;
+
+function conEnlaces(texto: string) {
+  return texto.split(_PARTIR_URL).map((trozo, i) =>
+    _ES_URL.test(trozo) ? (
+      <a key={i} href={trozo} target="_blank" rel="noopener noreferrer">{trozo}</a>
+    ) : (
+      trozo
+    ),
+  );
+}
+
+type Mensaje = { rol: "cliente" | "bot" | "asesor"; texto: string; explicacion?: Explanation };
 
 export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
   // WhatsApp **no tiene sesión**, y esa es justamente la premisa del canal: a un cliente
@@ -60,6 +85,7 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
   const [error, setError] = useState("");
   const [conversacion, setConversacion] = useState<string | undefined>();
   const fin = useRef<HTMLDivElement | null>(null);
+  const mensajesAsesorVistos = useRef(new Set<string>());
 
   // Si no llega cuenta sugerida —se entró directo a WhatsApp sin pasar por Mi Movistar—
   // se pregunta a la API cuál puede atender. El usuario no tiene que hacer nada.
@@ -94,6 +120,30 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
     onError: (causa) => setError(mensajeDeError(causa)),
   });
 
+  // Cuando un asesor toma el caso, sus turnos llegan al MISMO chat. Solo se incorporan
+  // los de rol `asesor`: los demás ya los pintó este cliente al enviarlos o al recibir
+  // la respuesta de BillSense.
+  const salaCliente = useQuery({
+    queryKey: ["sala-cliente", token, conversacion],
+    queryFn: () => api.estadoCliente(token, conversacion!),
+    enabled: Boolean(token && conversacion),
+    refetchInterval: 3000,
+  });
+  useEffect(() => {
+    const nuevos = salaCliente.data?.turnos.filter((turno) => {
+      const clave = `${turno.ts ?? ""}:${turno.texto}`;
+      if (turno.rol !== "asesor" || mensajesAsesorVistos.current.has(clave)) return false;
+      mensajesAsesorVistos.current.add(clave);
+      return true;
+    }) ?? [];
+    if (nuevos.length) {
+      setMensajes((previos) => [
+        ...previos,
+        ...nuevos.map((turno) => ({ rol: "asesor" as const, texto: turno.texto })),
+      ]);
+    }
+  }, [salaCliente.data]);
+
   useEffect(() => {
     fin.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [mensajes, enviar.isPending]);
@@ -124,7 +174,12 @@ export function WhatsApp({ cuentaSugerida }: { cuentaSugerida: string }) {
           Identidad verificada por número de teléfono (<b>LOA1</b>). Por este canal no se
           envían importes.
         </div>
-        {mensajes.map((m, i) => <div className={`wa-msg ${m.rol}`} key={i}>{m.texto}</div>)}
+        {mensajes.map((m, i) => (
+          <div className={`wa-msg ${m.rol === "asesor" ? "bot asesor" : m.rol}`} key={i}>
+            {m.rol === "asesor" && <small>Asesor Movistar</small>}
+            {conEnlaces(m.texto)}
+          </div>
+        ))}
         {enviar.isPending && <div className="wa-msg bot wa-esperando">escribiendo…</div>}
         {error && <div className="wa-error">{error}</div>}
         <div ref={fin} />

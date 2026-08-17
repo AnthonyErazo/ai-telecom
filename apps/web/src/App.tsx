@@ -14,7 +14,7 @@ import { ReciboGuiado } from "./components/ReciboGuiado";
 // —hacerlo dejaba «C-DEMO-01» escrito de entrada y, contra el dataset real, entrar sin
 // tocar nada fallaba con «la cuenta no existe»—.
 const fallback = ["C-DEMO-01", "C-DEMO-02", "C-DEMO-03"];
-type View = "whatsapp" | "mimovistar" | "guiado" | "conversacional";
+type View = "whatsapp" | "mimovistar" | "guiado" | "conversacional" | "asesor";
 
 // La app se sirve bajo `base: "/ui/"` (vite.config.ts): una ruta absoluta como
 // "/billsense-logo.png" apunta a la raíz del dominio, no a donde vite publica
@@ -181,6 +181,7 @@ export default function App() {
         <button type="button" className={view === "mimovistar" ? "active" : ""} aria-pressed={view === "mimovistar"} onClick={() => void selectView("mimovistar")}>Mi Movistar</button>
         <button type="button" className={view === "guiado" ? "active" : ""} aria-pressed={view === "guiado"} onClick={() => void selectView("guiado")}>Recibo guiado</button>
         <button type="button" className={view === "conversacional" ? "active" : ""} aria-pressed={view === "conversacional"} onClick={() => void selectView("conversacional")}>IA conversacional</button>
+        <button type="button" className={view === "asesor" ? "active" : ""} aria-pressed={view === "asesor"} onClick={() => void selectView("asesor")}>Asesor 104</button>
       </nav>
       <div className="topbar-status">
         {/* La sesión se cierra desde aquí, junto a la cuenta a la que pertenece. Antes
@@ -213,6 +214,8 @@ export default function App() {
         key={sesionesCerradas}
         onSesion={(cuentaEntrada, tokenEmitido) => { setAccount(cuentaEntrada); setToken(tokenEmitido); }}
       />
+    </main> : view === "asesor" ? <main className="canal-completo asesor-canal">
+      <Asesor cuentaSugerida={account} />
     </main> : !token ? <main className="canal-completo">
       {/* Sin sesión esta vista era un callejón: el chat no podía preguntar y el botón de
           voz salía deshabilitado sin decir por qué. El acceso vive en Mi Movistar —es

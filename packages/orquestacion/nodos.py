@@ -285,7 +285,11 @@ def responder_intencion(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dic
             timeout_s=float(getattr(servicios.ajustes, "llm_timeout_s", 12.0) or 12.0),
         )
 
-    bloques: list[Bloque] = [BloqueTexto(texto=conversacional.texto)]  # type: ignore[list-item]
+    # Misma función que la ruta lineal, por el mismo motivo por el que
+    # `registrar_expediente_derivacion` es compartida: si el enlace a la App se añadiera
+    # aquí a mano, las dos rutas divergirían en el primer cambio de copia.
+    texto_cliente = explicar.enlazar_app_si_procede(conversacional.texto, estado["canal"])
+    bloques: list[Bloque] = [BloqueTexto(texto=texto_cliente)]  # type: ignore[list-item]
 
     derivacion = Derivacion()
     context_ref: str | None = None
@@ -355,7 +359,7 @@ def responder_intencion(estado: EstadoTurno, runtime: Runtime[Servicios]) -> dic
         gobernanza=gobernanza,
         telemetria=telemetria_turno,
     )
-    servicios.memoria.anotar_turno(clave, Turno(utterance=conversacional.texto, rol="asistente"))
+    servicios.memoria.anotar_turno(clave, Turno(utterance=texto_cliente, rol="asistente"))
     servicios.auditoria.emitir(
         EtapaAuditoria.RESPONSE,
         trace_id,

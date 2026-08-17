@@ -154,12 +154,18 @@ lo cuenta: el paso *«LOA1 sin importes»* de `probar_e2e.py` verifica `0 dígit
 caracteres`. La respuesta real, ejecutada, empieza por un aviso que explica el porqué:
 
 > «Por seguridad, en este canal puedo indicarle si su recibo subió o bajó y por qué, pero no los
-> importes. Ingrese a la App Mi Movistar o autentíquese para ver el detalle completo.»
+> importes. Ingrese a la App Mi Movistar o autentíquese para ver el detalle completo. Descárguela
+> aquí: https://play.google.com/store/apps/details?id=tdp.app.col&hl=es_PE»
 >
 > «Su recibo de este mes subió respecto del mes anterior. El motivo principal es cambio de plan.»
 >
 > «Su recibo de «una fecha» llegó «un monto» más alto que el de «una fecha» porque cambió de
 > plan a mitad de mes y su renta se cobra por adelantado.»
+
+El enlace del final es la ficha de la App Mi Movistar en Google Play, y va ahí por una razón de
+producto: *«ingrese a la App»* sin decir dónde está es un callejón sin salida para alguien que está
+en WhatsApp. **No lleva ni un dígito** —de ahí que se omita el `&pli=1` de la URL que copia el
+navegador—, así que entra en este nivel sin romper su garantía.
 
 Los marcadores `«un monto»` y `«una fecha»` son los mismos que usa el saneador del recuperador.
 Se reutilizan a propósito: un solo mecanismo de neutralización de cifras, ejercitado en dos

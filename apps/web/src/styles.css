@@ -2583,3 +2583,39 @@
   flex-shrink: 0; border: none; background: none; color: #019DF4;
   font-size: 11.5px; font-weight: 800; cursor: pointer; text-decoration: underline;
 }
+
+/* ════════════════════════════════════════════════════════
+   WhatsApp — enlaces dentro de la burbuja
+   El servidor manda la ficha de Google Play en texto plano; el cliente de
+   WhatsApp la pinta como enlace y aquí se hace lo mismo. El azul es el de
+   los enlaces de WhatsApp, no el de Movistar: la burbuja imita ese canal.
+   ════════════════════════════════════════════════════════ */
+.wa-msg a {
+  color: #027eb5;
+  text-decoration: underline;
+  word-break: break-all;
+}
+.wa-msg.cliente a { color: #075e54; }
+
+/* Dashboard de asesor: los casos conservan su origen para que el asesor decida si
+   responde en la sala compartida o continúa la atención de WhatsApp. */
+.asesor-canal { align-items:stretch; padding:24px; }
+.asesor-canal > .asesor-dashboard { max-width:1420px; }
+.asesor-filtros { display:flex; flex-wrap:wrap; gap:6px; }
+.asesor-filtros button,
+.asesor-acciones .secundario {
+  border:1px solid #cbd6e0; background:#fff; color:#3c536b; border-radius:999px;
+  padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer;
+}
+.asesor-filtros button.activo { border-color:#019df4; background:#e4f7fd; color:#007bc0; }
+.asesor-canal-badge { align-self:flex-start; color:#007bc0 !important; background:#e4f7fd;
+  border-radius:999px; padding:3px 7px; font-size:10px !important; font-weight:800; }
+.asesor-acciones { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.asesor-acciones .secundario:disabled { opacity:.55; cursor:default; }
+.asesor-acciones small { color:#68768a; font-size:11px; line-height:1.4; flex:1 1 180px; }
+.wa-msg.asesor { border-left:3px solid #019df4; background:#e4f7fd; }
+.wa-msg.asesor small { display:block; color:#007bc0; font-size:10px; font-weight:800; margin-bottom:3px; }
+.mm-chat-avatar-advisor { width:28px; height:28px; display:grid; place-items:center; flex:0 0 auto;
+  border-radius:50%; background:#e4f7fd; color:#007bc0; }
+.mm-chat-bubble.advisor { border:1px solid #b3e0f7; background:#f4fbff; }
+.mm-chat-advisor-label { display:block; margin-bottom:5px; color:#007bc0; font-weight:800; font-size:10px; }

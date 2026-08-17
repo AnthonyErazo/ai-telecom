@@ -1049,6 +1049,17 @@
         "additionalProperties": false,
         "description": "Una derivación esperando a que alguien la recoja.",
         "properties": {
+          "canal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal"
+          },
           "context_ref": {
             "title": "Context Ref",
             "type": "string"
@@ -1129,6 +1140,38 @@
         ],
         "title": "EstadoAsercion",
         "type": "string"
+      },
+      "EstadoClienteSala": {
+        "additionalProperties": false,
+        "description": "Proyección de la sala que puede consultar el cliente.\n\nEl cliente necesita ver cuándo una persona entra y leer sus mensajes, pero no debe\nrecibir el identificador interno del asesor, el resumen operativo ni la cuenta que\nel 104 usa para auditar la atención.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "derivada": {
+            "default": false,
+            "title": "Derivada",
+            "type": "boolean"
+          },
+          "modo": {
+            "title": "Modo",
+            "type": "string"
+          },
+          "turnos": {
+            "items": {
+              "$ref": "#/components/schemas/TurnoCliente"
+            },
+            "title": "Turnos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "modo"
+        ],
+        "title": "EstadoClienteSala",
+        "type": "object"
       },
       "EstadoSala": {
         "additionalProperties": false,
@@ -3350,6 +3393,26 @@
         "title": "SegmentoParcial",
         "type": "object"
       },
+      "SolicitudLlamada": {
+        "additionalProperties": false,
+        "description": "Constancia de que el asesor pidió una llamada desde la consola.",
+        "properties": {
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "estado": {
+            "default": "SOLICITADA",
+            "title": "Estado",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id"
+        ],
+        "title": "SolicitudLlamada",
+        "type": "object"
+      },
       "TipoMovimiento": {
         "description": "Evento del historial de órdenes (Amdocs) capaz de explicar una variación.",
         "enum": [
@@ -3453,6 +3516,38 @@
           "etiqueta"
         ],
         "title": "Tramo",
+        "type": "object"
+      },
+      "TurnoCliente": {
+        "additionalProperties": false,
+        "description": "Turno público: deliberadamente no expone el id interno del asesor.",
+        "properties": {
+          "rol": {
+            "title": "Rol",
+            "type": "string"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          }
+        },
+        "required": [
+          "rol",
+          "texto"
+        ],
+        "title": "TurnoCliente",
         "type": "object"
       },
       "TurnoPublicado": {
@@ -3852,6 +3947,54 @@
         ]
       }
     },
+    "/v1/asesor/conversacion/{conversation_id}/cliente": {
+      "get": {
+        "description": "Devuelve al titular los mensajes del asesor en su conversación.\n\nEs la otra mitad del hand-off: el asesor se une por la consola y el cliente ve sus\nrespuestas en el mismo chat. El expediente interno nunca cruza esta frontera.",
+        "operationId": "estado_cliente_v1_asesor_conversacion__conversation_id__cliente_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoClienteSala"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Estado de la atención para la App o WhatsApp del titular",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
     "/v1/asesor/conversacion/{conversation_id}/mensaje": {
       "post": {
         "description": "Publica un turno de rol ``asesor``.\n\n**Este texto no pasa por el verificador numérico**, y es deliberado: el verificador\ngarantiza que la *máquina* no invente cifras. Una persona responde de sus propias\npalabras. Lo que sí queda es el rastro nominal en la bitácora.\n\nRaises:\n    ErrorApi: ``409`` si quien escribe no es el asesor que ocupa la sala.",
@@ -3953,6 +4096,54 @@
           }
         ],
         "summary": "El asesor deja la sala y la IA vuelve a atender",
+        "tags": [
+          "asesor"
+        ]
+      }
+    },
+    "/v1/asesor/conversacion/{conversation_id}/solicitar-llamada": {
+      "post": {
+        "description": "Registra la derivación a voz sin copiar teléfonos al dashboard.\n\nEl marcador real pertenece a la plataforma de telefonía de Movistar y no está en\neste prototipo. Esta operación deja la intención, el asesor y la conversación en\nla bitácora para que el conector de voz la consuma sin volver a pedir contexto.",
+        "operationId": "solicitar_llamada_v1_asesor_conversacion__conversation_id__solicitar_llamada_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudLlamada"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "El asesor solicita una llamada desde el dashboard",
         "tags": [
           "asesor"
         ]
